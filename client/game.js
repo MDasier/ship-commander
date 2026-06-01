@@ -1,0 +1,1418 @@
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+addEventListener("resize",()=>{
+
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+
+});
+
+const ws = new WebSocket("ws://localhost:8080");
+
+let uiState = "lobby"; 
+let currentRoomId = null;
+
+let myId = null;
+let roomData = null;
+
+let players = {};
+let bullets = [];
+let asteroids = [];
+
+let targetId = null;
+let missiles = [];
+let flares = [];
+
+let world = {
+  width:3000,
+  height:3000
+};
+
+let winner = null;
+let prevWinner = null;
+let deadIds = new Set();
+
+let specTargetId = null;
+let killFeed = [];
+let chatLog = [];
+let shakeMag = 0;
+
+const keys = {};
+
+const menu = document.getElementById("menu");
+const lobbyDiv = document.getElementById("lobby");
+const roomDiv = document.getElementById("room");
+
+const roomsDiv = document.getElementById("rooms");
+const playersDiv = document.getElementById("players");
+
+const hud = document.getElementById("hud");
+
+// ── Mobiglass
+const mobiglassEl  = document.getElementById("mobiglass");
+const mobiPlayerEl = document.getElementById("mobiPlayer");
+const mobiStatusEl = document.getElementById("mobiStatus");
+const mobiPilotBadge = document.getElementById("mobiPilotBadge");
+let mobiOpen = false;
+let mobiActiveTab = "piloto";
+
+// Tab switching
+document.getElementById("mobiTabBar").addEventListener("click", e => {
+  const btn = e.target.closest(".mobiTab");
+  if(!btn) return;
+  const pane = btn.dataset.pane;
+  document.querySelectorAll(".mobiTab").forEach(t => t.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelectorAll(".mobiPane").forEach(p => p.classList.add("hidden"));
+  document.getElementById("pane-" + pane).classList.remove("hidden");
+  mobiActiveTab = pane;
+  updateMobiPane(pane);
+});
+
+// Close button
+document.getElementById("mobiCloseBtn").onclick = closeMobiglass;
+
+// Click outside panel closes it
+mobiglassEl.addEventListener("click", e => {
+  if(e.target === mobiglassEl) closeMobiglass();
+});
+
+function openMobiglass() {
+  const me = getMe();
+  if(!me) return;
+  mobiOpen = true;
+  mobiglassEl.classList.remove("hidden");
+  updateMobiglass();
+}
+
+function closeMobiglass() {
+  mobiOpen = false;
+  mobiglassEl.classList.add("hidden");
+}
+
+function updateMobiPane(tab) {
+  if(tab === "piloto")  updateMobiPiloto();
+  if(tab === "partida") updateMobiPartida();
+}
+
+function updateMobiglass() {
+  const me = getMe();
+  if(!me) return;
+  mobiPilotBadge.textContent = me.name || "Pilot";
+  updateMobiPane(mobiActiveTab);
+}
+
+function updateMobiPiloto() {
+  const me = getMe();
+  if(!me) return;
+  const teamColor = me.team === "green" ? "#00ff88" : "#ff3355";
+  const teamName  = me.team === "green" ? "VERDE"   : "ROJO";
+  const hp   = Math.max(0, Math.floor(me.hp));
+  const fuel = Math.max(0, Math.floor(me.fuel));
+  const hpColor = hp > 50 ? "#00ff88" : hp > 25 ? "#ffaa00" : "#ff3355";
+  const spd = Math.floor(Math.hypot(me.vx || 0, me.vy || 0));
+  const msl = me.missileCooldown > 0
+    ? `<span style="color:#ff6644">${Math.ceil(me.missileCooldown/30)}s</span>`
+    : `<span style="color:#00ff88">LISTO</span>`;
+
+  mobiPlayerEl.innerHTML = `
+    <div class="mobiPilotHeader">
+      <span class="mobiCallsign">${me.name || "Pilot"}</span>
+      <span class="mobiTeamBadge" style="color:${teamColor};border-color:${teamColor}44">${teamName}</span>
+    </div>
+
+    <div class="mobiStat">
+      <div class="mobiStatRow">
+        <span class="mobiStatLabel">INTEGRIDAD ESTRUCTURAL</span>
+        <span class="mobiStatVal">${hp}%</span>
+      </div>
+      <div class="mobiBar"><div class="mobiBarFill" style="width:${hp}%;background:${hpColor}"></div></div>
+    </div>
+
+    <div class="mobiStat">
+      <div class="mobiStatRow">
+        <span class="mobiStatLabel">COMBUSTIBLE</span>
+        <span class="mobiStatVal">${fuel}%</span>
+      </div>
+      <div class="mobiBar"><div class="mobiBarFill" style="width:${fuel}%;background:#00aaff"></div></div>
+    </div>
+
+    <div class="mobiDivider"></div>
+
+    <div class="mobiGrid">
+      <div class="mobiGridCell">
+        <span class="mobiGridLabel">BAJAS</span>
+        <span class="mobiGridVal">${me.kills || 0}</span>
+      </div>
+      <div class="mobiGridCell">
+        <span class="mobiGridLabel">MUERTES</span>
+        <span class="mobiGridVal">${me.deaths || 0}</span>
+      </div>
+      <div class="mobiGridCell">
+        <span class="mobiGridLabel">VELOCIDAD</span>
+        <span class="mobiGridVal">${spd}</span>
+      </div>
+      <div class="mobiGridCell">
+        <span class="mobiGridLabel">MISIL</span>
+        <span class="mobiGridVal" style="font-size:14px">${msl}</span>
+      </div>
+    </div>
+
+    ${me.dead ? `
+      <div class="mobiDivider"></div>
+      <button id="mobiSwitchTeamBtn" style="width:100%;margin:0;padding:10px;border-color:#ffffff22;color:#888;letter-spacing:2px;font-size:11px">
+        ⇄ CAMBIAR EQUIPO
+      </button>
+    ` : ''}
+  `;
+
+  const switchBtn = document.getElementById("mobiSwitchTeamBtn");
+  if(switchBtn){
+    switchBtn.onmouseenter = () => switchBtn.style.borderColor = "#00ccff55";
+    switchBtn.onmouseleave = () => switchBtn.style.borderColor = "#ffffff22";
+    switchBtn.onclick = () => ws.send(JSON.stringify({ type: "switchTeam" }));
+  }
+}
+
+function updateMobiPartida() {
+  const green = Object.values(players).filter(p => p.team === "green").sort((a,b)=>(b.kills||0)-(a.kills||0));
+  const red   = Object.values(players).filter(p => p.team === "red").sort((a,b)=>(b.kills||0)-(a.kills||0));
+
+  const renderTeam = (list, color, label) => {
+    const alive = list.filter(p => !p.dead).length;
+    return `
+      <div class="mobiTeamSection">
+        <div class="mobiTeamHead" style="color:${color}">
+          <span>${label}</span>
+          <span>${alive} / ${list.length} vivos</span>
+        </div>
+        ${list.map(p => `
+          <div class="mobiPlayerEntry ${p.dead ? 'dead' : ''}">
+            <span class="mobiPlayerBullet" style="color:${p.dead ? '#222' : color}">${p.dead ? '✕' : '●'}</span>
+            <span class="mobiPlayerName ${p.id === myId ? 'me' : ''}">${p.name || 'Pilot'}</span>
+            <span class="mobiPlayerKD">${p.kills||0}K · ${p.deaths||0}D</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  };
+
+  mobiStatusEl.innerHTML =
+    renderTeam(green, "#00ff88", "EQUIPO VERDE") +
+    renderTeam(red,   "#ff3355", "EQUIPO ROJO");
+}
+
+// ── Game Over
+const gameOverEl  = document.getElementById("gameOver");
+const restartBtn  = document.getElementById("restartBtn");
+
+function showGameOver() {
+  gameOverEl.classList.remove("hidden");
+  // Show restart button only to the room owner
+  if(roomData && roomData.ownerId === myId){
+    restartBtn.classList.remove("hidden");
+  } else {
+    restartBtn.classList.add("hidden");
+  }
+  playVictorySound();
+  stopMusic();
+}
+
+function hideGameOver() {
+  gameOverEl.classList.add("hidden");
+  restartBtn.classList.add("hidden");
+}
+
+function resetClientState() {
+  players = {}; bullets = []; missiles = []; asteroids = [];
+  flares = []; winner = null; prevWinner = null; targetId = null;
+  specTargetId = null; deadIds = new Set(); killFeed = []; chatLog = [];
+  shakeMag = 0;
+  cancelSd();
+}
+
+restartBtn.onclick = () => {
+  ws.send(JSON.stringify({ type: "restartGame" }));
+};
+
+document.getElementById("backToLobby").onclick = () => {
+  ws.send(JSON.stringify({ type: "leaveRoom" }));
+  resetClientState();
+  uiState = "lobby";
+  currentRoomId = null;
+  roomData = null;
+  resetAudio();
+  hideGameOver();
+  closeMobiglass();
+  menu.style.display = "";
+  hud.classList.add("hidden");
+  roomDiv.classList.add("hidden");
+  lobbyDiv.classList.remove("hidden");
+  updateUI();
+  ws.send(JSON.stringify({ type: "getRooms" }));
+};
+
+// ── Chat
+const chatContainer = document.getElementById("chatContainer");
+const chatInput     = document.getElementById("chatInput");
+let chatInputOpen   = false;
+
+function openChat() {
+  chatInputOpen = true;
+  chatContainer.classList.remove("hidden");
+  chatInput.value = "";
+  chatInput.focus();
+}
+
+function closeChat() {
+  chatInputOpen = false;
+  chatContainer.classList.add("hidden");
+  chatInput.blur();
+}
+
+chatInput.addEventListener("keydown", e => {
+  e.stopPropagation();
+  if(e.key === "Enter"){
+    const text = chatInput.value.trim();
+    if(text) ws.send(JSON.stringify({ type: "chat", text }));
+    closeChat();
+  }
+  if(e.key === "Escape") closeChat();
+});
+
+// ── Spectator
+function cycleSpectator() {
+  const living = Object.values(players).filter(p => !p.dead && p.id !== myId);
+  if(living.length === 0){ specTargetId = null; return; }
+  if(!specTargetId){ specTargetId = living[0].id; return; }
+  const idx = living.findIndex(p => p.id === specTargetId);
+  specTargetId = living[(idx + 1) % living.length].id;
+}
+
+// ── Self-destruct
+let sdState      = null;  // null | "charging" | "countdown"
+let sdHoldTimer  = null;
+let sdInterval   = null;
+let sdCountdown  = 0;
+let sdHoldStart  = 0;
+
+function startSdCharge() {
+  const me = getMe();
+  if(!me || me.dead || sdState) return;
+  sdState     = "charging";
+  sdHoldStart = Date.now();
+  sdHoldTimer = setTimeout(startSdCountdown, 2000);
+}
+
+function startSdCountdown() {
+  sdState    = "countdown";
+  sdCountdown = 5;
+  playSelfDestructBeep(5);
+  sdInterval = setInterval(() => {
+    sdCountdown--;
+    if(sdCountdown > 0){
+      playSelfDestructBeep(sdCountdown);
+    } else {
+      clearInterval(sdInterval);
+      sdInterval = null;
+      sdState    = null;
+      ws.send(JSON.stringify({ type: "selfDestruct" }));
+    }
+  }, 1000);
+}
+
+function cancelSd() {
+  clearTimeout(sdHoldTimer);
+  clearInterval(sdInterval);
+  sdState     = null;
+  sdHoldTimer = null;
+  sdInterval  = null;
+  sdCountdown = 0;
+}
+
+// ── Name input
+const nameInput = document.getElementById("nameInput");
+
+const savedName = localStorage.getItem("spacetactics_name");
+if(savedName) nameInput.value = savedName;
+
+function applyName(){
+  const name = nameInput.value.trim() || "Pilot";
+  nameInput.value = name;
+  localStorage.setItem("spacetactics_name", name);
+  if(ws.readyState === 1){
+    ws.send(JSON.stringify({ type: "setName", name }));
+  }
+}
+
+document.getElementById("setNameBtn").onclick = applyName;
+
+nameInput.addEventListener("keydown", e => {
+  if(e.key === "Enter") applyName();
+});
+
+document.getElementById("createRoom").onclick = ()=>{
+  initAudio();
+  ws.send(JSON.stringify({
+    type:"createRoom"
+  }));
+};
+
+document.getElementById("refreshRooms").onclick = () => {
+  ws.send(JSON.stringify({
+    type: "getRooms"
+  }));
+};
+
+document.getElementById("ready").onclick = () => {
+  if (uiState !== "inRoom") return;
+  ws.send(JSON.stringify({
+    type: "ready"
+  }));
+};
+
+document.getElementById("leaveRoom").onclick = () => {
+  ws.send(JSON.stringify({ type: "leaveRoom" }));
+  uiState = "lobby";
+  currentRoomId = null;
+  roomDiv.classList.add("hidden");
+  lobbyDiv.classList.remove("hidden");
+  updateUI();
+};
+
+document.getElementById("switchTeam").onclick = () => {
+  ws.send(JSON.stringify({
+    type: "switchTeam"
+  }));
+};
+
+ws.onmessage = e=>{
+
+  const data = JSON.parse(e.data);
+
+  if(data.type==="init"){
+
+    myId = data.id;
+    applyName();
+
+  }
+
+  if(data.type==="rooms"){
+
+    renderRooms(data.rooms);
+
+  }
+
+  if(data.type==="roomJoined"){
+
+    currentRoomId = data.roomId;
+    uiState = "inRoom";
+  
+    lobbyDiv.classList.add("hidden");
+    roomDiv.classList.remove("hidden");
+    updateUI();
+  }
+
+  if(data.type==="roomUpdate"){
+    roomData = data.room;
+    renderPlayers();
+  }
+
+  if(data.type==="gameStarted"){
+
+    menu.style.display="none";
+    hud.classList.remove("hidden");
+    deadIds = new Set();
+    startMusic();
+
+  }
+
+  if(data.type === "chat"){
+    chatLog.push({ name: data.name, team: data.team, text: data.text, ts: Date.now() });
+    if(chatLog.length > 8) chatLog.shift();
+  }
+
+  if(data.type === "roomRestarted"){
+    resetClientState();
+    roomData = data.room;
+    uiState = "inRoom";
+    currentRoomId = data.room.id;
+    hideGameOver();
+    closeMobiglass();
+    hud.classList.add("hidden");
+    menu.style.display = "";
+    lobbyDiv.classList.add("hidden");
+    roomDiv.classList.remove("hidden");
+    renderPlayers();
+    resetAudio();
+    updateUI();
+  }
+
+  if(data.type==="state"){
+    const incoming = data.players || {};
+
+    // Detect newly dead → explosion + shake
+    Object.values(incoming).forEach(p => {
+      if(p.dead && !deadIds.has(p.id)){
+        deadIds.add(p.id);
+        spawnExplosion(p.x, p.y, p.team);
+        playExplosionSound();
+        if(p.id === myId) cancelSd();
+        const myP = players[myId];
+        if(myP){
+          const dist = Math.hypot(p.x - myP.x, p.y - myP.y);
+          shakeMag = Math.max(shakeMag, Math.max(0, (500 - dist) / 500) * 14);
+        }
+      }
+    });
+
+    // Detect damage taken → shake
+    const myPrev = players[myId];
+    const myNext = incoming[myId];
+    if(myPrev && myNext && myNext.hp < myPrev.hp && myNext.hp > 0){
+      shakeMag = Math.max(shakeMag, (myPrev.hp - myNext.hp) * 0.45);
+    }
+
+    players  = incoming;
+    bullets  = data.bullets  || [];
+    missiles = data.missiles || [];
+    asteroids = data.asteroids || [];
+    flares   = data.flare    || [];
+    world    = data.world    || world;
+    winner   = data.winner;
+    killFeed = data.killFeed || [];
+  }
+
+};
+
+function renderRooms(list){
+
+  roomsDiv.innerHTML = "";
+
+  if(list.length === 0){
+    roomsDiv.innerHTML = '<div style="color:#444;font-size:12px;padding:12px 0">No hay salas. Crea una.</div>';
+    return;
+  }
+
+  list.forEach(room => {
+
+    const div = document.createElement("div");
+    div.className = "roomItem";
+
+    const playing = room.status === "playing";
+
+    div.innerHTML = `
+      <span class="roomId">#${room.id.slice(0,6)}</span>
+      <span class="roomStatus ${playing ? 'playing' : ''}">${playing ? 'EN PARTIDA' : 'EN ESPERA'}</span>
+      <span class="roomPlayers">${room.players}/6</span>
+      <button ${playing ? 'disabled' : ''}>Unirse</button>
+    `;
+
+    if(!playing){
+      div.querySelector("button").onclick = () => {
+        ws.send(JSON.stringify({ type: "joinRoom", roomId: room.id }));
+      };
+    }
+
+    roomsDiv.appendChild(div);
+
+  });
+
+}
+function renderPlayers(){
+
+  if(!roomData) return;
+
+  playersDiv.innerHTML = "";
+
+  Object.values(roomData.players).forEach(player => {
+
+    const div = document.createElement("div");
+    div.className = "playerRow" + (player.id === myId ? " me" : "");
+
+    const team = player.team || "none";
+    const youTag = player.id === myId ? '<span class="you">(tú)</span>' : "";
+    const readyClass = player.ready ? "ready" : "";
+    const readyText = player.ready ? "LISTO" : "ESPERA";
+
+    div.innerHTML = `
+      <span class="teamDot ${team}"></span>
+      <span class="playerName">${player.name || "Pilot"}${youTag}</span>
+      <span class="playerReady ${readyClass}">${readyText}</span>
+    `;
+
+    playersDiv.appendChild(div);
+
+  });
+
+}
+
+addEventListener("keydown",e=>{
+
+  const key = e.key.toLowerCase();
+
+  keys[key] = true;
+
+  if(key==="e"){
+
+    ws.send(JSON.stringify({
+      type:"shoot"
+    }));
+    playShootSound();
+
+  }
+
+  if(e.key === "Tab"){
+    e.preventDefault();
+    const meNow = getMe();
+    if(meNow && meNow.dead) cycleSpectator();
+    else cycleTarget();
+  }
+
+  if(key === "t" && !chatInputOpen){
+    e.preventDefault();
+    const meNow = getMe();
+    if(meNow && !meNow.dead) openChat();
+  }
+
+  if(key==="q"){
+    if(targetId){
+      ws.send(JSON.stringify({
+        type:"missile",
+        targetId
+      }));
+      playMissileSound();
+    }
+  }
+
+  if(key === "f"){
+    ws.send(JSON.stringify({
+      type: "flare"
+    }));
+  }
+
+  if(e.key === "F1"){
+    e.preventDefault();
+    initAudio();
+    if(mobiOpen) closeMobiglass();
+    else openMobiglass();
+  }
+
+  if(e.key === "Delete"){
+    if(e.repeat) return;
+    e.preventDefault();
+    if(chatInputOpen) return;
+    const meNow = getMe();
+    if(!meNow || meNow.dead) return;
+    if(sdState === "countdown") cancelSd();
+    else if(!sdState) startSdCharge();
+  }
+
+});
+
+addEventListener("keyup",e=>{
+
+  keys[e.key.toLowerCase()] = false;
+
+  if(e.key === "Delete" && sdState === "charging") cancelSd();
+
+});
+
+setInterval(()=>{
+
+  ws.send(JSON.stringify({
+    type:"input",
+    thrust:  keys["w"],
+    reverse: keys["s"],
+    left:    keys["a"],
+    right:   keys["d"]
+  }));
+
+},33);
+
+function getMe(){
+
+  return players[myId];
+
+}
+
+function worldToScreen(x,y,camX,camY){
+
+  return {
+
+    x:x-camX+canvas.width/2,
+
+    y:y-camY+canvas.height/2
+
+  };
+
+}
+
+function drawGrid(camX,camY){
+
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 1;
+
+  const size = 100;
+
+  const startX = -camX % size;
+  const startY = -camY % size;
+
+  for(let x=startX;x<canvas.width;x+=size){
+
+    ctx.beginPath();
+    ctx.moveTo(x,0);
+    ctx.lineTo(x,canvas.height);
+    ctx.stroke();
+
+  }
+
+  for(let y=startY;y<canvas.height;y+=size){
+
+    ctx.beginPath();
+    ctx.moveTo(0,y);
+    ctx.lineTo(canvas.width,y);
+    ctx.stroke();
+
+  }
+
+}
+
+function drawAsteroids(camX,camY){
+
+  asteroids.forEach(a=>{
+
+    const pos = worldToScreen(
+      a.x,
+      a.y,
+      camX,
+      camY
+    );
+
+    ctx.beginPath();
+
+    ctx.arc(
+      pos.x,
+      pos.y,
+      a.r,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fillStyle="#333";
+
+    ctx.fill();
+
+    ctx.strokeStyle="#666";
+
+    ctx.stroke();
+
+  });
+
+}
+
+function drawShip(player,camX,camY){
+
+  const pos = worldToScreen(
+    player.x,
+    player.y,
+    camX,
+    camY
+  );
+
+  ctx.save();
+
+  ctx.translate(
+    pos.x,
+    pos.y
+  );
+
+  ctx.rotate(
+    player.angle
+  );
+
+  ctx.beginPath();
+
+  ctx.moveTo(18,0);
+  ctx.lineTo(-12,-10);
+  ctx.lineTo(-8,0);
+  ctx.lineTo(-12,10);
+
+  ctx.closePath();
+
+  if(player.dead){
+
+    ctx.fillStyle="#666";
+
+  }else{
+
+    ctx.fillStyle=
+      player.team==="green"
+      ? "#00ff88"
+      : "#ff3355";
+
+  }
+
+  ctx.fill();
+
+  // Hit flash overlay
+  if(player.hitFlash > 0){
+    ctx.save();
+    ctx.globalAlpha = (player.hitFlash / 8) * 0.85;
+    ctx.beginPath();
+    ctx.moveTo(18,0);
+    ctx.lineTo(-12,-10);
+    ctx.lineTo(-8,0);
+    ctx.lineTo(-12,10);
+    ctx.closePath();
+    ctx.fillStyle = "white";
+    ctx.fill();
+    ctx.restore();
+  }
+
+  if(!player.dead){
+
+    ctx.beginPath();
+
+    ctx.moveTo(-12,-5);
+    ctx.lineTo(-20,0);
+    ctx.lineTo(-12,5);
+
+    ctx.strokeStyle="#00aaff";
+
+    ctx.stroke();
+
+  }
+
+  ctx.restore();
+
+  const hpWidth = 40;
+
+  ctx.fillStyle="#222";
+
+  ctx.fillRect(
+    pos.x-20,
+    pos.y-30,
+    hpWidth,
+    4
+  );
+
+  ctx.fillStyle="#00ff00";
+
+  ctx.fillRect(
+    pos.x-20,
+    pos.y-30,
+    hpWidth*(player.hp/100),
+    4
+  );
+
+  ctx.fillStyle="#00aaff";
+
+  ctx.fillRect(
+    pos.x-20,
+    pos.y-24,
+    hpWidth*(player.fuel/100),
+    3
+  );
+
+  if(!player.dead){
+    ctx.save();
+    ctx.fillStyle = player.id === myId ? "#00ccff" : "rgba(255,255,255,0.6)";
+    ctx.font = "11px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(player.name || "Pilot", pos.x, pos.y - 36);
+    ctx.restore();
+  }
+
+  if(player.id===targetId){
+
+    ctx.beginPath();
+  
+    ctx.arc(
+      pos.x,
+      pos.y,
+      25,
+      0,
+      Math.PI*2
+    );
+  
+    ctx.strokeStyle="#ffff00";
+  
+    ctx.lineWidth=2;
+  
+    ctx.stroke();
+  
+  }
+
+}
+
+function drawVelocityVector(player,camX,camY){
+
+  const speed =
+    Math.hypot(
+      player.vx,
+      player.vy
+    );
+
+  if(speed<0.5) return;
+
+  const pos = worldToScreen(
+    player.x,
+    player.y,
+    camX,
+    camY
+  );
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    pos.x,
+    pos.y
+  );
+
+  ctx.lineTo(
+    pos.x + player.vx*20,
+    pos.y + player.vy*20
+  );
+
+  ctx.strokeStyle="#ffffff44";
+
+  ctx.stroke();
+
+}
+
+function drawBullets(camX,camY){
+
+  bullets.forEach(b=>{
+
+    const pos = worldToScreen(
+      b.x,
+      b.y,
+      camX,
+      camY
+    );
+
+    ctx.beginPath();
+
+    ctx.arc(
+      pos.x,
+      pos.y,
+      3,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fillStyle=
+      b.team==="green"
+      ? "#00ff88"
+      : "#ff3355";
+
+    ctx.fill();
+
+  });
+
+}
+//MISILES
+function cycleTarget(){
+
+  const me = players[myId];
+  if(!me) return;
+
+  const enemies = Object.values(players)
+    .filter(p => !p.dead && p.team !== me.team);
+
+  // 🔥 si no hay enemigos → siempre null
+  if(enemies.length === 0){
+    targetId = null;
+    return;
+  }
+
+  // si no hay target actual → seleccionar primero
+  if(!targetId){
+
+    targetId = enemies[0].id;
+    return;
+  }
+
+  const currentIndex = enemies.findIndex(e => e.id === targetId);
+
+  // 🔥 si el target ya no existe → reset
+  if(currentIndex === -1){
+    targetId = enemies[0].id;
+    return;
+  }
+
+  // 🔥 si pulsas TAB en último enemigo → deselecciona
+  if(currentIndex === enemies.length - 1){
+    targetId = null;
+    return;
+  }
+
+  // siguiente target
+  targetId = enemies[currentIndex + 1].id;
+}
+function drawMissiles(camX,camY){
+
+  missiles.forEach(m=>{
+
+    const pos = worldToScreen(m.x, m.y, camX, camY);
+    const angle = Math.atan2(m.vy, m.vx);
+
+    ctx.save();
+    ctx.translate(pos.x, pos.y);
+    ctx.rotate(angle);
+
+    // Exhaust glow
+    const grad = ctx.createRadialGradient(-7,0,0,-7,0,9);
+    grad.addColorStop(0,"rgba(255,120,0,0.85)");
+    grad.addColorStop(1,"rgba(255,60,0,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(-6,0,9,4,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Body
+    ctx.fillStyle = "#ffcc44";
+    ctx.beginPath();
+    ctx.ellipse(0,0,9,3,0,0,Math.PI*2);
+    ctx.fill();
+
+    // Tip
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(8,0,2,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();
+
+  });
+
+}
+function drawFlares(camX, camY){
+
+  flares.forEach(f => {
+
+    const pos = worldToScreen(f.x, f.y, camX, camY);
+
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 25, 0, Math.PI * 2);
+
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.fill();
+
+    ctx.strokeStyle = "#ffffff88";
+    ctx.stroke();
+
+  });
+
+}
+function updateUI() {
+  const readyBtn = document.getElementById("ready");
+
+  readyBtn.disabled = uiState !== "inRoom";
+}
+function drawRadar(){
+
+  const size = 140;
+
+  const x = canvas.width - 170;
+  const y = canvas.height - 170;
+
+  ctx.beginPath();
+
+  ctx.arc(
+    x,
+    y,
+    size/2,
+    0,
+    Math.PI*2
+  );
+
+  ctx.strokeStyle="#555";
+
+  ctx.stroke();
+
+  Object.values(players).forEach(p=>{
+
+    const rx =
+      x + ((p.x/world.width)-0.5)*size;
+
+    const ry =
+      y + ((p.y/world.height)-0.5)*size;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      rx,
+      ry,
+      4,
+      0,
+      Math.PI*2
+    );
+
+    if(p.dead){
+
+      ctx.fillStyle="#555";
+
+    }else{
+
+      ctx.fillStyle=
+        p.team==="green"
+        ? "#00ff88"
+        : "#ff3355";
+
+    }
+
+    ctx.fill();
+
+  });
+
+}
+function drawWarningOverlay(me){
+
+  if(!me || !me.lockedByMissile) return;
+  if(!me || me.lockedOnMe <= 0) return;
+
+  const t = Date.now() * 0.01;
+  const pulse = (Math.sin(t) + 1) / 2; // 0 → 1
+  const intensity = Math.min(me.lockedOnMe / 3, 1);
+  const margin = 25;
+  const len = 80;
+
+  ctx.save();
+
+  ctx.strokeStyle = `rgba(255,0,0,${0.2 + intensity})`;
+  ctx.lineWidth = 4;
+
+  // TOP LEFT
+  ctx.beginPath();
+  ctx.moveTo(margin, margin + len);
+  ctx.lineTo(margin, margin);
+  ctx.lineTo(margin + len, margin);
+  ctx.stroke();
+
+  // TOP RIGHT
+  ctx.beginPath();
+  ctx.moveTo(canvas.width - margin - len, margin);
+  ctx.lineTo(canvas.width - margin, margin);
+  ctx.lineTo(canvas.width - margin, margin + len);
+  ctx.stroke();
+
+  // BOTTOM LEFT
+  ctx.beginPath();
+  ctx.moveTo(margin, canvas.height - margin - len);
+  ctx.lineTo(margin, canvas.height - margin);
+  ctx.lineTo(margin + len, canvas.height - margin);
+  ctx.stroke();
+
+  // BOTTOM RIGHT
+  ctx.beginPath();
+  ctx.moveTo(canvas.width - margin - len, canvas.height - margin);
+  ctx.lineTo(canvas.width - margin, canvas.height - margin);
+  ctx.lineTo(canvas.width - margin, canvas.height - margin - len);
+  ctx.stroke();
+
+  ctx.shadowColor = "red";
+  ctx.shadowBlur = 20;
+
+  ctx.restore();
+}
+function updateHUD(me){
+
+  document.getElementById("hp").textContent =
+    Math.floor(me.hp);
+
+  document.getElementById("fuel").textContent =
+    Math.floor(me.fuel);
+
+  document.getElementById("speed").textContent =
+    Math.floor(Math.hypot(me.vx, me.vy));
+
+  document.getElementById("kd").textContent =
+    (me.kills || 0) + "/" + (me.deaths || 0);
+
+  document.getElementById("mslCd").textContent =
+    me.missileCooldown > 0
+      ? Math.ceil(me.missileCooldown / 30) + "s"
+      : "LISTO";
+
+  const alive =
+    Object.values(players)
+      .filter(p=>!p.dead)
+      .length;
+
+  document.getElementById("alive").textContent =
+    "Vivos: " + alive;
+
+  if(targetId){
+
+    const t = players[targetId];
+  
+    if(t){
+  
+      ctx.fillStyle="yellow";
+  
+      ctx.font="20px Arial";
+  
+      ctx.fillText(
+        "LOCK: " + (t.name || t.id.slice(0, 6)),
+        20,
+        120
+      );
+  
+    }
+  
+  }
+}
+
+function loop(){
+
+  updateParticles();
+
+  const me = getMe();
+
+  // ── Camera: spectator or normal
+  let camX, camY;
+  if(me && me.dead){
+    let spec = specTargetId ? players[specTargetId] : null;
+    if(!spec || spec.dead){
+      const living = Object.values(players).filter(p => !p.dead && p.id !== myId);
+      spec = living[0] || null;
+      specTargetId = spec ? spec.id : null;
+    }
+    camX = spec ? spec.x : me.x;
+    camY = spec ? spec.y : me.y;
+  } else if(me){
+    camX = me.x;
+    camY = me.y;
+    specTargetId = null;
+  } else {
+    camX = 0; camY = 0;
+  }
+
+  // ── Screen shake
+  if(shakeMag > 0.5){
+    camX += (Math.random() - 0.5) * shakeMag;
+    camY += (Math.random() - 0.5) * shakeMag;
+    shakeMag *= 0.82;
+  } else {
+    shakeMag = 0;
+  }
+
+  // ── Thrust particles for local player
+  if(me && !me.dead && keys["w"]){
+    spawnThrustParticle(me.x, me.y, me.angle);
+  }
+
+  // Background
+  ctx.fillStyle = "#050505";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawStars(ctx, camX, camY);
+
+  if(me) drawWarningOverlay(me);
+
+  drawGrid(camX, camY);
+  drawAsteroids(camX, camY);
+
+  Object.values(players).forEach(p => drawVelocityVector(p, camX, camY));
+  Object.values(players).forEach(p => drawShip(p, camX, camY));
+
+  drawParticles(ctx, camX, camY);
+  drawBullets(camX, camY);
+  drawMissiles(camX, camY);
+  drawFlares(camX, camY);
+
+  drawRadar();
+
+  if(me){
+    updateHUD(me);
+    setMissileWarning(!!me.lockedByMissile);
+
+    if(me.dead){
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = "bold 40px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("DESTRUIDO", canvas.width/2, canvas.height/2 - 30);
+      ctx.font = "13px 'Courier New', monospace";
+      ctx.fillStyle = "#666";
+      ctx.fillText("Esperando resultado...", canvas.width/2, canvas.height/2 + 10);
+      ctx.textAlign = "left";
+    }
+  }
+
+  if(winner){
+
+    if(winner !== prevWinner){
+      prevWinner = winner;
+      showGameOver();
+      if(mobiOpen) closeMobiglass();
+    }
+
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    ctx.textAlign = "center";
+
+    ctx.fillStyle = winner === "green" ? "#00ff88" : "#ff3355";
+    ctx.font = "bold 52px 'Courier New', monospace";
+    ctx.fillText("VICTORIA " + winner.toUpperCase(), cx, cy - 90);
+
+    const sorted = Object.values(players).sort((a,b) => (b.kills||0) - (a.kills||0));
+
+    ctx.font = "12px 'Courier New', monospace";
+    ctx.fillStyle = "#444";
+    ctx.fillText("─────────────────────────────────────", cx, cy - 48);
+    ctx.fillStyle = "#555";
+    ctx.fillText("NOMBRE                    K      D", cx, cy - 32);
+
+    sorted.forEach((p, i) => {
+      ctx.fillStyle = p.team === "green" ? "#00ff88" : "#ff3355";
+      const name = (p.name || "Pilot").slice(0, 16).padEnd(16);
+      const me_marker = p.id === myId ? " ◄" : "";
+      ctx.fillText(
+        name + "          " + String(p.kills||0).padStart(2) + "     " + String(p.deaths||0).padStart(2) + me_marker,
+        cx,
+        cy - 6 + i * 26
+      );
+    });
+
+    ctx.textAlign = "left";
+  }
+
+  // ── Self-destruct UI
+  if(sdState === "charging"){
+    const progress = Math.min(1, (Date.now() - sdHoldStart) / 2000);
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2 + 80;
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(0,0,0,0.65)";
+    ctx.fillRect(cx - 160, cy - 36, 320, 44);
+    ctx.font = "12px 'Courier New', monospace";
+    ctx.fillStyle = "#ff6666";
+    ctx.fillText("Mantén [DEL] para autodestruir...", cx, cy - 16);
+    ctx.fillStyle = "#222";
+    ctx.fillRect(cx - 130, cy - 4, 260, 8);
+    ctx.fillStyle = "#ff4444";
+    ctx.fillRect(cx - 130, cy - 4, 260 * progress, 8);
+    ctx.restore();
+  }
+
+  if(sdState === "countdown"){
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    ctx.save();
+    // Red tint on edges
+    const pulse = 0.04 + 0.04 * Math.sin(Date.now() * 0.008);
+    ctx.fillStyle = `rgba(180,0,0,${pulse})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Box
+    ctx.fillStyle = "rgba(0,0,0,0.82)";
+    ctx.fillRect(cx - 170, cy - 90, 340, 130);
+    ctx.strokeStyle = "#ff2222";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx - 170, cy - 90, 340, 130);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ff4444";
+    ctx.font = "bold 13px 'Courier New', monospace";
+    ctx.fillText("⚠  AUTODESTRUCCIÓN  ⚠", cx, cy - 62);
+    ctx.fillStyle = "#ff2222";
+    ctx.font = `bold ${70 + (5 - sdCountdown) * 4}px 'Courier New', monospace`;
+    ctx.fillText(sdCountdown, cx, cy + 12);
+    ctx.fillStyle = "#555";
+    ctx.font = "11px 'Courier New', monospace";
+    ctx.fillText("[DEL] para cancelar", cx, cy + 36);
+    ctx.restore();
+  }
+
+  // ── Kill feed (top-right, below alive counter)
+  const now = Date.now();
+  const recentKills = killFeed.filter(e => now - e.time < 5000);
+  if(recentKills.length > 0){
+    ctx.save();
+    ctx.font = "12px 'Courier New', monospace";
+    ctx.textAlign = "right";
+    recentKills.forEach((e, i) => {
+      const age   = now - e.time;
+      const alpha = age < 3500 ? 1 : 1 - (age - 3500) / 1500;
+      ctx.globalAlpha = Math.max(0, alpha);
+      const kColor = e.killerTeam === "green" ? "#00ff88" : (e.killerTeam === "red" ? "#ff3355" : "#888");
+      const vColor = e.victimTeam === "green" ? "#00ff88" : "#ff3355";
+      const icons = { missile:"⬥", asteroid:"✦", self:"☠", bullet:"·" };
+      const icon  = icons[e.weapon] || "·";
+      const y     = 90 + i * 20;
+
+      if(e.weapon === "self"){
+        ctx.fillStyle = vColor;
+        ctx.fillText(e.victimName, canvas.width - 24, y);
+        ctx.fillStyle = "#555";
+        ctx.fillText(" ☠", canvas.width - 24 - ctx.measureText(e.victimName).width, y);
+      } else if(e.killerName){
+        ctx.fillStyle = "#555";
+        ctx.fillText(icon, canvas.width - 16, y);
+        ctx.fillStyle = vColor;
+        ctx.fillText(e.victimName, canvas.width - 24, y);
+        ctx.fillStyle = "#555";
+        ctx.fillText(" ← ", canvas.width - 24 - ctx.measureText(e.victimName).width, y);
+        ctx.fillStyle = kColor;
+        ctx.fillText(e.killerName, canvas.width - 24 - ctx.measureText(e.victimName).width - ctx.measureText(" ← ").width, y);
+      } else {
+        ctx.fillStyle = "#555";
+        ctx.fillText(icon, canvas.width - 16, y);
+        ctx.fillStyle = vColor;
+        ctx.fillText(e.victimName, canvas.width - 24, y);
+      }
+    });
+    ctx.restore();
+  }
+
+  // ── Chat log (bottom-left)
+  const recentChat = chatLog.filter(m => now - m.ts < 7000);
+  if(recentChat.length > 0){
+    ctx.save();
+    ctx.font = "12px 'Courier New', monospace";
+    ctx.textAlign = "left";
+    recentChat.forEach((m, i) => {
+      const age   = now - m.ts;
+      const alpha = age < 5000 ? 0.9 : 0.9 * (1 - (age - 5000) / 2000);
+      ctx.globalAlpha = Math.max(0, alpha);
+      const teamColor = m.team === "green" ? "#00ff88" : "#ff3355";
+      const y = canvas.height - 70 - (recentChat.length - 1 - i) * 22;
+      ctx.fillStyle = teamColor;
+      const nameTag = "[" + m.name + "] ";
+      ctx.fillText(nameTag, 20, y);
+      ctx.fillStyle = "#ccc";
+      ctx.fillText(m.text, 20 + ctx.measureText(nameTag).width, y);
+    });
+    ctx.restore();
+  }
+
+  // ── Spectator indicator
+  if(me && me.dead && specTargetId){
+    const spec = players[specTargetId];
+    if(spec){
+      ctx.save();
+      ctx.font = "12px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(canvas.width/2 - 180, canvas.height - 44, 360, 24);
+      ctx.fillStyle = "#aaa";
+      ctx.fillText("ESPECTADOR · " + (spec.name || "Pilot") + " · [TAB] cambiar", canvas.width/2, canvas.height - 27);
+      ctx.restore();
+    }
+  }
+
+  if(mobiOpen) updateMobiglass();
+
+  requestAnimationFrame(loop);
+
+}
+
+loop();
