@@ -63,11 +63,39 @@ adminServer.listen(8081, () =>
 );
 
 // ─────────────────────────────────────────────
-// WebSocket game server (port 8080)
+// Game HTTP server — serves client + WebSocket on port 8080
 // ─────────────────────────────────────────────
-const wss     = new WebSocket.Server({ port: 8080 });
+const clientDir = path.join(__dirname, "../client");
+const MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".js":   "application/javascript; charset=utf-8",
+  ".css":  "text/css; charset=utf-8",
+};
+
+const gameHttpServer = http.createServer((req, res) => {
+  const reqPath  = req.url === "/" ? "/index.html" : req.url.split("?")[0];
+  const safePath = path.normalize(reqPath).replace(/^(\.\.[/\\])+/, "");
+  const fullPath = path.join(clientDir, safePath);
+
+  if (!fullPath.startsWith(clientDir)) {
+    res.writeHead(403); res.end(); return;
+  }
+
+  fs.readFile(fullPath, (err, data) => {
+    if (err) { res.writeHead(404); res.end("Not found"); return; }
+    const mime = MIME_TYPES[path.extname(fullPath)] || "application/octet-stream";
+    res.writeHead(200, { "Content-Type": mime });
+    res.end(data);
+  });
+});
+
+const wss     = new WebSocket.Server({ server: gameHttpServer });
 const clients = new Map();
 const rooms   = {};
+
+gameHttpServer.listen(8080, () =>
+  console.log("Game:         http://localhost:8080")
+);
 
 function createPlayer(id) {
   return {
@@ -638,4 +666,3 @@ function update() {
 }
 
 setInterval(update, 1000 / FPS);
-console.log("Game server:  ws://localhost:8080");

@@ -1,6 +1,6 @@
 # Ship Commander
 
-> **Alpha** — Juego de combate espacial multijugador en el navegador, creado para practicar combate en equipo al estilo Star Citizen.
+> **Beta** — Juego de combate espacial multijugador en el navegador, creado para practicar combate en equipo al estilo Star Citizen.
 
 Combate espacial en tiempo real, en equipo, que funciona completamente en el navegador. Sin instalaciones, sin plugins — abre el cliente y vuela.
 
@@ -101,11 +101,11 @@ npm install
 
 # Arrancar el servidor de juego
 node server.js
-# → Game server:  ws://localhost:8080
+# → Game:         http://localhost:8080
 # → Panel admin:  http://localhost:8081
 ```
 
-Luego abre `client/index.html` directamente en el navegador (`file://` funciona — no hace falta servidor HTTP).
+Abre `http://localhost:8080` en el navegador. El servidor sirve el cliente directamente — no hace falta abrir archivos locales.
 
 Abre varias pestañas para probar el multijugador en local.
 
@@ -121,14 +121,7 @@ Usa [ngrok](https://ngrok.com) para exponer tu servidor local:
 ngrok http 8080
 ```
 
-Cambia la URL WebSocket en `client/game.js` línea 14:
-
-```js
-// Sustituye por tu URL de ngrok (usa wss://)
-const ws = new WebSocket("wss://tu-id.ngrok-free.app");
-```
-
-Comparte `client/index.html` con tus amigos. Todos conectan a tu servidor local a través del túnel.
+Comparte la URL pública de ngrok con tus amigos. El cliente se conecta automáticamente al servidor correcto — no hay que cambiar ningún archivo.
 
 ---
 
@@ -178,7 +171,7 @@ ship-commander/
 
 ---
 
-## Estado actual (Alpha)
+## Estado actual (Beta)
 
 El juego es jugable y estable para sesiones locales y con amigos via túnel. Las áreas principales aún en desarrollo son:
 

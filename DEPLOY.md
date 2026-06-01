@@ -1,111 +1,61 @@
 # Ship Commander — Guía de despliegue
 
-## Arquitectura actual
+## Arquitectura
 
 ```
-client/ (ficheros estáticos: HTML, JS, CSS)
-server/ (Node.js + WebSocket, puerto 8080)
+server/server.js   puerto 8080 — HTTP (cliente estático) + WebSocket (juego)
+server/server.js   puerto 8081 — HTTP (panel admin)
 ```
 
-El cliente se conecta al servidor vía WebSocket. Actualmente la URL está hardcodeada como `ws://localhost:8080` — esto hay que hacerlo dinámico para producción.
+El servidor sirve los archivos del cliente directamente en el puerto 8080. No hace falta ningún servidor web separado. La URL del WebSocket en el cliente es dinámica (`location.host`), por lo que funciona en local, en producción y via túnel sin cambiar ningún archivo.
 
-No hay base de datos. El estado de las partidas vive en memoria; se pierde al reiniciar el servidor (comportamiento esperado).
+No hay base de datos. El estado de las partidas vive en memoria y se pierde al reiniciar el proceso (comportamiento esperado).
 
 ---
 
-## Cambios de código necesarios antes del deploy
+## Variables de entorno
 
-### 1. Servidor — puerto dinámico y servir ficheros estáticos
+| Variable | Default | Descripción |
+|---|---|---|
+| `PORT` | `8080` | Puerto del servidor de juego + cliente |
 
-El servidor actual solo gestiona WebSocket. En producción debe servir también el cliente estático desde el mismo proceso y puerto.
+El puerto del panel admin es siempre `PORT + 1` (o `8081` si `PORT` no está definido). Ajústalo en `server.js` si la plataforma no lo permite.
 
-Reemplazar el inicio de `server/server.js`:
+---
 
-```js
-const WebSocket = require("ws");
-const crypto    = require("crypto");
-const http      = require("http");
-const fs        = require("fs");
-const path      = require("path");
+## Ejecutar en local
 
-const CLIENT_DIR = path.join(__dirname, "../client");
-
-const MIME = {
-  ".html": "text/html",
-  ".js":   "application/javascript",
-  ".css":  "text/css",
-  ".jpg":  "image/jpeg",
-  ".png":  "image/png",
-};
-
-const httpServer = http.createServer((req, res) => {
-  const url      = req.url === "/" ? "/index.html" : req.url;
-  const filePath = path.join(CLIENT_DIR, url);
-
-  fs.readFile(filePath, (err, data) => {
-    if (err) { res.writeHead(404); res.end("Not found"); return; }
-    const ext  = path.extname(filePath);
-    const mime = MIME[ext] || "application/octet-stream";
-    res.writeHead(200, { "Content-Type": mime });
-    res.end(data);
-  });
-});
-
-const wss = new WebSocket.Server({ server: httpServer });
-
-const PORT = process.env.PORT || 8080;
-httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-```
-
-Eliminar la línea original `new WebSocket.Server({ port: 8080 })` y la llamada a `setInterval` / `console.log` al final (quedan igual, solo cambia el arranque).
-
-### 2. Cliente — URL de WebSocket dinámica
-
-En `client/game.js`, línea 14, sustituir:
-
-```js
-// Antes
-const ws = new WebSocket("ws://localhost:8080");
-
-// Después
-const proto = location.protocol === "https:" ? "wss:" : "ws:";
-const ws    = new WebSocket(`${proto}//${location.host}`);
+```bash
+cd server
+npm install
+node server.js
+# → Game:        http://localhost:8080
+# → Panel admin: http://localhost:8081
 ```
 
 ---
 
-## Requisitos de infraestructura
+## Plataformas PaaS (opción más rápida)
 
-| Requisito | Detalle |
-|---|---|
-| Runtime | Node.js 18+ |
-| Puerto | Uno solo (HTTP + WS upgrade en el mismo puerto) |
-| Base de datos | Ninguna |
-| Variables de entorno | Solo `PORT` (opcional, default 8080) |
-| Persistencia de ficheros | No necesaria |
-| Procesos | Un único proceso Node.js |
+### Railway · Render · Fly.io
 
----
-
-## Plataformas recomendadas (PaaS — opción más rápida)
-
-### Railway · render.com · Fly.io
-
-Cualquiera de las tres detecta Node.js automáticamente. Pasos generales:
+Cualquiera de las tres detecta Node.js automáticamente.
 
 1. Subir el repositorio a GitHub
 2. Conectar el repositorio en la plataforma elegida
-3. Configurar el **directorio raíz del servidor** como `server/` (o ajustar el start command)
-4. Start command: `node server.js`
-5. La plataforma asigna `PORT` automáticamente
+3. **Root directory:** `server/`
+4. **Start command:** `node server.js`
+5. La plataforma asigna `PORT` automáticamente — el servidor ya lo lee con `process.env.PORT || 8080`
 
-> **Railway** es la opción más rápida. Detecta `package.json` en `server/` sin configuración adicional.
+> **Railway** es la opción más rápida: detecta `package.json` en `server/` sin configuración adicional.
+
+**Sobre el panel admin en producción:** el puerto 8081 normalmente no estará expuesto públicamente en PaaS. Es intencionado — el panel no tiene autenticación. Si necesitas acceder al panel en producción, usa un túnel SSH o expón el puerto manualmente con restricción de IP.
 
 ---
 
 ## VPS (nginx + pm2)
 
-Si se despliega en un servidor propio:
+### nginx
 
 ```nginx
 # /etc/nginx/sites-available/shipcommander
@@ -113,39 +63,50 @@ server {
     listen 80;
     server_name tu-dominio.com;
 
+    # Juego + cliente (HTTP y WebSocket en el mismo puerto)
     location / {
         proxy_pass         http://localhost:8080;
         proxy_http_version 1.1;
-        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Upgrade    $http_upgrade;
         proxy_set_header   Connection "upgrade";
-        proxy_set_header   Host $host;
+        proxy_set_header   Host       $host;
+        proxy_set_header   X-Real-IP  $remote_addr;
     }
 }
 ```
 
+Para TLS (necesario si quieres `wss://`): Certbot/Let's Encrypt.
+
 ```bash
-# Arrancar con pm2
-cd server
-pm2 start server.js --name shipcommander
-pm2 save
+certbot --nginx -d tu-dominio.com
 ```
 
-Para TLS (obligatorio si se quiere `wss://`): Certbot/Let's Encrypt en el dominio.
+### pm2
+
+```bash
+cd server
+npm install
+pm2 start server.js --name shipcommander
+pm2 save
+pm2 startup   # para que arranque con el sistema
+```
 
 ---
 
-## Verificación
+## Verificación post-despliegue
 
-1. Abrir el dominio en el navegador — debe aparecer el lobby
-2. Abrir una segunda pestaña — el jugador debe aparecer en la lista de la sala
-3. Ambas pestañas deben poder entrar en partida y verse mutuamente
+1. Abrir el dominio — debe aparecer el lobby de Ship Commander
+2. Abrir una segunda pestaña con la misma URL — el jugador debe aparecer en la lista
+3. Ambas pestañas pueden entrar en partida y verse mutuamente
+4. La consola del navegador no debe mostrar errores de WebSocket
 
-Si hay problemas de WebSocket: revisar que el proxy pasa correctamente las cabeceras `Upgrade` y `Connection`.
+Si hay problemas de WS detrás de un proxy: asegurarse de que se pasan las cabeceras `Upgrade` y `Connection` (el bloque nginx de arriba ya lo hace).
 
 ---
 
-## Notas adicionales
+## Notas
 
-- El juego **no tiene autenticación**. Cualquiera con la URL puede unirse. Si se quiere acceso restringido, un proxy con basic auth es suficiente para esta fase.
-- El estado de las salas se pierde al reiniciar el proceso. Es el comportamiento esperado en alpha.
-- No hay límite de salas ni de jugadores globales más allá de la RAM disponible. Para este caso de uso (grupos pequeños) no es un problema.
+- **Sin autenticación.** Cualquiera con la URL puede unirse. Para acceso restringido, un proxy con basic auth es suficiente en esta fase.
+- **Panel admin** (`puerto 8081`) no debe exponerse públicamente. Solo para uso en local o acceso vía SSH tunnel.
+- **Sin límite** de salas o jugadores más allá de la RAM disponible. Para grupos pequeños no es un problema.
+- El estado de las salas se pierde al reiniciar el proceso. Es el comportamiento esperado.

@@ -84,7 +84,9 @@ addEventListener("resize",()=>{
 
 });
 
-const ws = new WebSocket("ws://localhost:8080");
+const _wsProto = location.protocol === "https:" ? "wss:" : "ws:";
+const _wsHost  = location.hostname ? location.host : "localhost:8080";
+const ws = new WebSocket(_wsProto + "//" + _wsHost);
 
 let uiState = "lobby"; 
 let currentRoomId = null;
@@ -107,6 +109,74 @@ let world = {
 
 let winner = null;
 let prevWinner = null;
+
+// ── Client-side interpolation ──────────────────
+const INTERP_DELAY = 80;  // ms behind server time (~2.5 ticks at 30fps)
+const MAX_BUFFER   = 12;
+let   stateBuffer  = [];  // [{time, players, bullets, missiles, flares}]
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function lerpAngle(a, b, t) {
+  let d = b - a;
+  while (d >  Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  return a + d * t;
+}
+
+function extrapolateArr(arr, ticks) {
+  return arr.map(e => ({ ...e, x: e.x + e.vx * ticks, y: e.y + e.vy * ticks }));
+}
+
+function applyInterpolatedState() {
+  if (stateBuffer.length === 0) return;
+
+  const renderTime = Date.now() - INTERP_DELAY;
+
+  // Find the two states that bracket renderTime
+  let idx = 0;
+  while (idx < stateBuffer.length - 1 && stateBuffer[idx + 1].time <= renderTime) idx++;
+
+  const s0 = stateBuffer[idx];
+  const s1 = stateBuffer[idx + 1];
+
+  // Ticks elapsed since the latest state we have (for bullet/missile extrapolation)
+  const latest     = s1 || s0;
+  const ticksSince = Math.max(0, (Date.now() - latest.time) / (1000 / 30));
+
+  if (!s1) {
+    // Only one state available — use it directly, extrapolate projectiles
+    players  = s0.players;
+    bullets  = extrapolateArr(s0.bullets,  ticksSince);
+    missiles = extrapolateArr(s0.missiles, ticksSince);
+    flares   = s0.flares;
+    return;
+  }
+
+  // Interpolation factor [0,1] between s0 and s1
+  const t = Math.max(0, Math.min(1, (renderTime - s0.time) / (s1.time - s0.time)));
+
+  // Interpolate player positions and angle
+  const interped = {};
+  for (const id in s1.players) {
+    const p1 = s1.players[id];
+    const p0 = s0.players[id];
+    if (!p0) { interped[id] = p1; continue; }
+    interped[id] = {
+      ...p1,
+      x:     lerp(p0.x, p1.x, t),
+      y:     lerp(p0.y, p1.y, t),
+      angle: lerpAngle(p0.angle, p1.angle, t),
+    };
+  }
+  players  = interped;
+  bullets  = extrapolateArr(s1.bullets,  ticksSince);
+  missiles = extrapolateArr(s1.missiles, ticksSince);
+  flares   = s1.flares;
+
+  // Trim buffer — keep only the last MAX_BUFFER entries
+  if (stateBuffer.length > MAX_BUFFER) stateBuffer.splice(0, stateBuffer.length - MAX_BUFFER);
+}
 let deadIds = new Set();
 
 let specTargetId = null;
@@ -350,6 +420,7 @@ function hideGameOver() {
 function resetClientState() {
   players = {}; bullets = []; missiles = []; asteroids = [];
   flares = []; winner = null; prevWinner = null; targetId = null;
+  stateBuffer = [];
   specTargetId = null; deadIds = new Set(); killFeed = []; chatLog = [];
   shakeMag = 0;
   cancelSd();
@@ -598,14 +669,20 @@ ws.onmessage = e=>{
       shakeMag = Math.max(shakeMag, (myPrev.hp - myNext.hp) * 0.45);
     }
 
-    players  = incoming;
-    bullets  = data.bullets  || [];
-    missiles = data.missiles || [];
+    // Push to interpolation buffer — positions are applied each RAF frame
+    stateBuffer.push({
+      time:     Date.now(),
+      players:  incoming,
+      bullets:  data.bullets  || [],
+      missiles: data.missiles || [],
+      flares:   data.flare    || [],
+    });
+
+    // Non-interpolated state: apply immediately
     asteroids = data.asteroids || [];
-    flares   = data.flare    || [];
-    world    = data.world    || world;
-    winner   = data.winner;
-    killFeed = data.killFeed || [];
+    world     = data.world    || world;
+    winner    = data.winner;
+    killFeed  = data.killFeed || [];
     updateTimer(data.timeLeft);
   }
 
@@ -1268,6 +1345,8 @@ function updateHUD(me){
 }
 
 function loop(){
+
+  applyInterpolatedState();   // compute positions interpolated to now - INTERP_DELAY
 
   updateParticles();
 
