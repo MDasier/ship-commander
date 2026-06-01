@@ -1,0 +1,14 @@
+{
+  "name": "ship-commander",
+  "version": "1.0.0",
+  "description": "Multiplayer browser space dogfighting game",
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

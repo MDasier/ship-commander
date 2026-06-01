@@ -8,6 +8,8 @@ const CFG       = require("./config");
 const WORLD_W = 3000;
 const WORLD_H = 3000;
 const FPS     = 30;
+const PORT    = parseInt(process.env.PORT) || 8080;
+const ADMIN_PORT = PORT + 1;
 
 // ─────────────────────────────────────────────
 // HTTP admin server (port 8081)
@@ -58,8 +60,8 @@ const adminServer = http.createServer((req, res) => {
   res.end(adminHtml);
 });
 
-adminServer.listen(8081, () =>
-  console.log("Panel admin: http://localhost:8081")
+adminServer.listen(ADMIN_PORT, () =>
+  console.log(`Panel admin: http://localhost:${ADMIN_PORT}`)
 );
 
 // ─────────────────────────────────────────────
@@ -93,8 +95,8 @@ const wss     = new WebSocket.Server({ server: gameHttpServer });
 const clients = new Map();
 const rooms   = {};
 
-gameHttpServer.listen(8080, () =>
-  console.log("Game:         http://localhost:8080")
+gameHttpServer.listen(PORT, () =>
+  console.log(`Game:         http://localhost:${PORT}`)
 );
 
 function createPlayer(id) {
