@@ -175,8 +175,14 @@ ship-commander/
 
 El juego es jugable y estable para sesiones locales y con amigos via túnel. Las áreas principales aún en desarrollo son:
 
-- [ ] Estadísticas persistentes entre sesiones
-- [ ] Servir el cliente desde el mismo proceso Node (sin necesidad de `file://`)
+- [ ] Mejor control de "fin de partida" y "reinicio"
+- [ ] Obligar a cambio de nombre mientras no haya uno guardado en localStorage
+- [ ] Añadir a la pantalla de lobby la lista de controles actuales para recordar al player como se juega etc
+- [ ] Automatizar el listado de rooms, que no haga falta el botón de "actualizar" en el lobby
+- [ ] Posibilidad de configurar las teclas de control del cliente
+- [ ] Controlar que solo puedas targetear/lockear al enemigo si lo ves en el radar. + Controlar disparos de misil/distancia
 - [ ] Reaparición en modo equipo
+- [ ] Añadir un "Leaderboard" de puntuación (con damge, kills, time, etc)
+- [ ] Añadir "ruido" además del "flare". Una habilidad que hace que no te puedan ver/targetear
+- [ ] Estadísticas persistentes entre sesiones
 - [ ] Más tipos de nave y personalización visual
-- [ ] Más variedad de mapas / configuraciones de asteroides

@@ -669,9 +669,8 @@ kbd {
 
 #chatContainer {
   position: absolute;
-  bottom: 60px;
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: 20px;
+  left: 10px;
   z-index: 300;
   width: min(480px, 80vw);
 }

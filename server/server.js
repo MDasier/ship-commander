@@ -5,9 +5,9 @@ const fs        = require("fs");
 const path      = require("path");
 const CFG       = require("./config");
 
-const WORLD_W = 3000;
-const WORLD_H = 3000;
-const FPS     = 30;
+const WORLD_W = 6000;
+const WORLD_H = 6000;
+const FPS     = 60;
 const PORT    = parseInt(process.env.PORT) || 8080;
 const ADMIN_PORT = PORT + 1;
 
@@ -154,9 +154,22 @@ function broadcastRoom(room, data) {
     if (ws && ws.readyState === 1) ws.send(payload);
   });
 }
+function createAsteroids(count = 40) {
+  const arr = [];
+
+  for (let i = 0; i < count; i++) {
+    arr.push({
+      x: Math.random() * WORLD_W,
+      y: Math.random() * WORLD_H,
+      r: 40 + Math.random() * 100
+    });
+  }
+  return arr;
+}
 
 function createRoom(ownerId) {
   const id = crypto.randomUUID();
+  const asteroids = createAsteroids();
   rooms[id] = {
     id,
     status: "waiting",
@@ -165,12 +178,7 @@ function createRoom(ownerId) {
     bullets: [],
     missiles: [],
     flare: [],
-    asteroids: [
-      { x: 1000, y: 900,  r: 80  },
-      { x: 1700, y: 1200, r: 120 },
-      { x: 2100, y: 1800, r: 60  },
-      { x: 1300, y: 2200, r: 100 }
-    ],
+    asteroids: asteroids,
     winner:  null,
     killFeed: [],
     timeLeft: 0
@@ -377,9 +385,15 @@ wss.on("connection", ws => {
 
     if (msg.type === "flare") {
       const room = rooms[player.roomId];
-      if (!room || player.flaredCooldown > 0) return;
-      room.flare = room.flare || [];
-      room.flare.push({ x: player.x, y: player.y, life: CFG.FLARE_LIFE, team: player.team });
+      if (!room || player.flaredCooldown > 0) return;    
+      room.flare = room.flare || [];    
+      room.flare.push({
+        id: Date.now() + Math.random(),
+        x: player.x,
+        y: player.y,
+        life: CFG.FLARE_LIFE,
+        team: player.team
+      });    
       player.flaredCooldown = CFG.FLARE_COOLDOWN;
     }
 
@@ -474,6 +488,7 @@ function steerMissile(m, tx, ty, maxTurn, thrust) {
 // ─────────────────────────────────────────────
 // Game loop
 // ─────────────────────────────────────────────
+
 function update() {
   Object.values(rooms).forEach(room => {
     if (room.status !== "playing") return;
@@ -516,28 +531,58 @@ function update() {
     // ── Asteroid collision
     Object.values(room.players).forEach(p => {
       if (p.dead) return;
+    
       for (const ast of room.asteroids) {
-        const dx   = p.x - ast.x;
-        const dy   = p.y - ast.y;
+    
+        const dx = p.x - ast.x;
+        const dy = p.y - ast.y;
         const dist = Math.hypot(dx, dy);
-        const min  = ast.r + 14;
-        if (dist < min) {
+    
+        const min = ast.r + 14;
+    
+        if (dist < min) {    
+          // ── normal de colisión
           const nx = dx / (dist || 1);
           const ny = dy / (dist || 1);
-          p.x  = ast.x + nx * min;
-          p.y  = ast.y + ny * min;
-          const impact = Math.hypot(p.vx, p.vy);
-          p.vx *= -0.4;
-          p.vy *= -0.4;
-          if (impact > CFG.ASTEROID_IMPACT_MIN) {
-            p.hp -= Math.floor(impact * CFG.ASTEROID_DAMAGE_FACTOR);
-            p.hitFlash = 8;
-            if (p.hp <= 0) {
-              p.hp   = 0;
-              p.dead = true;
-              p.deaths++;
-              room.shipsDestroyed = true;
-              pushKill(room, null, p, "asteroid");
+    
+          // ── corregir penetración (sacar fuera del asteroide)
+          const penetration = min - dist;
+          p.x += nx * penetration;
+          p.y += ny * penetration;
+    
+          // ── velocidad actual
+          const vx = p.vx;
+          const vy = p.vy;
+    
+          // ── velocidad en dirección de la normal (impacto real)
+          const dot = vx * nx + vy * ny;
+    
+          // ── solo si viene HACIA el asteroide
+          if (dot < 0) {    
+            const restitution = 0.35; // rebote (0 = absorbe, 1 = perfecto rebote)
+    
+            // ── rebote físico correcto
+            p.vx = vx - (1 + restitution) * dot * nx;
+            p.vy = vy - (1 + restitution) * dot * ny;
+    
+            // ── daño SOLO si supera velocidad mínima
+            const impactSpeed = -dot;
+    
+            if (impactSpeed > CFG.ASTEROID_IMPACT_MIN) {    
+              const damage =
+                (impactSpeed - CFG.ASTEROID_IMPACT_MIN) *
+                CFG.ASTEROID_DAMAGE_FACTOR;
+    
+              p.hp -= Math.floor(damage);
+              p.hitFlash = 8;
+    
+              if (p.hp <= 0) {
+                p.hp = 0;
+                p.dead = true;
+                p.deaths++;
+                room.shipsDestroyed = true;
+                pushKill(room, null, p, "asteroid");
+              }
             }
           }
         }
@@ -573,26 +618,57 @@ function update() {
 
     // ── Missiles
     room.missiles.forEach(m => {
-      const target = room.players[m.targetId];
+      const flares = room.flare || [];
+
+      // ¿Está siguiendo una flare?
+      const flareTarget = m.flareTarget
+        ? flares.find(f => f.id === m.flareTarget)
+        : null;
+
+      // ¿Está siguiendo un avión?
+      const target = m.targetId
+        ? room.players[m.targetId]
+        : null;
+
       if (target && !target.dead) {
         target.lockedByMissile = true;
         target.lockedOnMe++;
       }
 
-      const flares     = room.flare || [];
-      let   distracted = false;
-      for (const f of flares) {
-        if (Math.hypot(m.x - f.x, m.y - f.y) < CFG.FLARE_RADIUS) {
-          steerMissile(m, f.x, f.y, CFG.FLARE_TURN, CFG.FLARE_THRUST);
-          distracted = true;
-          break;
+      // Si todavía no fue engañado por una flare
+      if (!m.flareTarget) {
+        for (const f of flares) {
+          if (Math.hypot(m.x - f.x, m.y - f.y) < CFG.FLARE_RADIUS) {
+            // 90% de probabilidad de perder el lock
+            if (Math.random() < 0.9) {
+              m.flareTarget = f.id;
+              m.targetId = null;
+            }
+            break;
+          }
         }
       }
 
-      if (!distracted && target && !target.dead) {
-        steerMissile(m, target.x, target.y, CFG.MISSILE_TURN, CFG.MISSILE_THRUST);
+      // Persigue la flare
+      if (flareTarget) {
+        steerMissile(
+          m,
+          flareTarget.x,
+          flareTarget.y,
+          CFG.FLARE_TURN,
+          CFG.FLARE_THRUST
+        );
       }
-
+      // Persigue a la nave
+      else if (target && !target.dead) {
+        steerMissile(
+          m,
+          target.x,
+          target.y,
+          CFG.MISSILE_TURN,
+          CFG.MISSILE_THRUST
+        );
+      }
       m.x += m.vx;
       m.y += m.vy;
       m.life--;

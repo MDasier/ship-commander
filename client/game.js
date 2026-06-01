@@ -26,6 +26,16 @@ const SHIP_SHAPES = {
   },
 };
 
+const pingEffect = [];
+function triggerPingEffect(x, y) {
+  pingEffect.push({
+    x,
+    y,
+    start: performance.now(),
+    duration: 1200
+  });
+}
+
 function getShapeDef(type) {
   return SHIP_SHAPES[type] || SHIP_SHAPES.fighter;
 }
@@ -78,10 +88,8 @@ canvas.width = innerWidth;
 canvas.height = innerHeight;
 
 addEventListener("resize",()=>{
-
   canvas.width = innerWidth;
   canvas.height = innerHeight;
-
 });
 
 const _wsProto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -101,10 +109,11 @@ let asteroids = [];
 let targetId = null;
 let missiles = [];
 let flares = [];
+let scanUntil = 0;
 
 let world = {
-  width:3000,
-  height:3000
+  width:6000,
+  height:6000
 };
 
 let winner = null;
@@ -774,18 +783,33 @@ document.getElementById("shipCards").addEventListener("click", e => {
 drawShipPreviews();
 
 addEventListener("keydown",e=>{
+  const tag = document.activeElement?.tagName;
+
+  if (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    document.activeElement?.isContentEditable
+  ) {
+    return;
+  }
 
   const key = e.key.toLowerCase();
 
   keys[key] = true;
 
-  if(key==="e"){
+  if (key === "c") {
+    const me = getMe();  
+    if (me && !me.dead) {
+      scanUntil = performance.now() + 8000; // 8 segundos de "radar/ping"
+      triggerPingEffect(me.x, me.y);
+    }
+  }
 
+  if(key==="e" || key===" "){
     ws.send(JSON.stringify({
       type:"shoot"
     }));
     playShootSound();
-
   }
 
   if(e.key === "Tab"){
@@ -837,7 +861,15 @@ addEventListener("keydown",e=>{
 });
 
 addEventListener("keyup",e=>{
+  const tag = document.activeElement?.tagName;
 
+  if (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    document.activeElement?.isContentEditable
+  ) {
+    return;
+  }
   keys[e.key.toLowerCase()] = false;
 
   if(e.key === "Delete" && sdState === "charging") cancelSd();
@@ -863,21 +895,76 @@ function getMe(){
 }
 
 function worldToScreen(x,y,camX,camY){
-
   return {
-
     x:x-camX+canvas.width/2,
-
     y:y-camY+canvas.height/2
-
   };
-
 }
+//LIMITES Y GRID DEL MAPA
+function drawWorldBounds(camX, camY) {
+  const me = getMe();
+  if (!me) return;
 
+  const WARNING_DIST = 1000;
+
+  const leftDist   = me.x;
+  const rightDist  = 6000 - me.x;
+  const topDist    = me.y;
+  const bottomDist = 6000 - me.y;
+
+  const leftX   = worldToScreen(0, 0, camX, camY).x;
+  const rightX  = worldToScreen(6000, 0, camX, camY).x;
+  const topY    = worldToScreen(0, 0, camX, camY).y;
+  const bottomY = worldToScreen(0, 6000, camX, camY).y;
+
+  ctx.lineWidth = 4;
+
+  if (leftDist < WARNING_DIST) {
+    ctx.globalAlpha = 1 - leftDist / WARNING_DIST;
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#ff4444";
+    ctx.moveTo(leftX, 0);
+    ctx.lineTo(leftX, canvas.height);
+    ctx.stroke();
+  }
+
+  if (rightDist < WARNING_DIST) {
+    ctx.globalAlpha = 1 - rightDist / WARNING_DIST;
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#ff4444";
+    ctx.moveTo(rightX, 0);
+    ctx.lineTo(rightX, canvas.height);
+    ctx.stroke();
+  }
+
+  if (topDist < WARNING_DIST) {
+    ctx.globalAlpha = 1 - topDist / WARNING_DIST;
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#ff4444";
+    ctx.moveTo(0, topY);
+    ctx.lineTo(canvas.width, topY);
+    ctx.stroke();
+  }
+
+  if (bottomDist < WARNING_DIST) {
+    ctx.globalAlpha = 1 - bottomDist / WARNING_DIST;
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#ff4444";
+    ctx.moveTo(0, bottomY);
+    ctx.lineTo(canvas.width, bottomY);
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = 1;
+}
 function drawGrid(camX,camY){
-
+  return;
   ctx.strokeStyle = "#111";
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 0;
 
   const size = 100;
 
@@ -903,7 +990,76 @@ function drawGrid(camX,camY){
   }
 
 }
+//!EFECTO DE PING
+function drawpingEffect(camX, camY) {
+  const now = performance.now();
 
+  for(let i = pingEffect.length - 1; i >= 0; i--){
+    const emp = pingEffect[i];
+    const t =
+      (now - emp.start) /
+      emp.duration;
+
+    if(t >= 1){
+      pingEffect.splice(i, 1);
+      continue;
+    }
+
+    const pos = worldToScreen(
+      emp.x,
+      emp.y,
+      camX,
+      camY
+    );
+
+    const radius = t * 900;
+    const alpha = 1 - t;
+
+    ctx.save();
+
+    const gradient =
+      ctx.createRadialGradient(
+        pos.x,
+        pos.y,
+        Math.max(0, radius - 30),
+        pos.x,
+        pos.y,
+        radius
+      );
+
+    gradient.addColorStop(
+      0,
+      "rgba(0,255,255,0)"
+    );
+
+    gradient.addColorStop(
+      0.75,
+      `rgba(0,255,255,${alpha * 0.15})`
+    );
+
+    gradient.addColorStop(
+      1,
+      `rgba(0,255,255,${alpha})`
+    );
+
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 8;
+
+    ctx.beginPath();
+    ctx.arc(
+      pos.x,
+      pos.y,
+      radius,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+//ASTEROIDS
 function drawAsteroids(camX,camY){
 
   asteroids.forEach(a=>{
@@ -1092,6 +1248,8 @@ function drawBullets(camX,camY){
   });
 
 }
+
+
 //MISILES
 function cycleTarget(){
 
@@ -1191,52 +1349,133 @@ function updateUI() {
 
   readyBtn.disabled = uiState !== "inRoom";
 }
-function drawRadar(){
 
+//RADAR
+function drawRadar() {
+  const scanning = performance.now() < scanUntil;
   const size = 140;
 
   const x = canvas.width - 170;
   const y = canvas.height - 170;
+  const r = size / 2;
+
+  // Fondo radar
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fill();
+
+  // Pulsos
+  const pulse1 = (performance.now() * 0.015) % r;
+  const pulse2 = (pulse1 + r / 0.5) % r;
+
+  ctx.save();
 
   ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.clip();
 
-  ctx.arc(
-    x,
-    y,
-    size/2,
-    0,
-    Math.PI*2
-  );
+  drawRadarPulse(x, y, pulse1);
+  drawRadarPulse(x, y, pulse2);
 
-  ctx.strokeStyle="#555";
+  ctx.restore();
 
+  // Retícula radar
+  ctx.strokeStyle = "#333";
+  ctx.lineWidth = 1;
+
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.33, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.66, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(x - r, y);
+  ctx.lineTo(x + r, y);
+  ctx.moveTo(x, y - r);
+  ctx.lineTo(x, y + r);
+  ctx.stroke();
+
+  // Marco exterior
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.strokeStyle = "#555";
+  ctx.lineWidth = 2;
   ctx.stroke();
 
   const me = getMe();
 
   Object.values(players).forEach(p => {
-    // Enemies only appear on radar if within their radar signature
+
+    // Enemigos solo visibles dentro de su firma radar
     if (me && p.team !== me.team) {
       const dist = Math.hypot(p.x - me.x, p.y - me.y);
       if (dist > (p.radarSignature || 450)) return;
     }
 
-    const rx = x + ((p.x / world.width)  - 0.5) * size;
+    const rx = x + ((p.x / world.width) - 0.5) * size;
     const ry = y + ((p.y / world.height) - 0.5) * size;
 
-    // Bomber blip is larger, interceptor is smaller
-    const blipR = p.shipType === "bomber" ? 5 : p.shipType === "interceptor" ? 2.5 : 3.5;
+    const blipR =
+      p.shipType === "bomber" ? 5 :
+      p.shipType === "interceptor" ? 2.5 :
+      3.5;
 
     ctx.beginPath();
     ctx.arc(rx, ry, blipR, 0, Math.PI * 2);
-    ctx.fillStyle = p.dead ? "#555"
-      : p.id === myId    ? "#00ccff"
-      : p.team === "green" ? "#00ff88"
-      : "#ff3355";
+
+    ctx.fillStyle =
+      p.dead ? "#555" :
+      p.id === myId ? "#00ccff" :
+      p.team === "green" ? "#00ff88" :
+      "#ff3355";
+
     ctx.fill();
   });
+  if (scanning){
+    // ── Asteroids on radar
+    asteroids.forEach(a => {
 
+      const rx = x + (a.x / world.width - 0.5) * size;
+      const ry = y + (a.y / world.height - 0.5) * size;
+
+      ctx.beginPath();
+      ctx.arc(rx, ry, 1.5, 0, Math.PI * 2);
+
+      ctx.fillStyle = "#666";
+      ctx.fill();
+    });
+  }
+  
 }
+function drawRadarPulse(x, y, radius) {
+
+  const gradient = ctx.createRadialGradient(
+    x,
+    y,
+    Math.max(0, radius - 25),
+    x,
+    y,
+    radius + 25
+  );
+
+  gradient.addColorStop(0.00, "rgba(0,255,255,0)");
+  gradient.addColorStop(0.60, "rgba(0,255,255,0.02)");
+  gradient.addColorStop(0.80, "rgba(0,255,255,0.06)");
+  gradient.addColorStop(0.92, "rgba(0,255,255,0.12)");
+  gradient.addColorStop(1.00, "rgba(0, 255, 255, 0.4)");
+
+  ctx.strokeStyle = gradient;
+  ctx.lineWidth = 3;
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
 function drawWarningOverlay(me){
 
   if(!me || !me.lockedByMissile) return;
@@ -1335,8 +1574,8 @@ function updateHUD(me){
   
       ctx.fillText(
         "LOCK: " + (t.name || t.id.slice(0, 6)),
-        20,
-        120
+        40,
+        220
       );
   
     }
@@ -1393,6 +1632,7 @@ function loop(){
 
   if(me) drawWarningOverlay(me);
 
+  drawWorldBounds(camX, camY);
   drawGrid(camX, camY);
   drawAsteroids(camX, camY);
 
@@ -1403,6 +1643,8 @@ function loop(){
   drawBullets(camX, camY);
   drawMissiles(camX, camY);
   drawFlares(camX, camY);
+
+  drawpingEffect(camX, camY);
 
   drawRadar();
 
@@ -1441,7 +1683,7 @@ function loop(){
     ctx.font = "bold 52px 'Courier New', monospace";
     const resultText = winner === "draw"
       ? "⬡ EMPATE"
-      : "⬡ " + (winner === "green" ? "VICTORIA VERDE" : "VICTORIA ROJA");
+      : "⬡ " + (winner === "green" ? "VICTORIA EQUIPO VERDE" : "VICTORIA EQUIPO ROJO");
     ctx.fillText(resultText, cx, cy - 90);
 
     const sorted = Object.values(players).sort((a,b) => (b.kills||0) - (a.kills||0));
@@ -1555,22 +1797,61 @@ function loop(){
 
   // ── Chat log (bottom-left)
   const recentChat = chatLog.filter(m => now - m.ts < 7000);
+
   if(recentChat.length > 0){
     ctx.save();
     ctx.font = "12px 'Courier New', monospace";
     ctx.textAlign = "left";
+
     recentChat.forEach((m, i) => {
       const age   = now - m.ts;
       const alpha = age < 5000 ? 0.9 : 0.9 * (1 - (age - 5000) / 2000);
+
       ctx.globalAlpha = Math.max(0, alpha);
+
       const teamColor = m.team === "green" ? "#00ff88" : "#ff3355";
       const y = canvas.height - 70 - (recentChat.length - 1 - i) * 22;
+
       ctx.fillStyle = teamColor;
+
       const nameTag = "[" + m.name + "] ";
+
       ctx.fillText(nameTag, 20, y);
+
       ctx.fillStyle = "#ccc";
-      ctx.fillText(m.text, 20 + ctx.measureText(nameTag).width, y);
+
+      ctx.fillText(
+        m.text,
+        20 + ctx.measureText(nameTag).width,
+        y
+      );
     });
+
+    ctx.restore();
+  }
+  // ── Chat indicator
+  if (chatLog.length > 0) {
+
+    ctx.save();
+
+    const pulse =
+      0.5 + Math.sin(performance.now() * 0.005) * 0.4;
+
+    ctx.globalAlpha =
+      recentChat.length === 0
+        ? pulse
+        : 0.7;
+
+    ctx.font = "11px 'Courier New', monospace";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#00ccff";
+
+    ctx.fillText(
+      "[T] Chat",
+      20,
+      canvas.height - 30
+    );
+
     ctx.restore();
   }
 

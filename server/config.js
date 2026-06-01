@@ -15,16 +15,16 @@ const DEFAULTS = {
   DRAG:           0.99,
 
   // ── Balas
-  BULLET_SPEED:    12,
+  BULLET_SPEED:    10,
   BULLET_COOLDOWN: 5,
-  BULLET_DAMAGE:   25,
+  BULLET_DAMAGE:   15,
   BULLET_RADIUS:   15,
 
   // ── Misiles
   MISSILE_SPEED_INIT: 8,
-  MISSILE_SPEED_MAX:  16,
+  MISSILE_SPEED_MAX:  12,
   MISSILE_COOLDOWN:   150,
-  MISSILE_LIFE:       300,
+  MISSILE_LIFE:       100,
   MISSILE_TURN:       0.18,
   MISSILE_THRUST:     0.6,
   MISSILE_DAMAGE:     40,
@@ -33,8 +33,8 @@ const DEFAULTS = {
 
   // ── Bengalas
   FLARE_LIFE:     90,
-  FLARE_COOLDOWN: 460,
-  FLARE_RADIUS:   160,
+  FLARE_COOLDOWN: 100,
+  FLARE_RADIUS:   200,
   FLARE_TURN:     0.20,
   FLARE_THRUST:   0.6,
 
@@ -50,36 +50,36 @@ const DEFAULTS = {
   SHIP_TYPES: {
     interceptor: {
       label:            "Interceptor",
-      maxHp:            70,
+      maxHp:            50,
       thrustMult:       1.55,
       turnMult:         1.65,
       dragVal:          0.985,
       fuelRegenMult:    1.7,
       maxMissiles:      3,
       missileCooldown:  110,
-      radarSignature:   220,
+      radarSignature:   700,
     },
     fighter: {
       label:            "Caza",
-      maxHp:            100,
+      maxHp:            120,
       thrustMult:       1.0,
       turnMult:         1.0,
       dragVal:          null,   // usa CFG.DRAG
       fuelRegenMult:    1.0,
       maxMissiles:      6,
       missileCooldown:  150,
-      radarSignature:   450,
+      radarSignature:   1000,
     },
     bomber: {
       label:            "Bombardero",
-      maxHp:            160,
+      maxHp:            300,
       thrustMult:       0.60,
       turnMult:         0.55,
       dragVal:          0.996,
       fuelRegenMult:    0.55,
       maxMissiles:      12,
       missileCooldown:  85,
-      radarSignature:   700,
+      radarSignature:   2000,
     },
   },
 };
