@@ -1,6 +1,79 @@
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
+// ── Ship geometry definitions ──────────────────
+const SHIP_SHAPES = {
+  interceptor: {
+    // Long needle: elongated body, small swept wings at rear
+    body:   [[22,0],[4,-4],[-2,-9],[-12,-4],[-12,4],[-2,9],[4,4]],
+    engine: [[-12,-3],[-20,0],[-12,3]],
+    hpBarW: 30,
+    uiOffY: -20,   // vertical offset for HP bar above ship center
+  },
+  fighter: {
+    // Classic delta wing
+    body:   [[18,0],[-4,-14],[-10,-8],[-8,0],[-10,8],[-4,14]],
+    engine: [[-10,-5],[-18,0],[-10,5]],
+    hpBarW: 40,
+    uiOffY: -28,
+  },
+  bomber: {
+    // Wide flying wing (B-2 style) — very wide, short nose
+    body:   [[14,0],[4,-22],[-4,-26],[-12,-10],[-14,0],[-12,10],[-4,26],[4,22]],
+    engine: [[-14,-7],[-23,0],[-14,7]],
+    hpBarW: 56,
+    uiOffY: -40,
+  },
+};
+
+function getShapeDef(type) {
+  return SHIP_SHAPES[type] || SHIP_SHAPES.fighter;
+}
+
+// Draw a ship polygon path (no fill/stroke — caller does that)
+function buildShipPath(c, type) {
+  const pts = getShapeDef(type).body;
+  c.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
+  c.closePath();
+}
+
+// Draw preview silhouettes into the selector canvases
+function drawShipPreviews() {
+  for (const [type, shape] of Object.entries(SHIP_SHAPES)) {
+    const el = document.getElementById("prev-" + type);
+    if (!el) continue;
+    const pc = el.getContext("2d");
+    const w = el.width, h = el.height;
+    pc.clearRect(0, 0, w, h);
+    pc.save();
+    pc.translate(w / 2, h / 2);
+
+    // For the bomber (very tall), rotate 90° so it fits horizontally
+    if (type === "bomber") pc.rotate(-Math.PI / 2);
+
+    pc.beginPath();
+    buildShipPath(pc, type);
+    pc.fillStyle = "#00ccff55";
+    pc.strokeStyle = "#00ccff";
+    pc.lineWidth = 1.5;
+    pc.fill();
+    pc.stroke();
+
+    // Engine glow mark
+    const eng = shape.engine;
+    pc.beginPath();
+    pc.moveTo(eng[0][0], eng[0][1]);
+    pc.lineTo(eng[1][0], eng[1][1]);
+    pc.lineTo(eng[2][0], eng[2][1]);
+    pc.strokeStyle = "#00aaff88";
+    pc.lineWidth = 1;
+    pc.stroke();
+
+    pc.restore();
+  }
+}
+
 canvas.width = innerWidth;
 canvas.height = innerHeight;
 
@@ -97,6 +170,53 @@ function closeMobiglass() {
 function updateMobiPane(tab) {
   if(tab === "piloto")  updateMobiPiloto();
   if(tab === "partida") updateMobiPartida();
+  if(tab === "ajustes") initAjustesPane();
+}
+
+// ── AJUSTES pane ──────────────────────────────
+let ajustesReady = false;
+
+function initAjustesPane(){
+  if(ajustesReady) return;
+  ajustesReady = true;
+
+  const masterSlider = document.getElementById("volMaster");
+  const masterVal    = document.getElementById("volMasterVal");
+  const musicSlider  = document.getElementById("volMusic");
+  const musicVal     = document.getElementById("volMusicVal");
+
+  const savedMaster = parseFloat(localStorage.getItem("vol_master") ?? "0.8");
+  const savedMusic  = parseFloat(localStorage.getItem("vol_music")  ?? "0.5");
+
+  masterSlider.value = savedMaster;
+  masterVal.textContent = Math.round(savedMaster * 100) + "%";
+  musicSlider.value  = savedMusic;
+  musicVal.textContent  = Math.round(savedMusic  * 100) + "%";
+
+  masterSlider.addEventListener("input", () => {
+    const v = parseFloat(masterSlider.value);
+    masterVal.textContent = Math.round(v * 100) + "%";
+    setMasterVolume(v);
+    localStorage.setItem("vol_master", v);
+  });
+
+  musicSlider.addEventListener("input", () => {
+    const v = parseFloat(musicSlider.value);
+    musicVal.textContent = Math.round(v * 100) + "%";
+    setMusicVolume(v);
+    localStorage.setItem("vol_music", v);
+  });
+
+  document.getElementById("openAdminBtn").addEventListener("click", () => {
+    window.open("http://" + location.hostname + ":8081", "_blank");
+  });
+}
+
+function applyStoredVolumes(){
+  const master = parseFloat(localStorage.getItem("vol_master") ?? "0.8");
+  const music  = parseFloat(localStorage.getItem("vol_music")  ?? "0.5");
+  setMasterVolume(master);
+  setMusicVolume(music);
 }
 
 function updateMobiglass() {
@@ -357,6 +477,7 @@ nameInput.addEventListener("keydown", e => {
 
 document.getElementById("createRoom").onclick = ()=>{
   initAudio();
+  applyStoredVolumes();
   ws.send(JSON.stringify({
     type:"createRoom"
   }));
@@ -485,6 +606,7 @@ ws.onmessage = e=>{
     world    = data.world    || world;
     winner   = data.winner;
     killFeed = data.killFeed || [];
+    updateTimer(data.timeLeft);
   }
 
 };
@@ -514,6 +636,8 @@ function renderRooms(list){
 
     if(!playing){
       div.querySelector("button").onclick = () => {
+        initAudio();
+        applyStoredVolumes();
         ws.send(JSON.stringify({ type: "joinRoom", roomId: room.id }));
       };
     }
@@ -523,33 +647,54 @@ function renderRooms(list){
   });
 
 }
-function renderPlayers(){
+const SHIP_LABELS = { interceptor: "INT", fighter: "CAZA", bomber: "BMB" };
 
-  if(!roomData) return;
+function renderPlayers() {
+  if (!roomData) return;
 
   playersDiv.innerHTML = "";
 
   Object.values(roomData.players).forEach(player => {
-
     const div = document.createElement("div");
     div.className = "playerRow" + (player.id === myId ? " me" : "");
 
-    const team = player.team || "none";
-    const youTag = player.id === myId ? '<span class="you">(tú)</span>' : "";
+    const team       = player.team || "none";
+    const youTag     = player.id === myId ? '<span class="you">(tú)</span>' : "";
     const readyClass = player.ready ? "ready" : "";
-    const readyText = player.ready ? "LISTO" : "ESPERA";
+    const readyText  = player.ready ? "LISTO" : "ESPERA";
+    const shipLabel  = SHIP_LABELS[player.shipType] || "CAZA";
 
     div.innerHTML = `
       <span class="teamDot ${team}"></span>
       <span class="playerName">${player.name || "Pilot"}${youTag}</span>
+      <span class="playerShipTag">${shipLabel}</span>
       <span class="playerReady ${readyClass}">${readyText}</span>
     `;
 
     playersDiv.appendChild(div);
-
   });
 
+  // Sync ship selector highlight with this player's current choice
+  const myPlayer = roomData.players[myId];
+  if (myPlayer) syncShipSelector(myPlayer.shipType || "fighter");
 }
+
+function syncShipSelector(type) {
+  document.querySelectorAll(".shipCard").forEach(card => {
+    card.classList.toggle("selected", card.dataset.type === type);
+  });
+}
+
+// Ship card clicks → send to server
+document.getElementById("shipCards").addEventListener("click", e => {
+  const card = e.target.closest(".shipCard");
+  if (!card) return;
+  ws.send(JSON.stringify({ type: "selectShip", shipType: card.dataset.type }));
+  syncShipSelector(card.dataset.type);
+});
+
+// Draw preview silhouettes once
+drawShipPreviews();
 
 addEventListener("keydown",e=>{
 
@@ -715,139 +860,93 @@ function drawAsteroids(camX,camY){
 
 }
 
-function drawShip(player,camX,camY){
+function drawShip(player, camX, camY) {
+  const pos   = worldToScreen(player.x, player.y, camX, camY);
+  const shape = getShapeDef(player.shipType);
+  const eng   = shape.engine;
+  const maxHp = player.maxHp || 100;
 
-  const pos = worldToScreen(
-    player.x,
-    player.y,
-    camX,
-    camY
-  );
+  // ── Detection check for HUD elements ──────────
+  const me = getMe();
+  const isEnemy  = me && player.team !== me.team;
+  const dist     = me ? Math.hypot(player.x - me.x, player.y - me.y) : 0;
+  const detected = !isEnemy || dist <= (player.radarSignature || 450);
 
+  // ── Ship body ──────────────────────────────────
   ctx.save();
-
-  ctx.translate(
-    pos.x,
-    pos.y
-  );
-
-  ctx.rotate(
-    player.angle
-  );
+  ctx.translate(pos.x, pos.y);
+  ctx.rotate(player.angle);
 
   ctx.beginPath();
+  buildShipPath(ctx, player.shipType);
 
-  ctx.moveTo(18,0);
-  ctx.lineTo(-12,-10);
-  ctx.lineTo(-8,0);
-  ctx.lineTo(-12,10);
-
-  ctx.closePath();
-
-  if(player.dead){
-
-    ctx.fillStyle="#666";
-
-  }else{
-
-    ctx.fillStyle=
-      player.team==="green"
-      ? "#00ff88"
-      : "#ff3355";
-
+  if (player.dead) {
+    ctx.fillStyle = "#444";
+  } else {
+    ctx.fillStyle = player.team === "green" ? "#00ff88" : "#ff3355";
   }
-
   ctx.fill();
 
-  // Hit flash overlay
-  if(player.hitFlash > 0){
+  // Hit-flash white overlay
+  if (player.hitFlash > 0) {
     ctx.save();
     ctx.globalAlpha = (player.hitFlash / 8) * 0.85;
     ctx.beginPath();
-    ctx.moveTo(18,0);
-    ctx.lineTo(-12,-10);
-    ctx.lineTo(-8,0);
-    ctx.lineTo(-12,10);
-    ctx.closePath();
+    buildShipPath(ctx, player.shipType);
     ctx.fillStyle = "white";
     ctx.fill();
     ctx.restore();
   }
 
-  if(!player.dead){
-
+  // Engine glow (only when alive)
+  if (!player.dead) {
     ctx.beginPath();
-
-    ctx.moveTo(-12,-5);
-    ctx.lineTo(-20,0);
-    ctx.lineTo(-12,5);
-
-    ctx.strokeStyle="#00aaff";
-
+    ctx.moveTo(eng[0][0], eng[0][1]);
+    ctx.lineTo(eng[1][0], eng[1][1]);
+    ctx.lineTo(eng[2][0], eng[2][1]);
+    ctx.strokeStyle = "#00aaff";
+    ctx.lineWidth   = 1.5;
     ctx.stroke();
-
   }
 
   ctx.restore();
 
-  const hpWidth = 40;
+  // ── HUD elements (only if detected) ───────────
+  if (!player.dead && detected) {
+    const hw  = shape.hpBarW;
+    const offY = shape.uiOffY;   // negative = above ship
 
-  ctx.fillStyle="#222";
+    // HP bar background
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(pos.x - hw / 2, pos.y + offY, hw, 4);
+    // HP bar fill — color shifts red as HP drops
+    const hpFrac = player.hp / maxHp;
+    ctx.fillStyle = hpFrac > 0.5 ? "#00ff88" : hpFrac > 0.25 ? "#ffaa00" : "#ff3355";
+    ctx.fillRect(pos.x - hw / 2, pos.y + offY, hw * hpFrac, 4);
 
-  ctx.fillRect(
-    pos.x-20,
-    pos.y-30,
-    hpWidth,
-    4
-  );
+    // Fuel bar
+    ctx.fillStyle = "#00aaff44";
+    ctx.fillRect(pos.x - hw / 2, pos.y + offY + 6, hw, 3);
+    ctx.fillStyle = "#00aaff";
+    ctx.fillRect(pos.x - hw / 2, pos.y + offY + 6, hw * (player.fuel / 100), 3);
 
-  ctx.fillStyle="#00ff00";
-
-  ctx.fillRect(
-    pos.x-20,
-    pos.y-30,
-    hpWidth*(player.hp/100),
-    4
-  );
-
-  ctx.fillStyle="#00aaff";
-
-  ctx.fillRect(
-    pos.x-20,
-    pos.y-24,
-    hpWidth*(player.fuel/100),
-    3
-  );
-
-  if(!player.dead){
+    // Callsign
     ctx.save();
     ctx.fillStyle = player.id === myId ? "#00ccff" : "rgba(255,255,255,0.6)";
-    ctx.font = "11px 'Courier New', monospace";
+    ctx.font      = "11px 'Courier New', monospace";
     ctx.textAlign = "center";
-    ctx.fillText(player.name || "Pilot", pos.x, pos.y - 36);
+    ctx.fillText(player.name || "Pilot", pos.x, pos.y + offY - 6);
     ctx.restore();
   }
 
-  if(player.id===targetId){
-
+  // ── Target lock ring (always visible if targeted) ──
+  if (player.id === targetId) {
     ctx.beginPath();
-  
-    ctx.arc(
-      pos.x,
-      pos.y,
-      25,
-      0,
-      Math.PI*2
-    );
-  
-    ctx.strokeStyle="#ffff00";
-  
-    ctx.lineWidth=2;
-  
+    ctx.arc(pos.x, pos.y, 28, 0, Math.PI * 2);
+    ctx.strokeStyle = "#ffff00";
+    ctx.lineWidth   = 2;
     ctx.stroke();
-  
   }
-
 }
 
 function drawVelocityVector(player,camX,camY){
@@ -1036,39 +1135,28 @@ function drawRadar(){
 
   ctx.stroke();
 
-  Object.values(players).forEach(p=>{
+  const me = getMe();
 
-    const rx =
-      x + ((p.x/world.width)-0.5)*size;
-
-    const ry =
-      y + ((p.y/world.height)-0.5)*size;
-
-    ctx.beginPath();
-
-    ctx.arc(
-      rx,
-      ry,
-      4,
-      0,
-      Math.PI*2
-    );
-
-    if(p.dead){
-
-      ctx.fillStyle="#555";
-
-    }else{
-
-      ctx.fillStyle=
-        p.team==="green"
-        ? "#00ff88"
-        : "#ff3355";
-
+  Object.values(players).forEach(p => {
+    // Enemies only appear on radar if within their radar signature
+    if (me && p.team !== me.team) {
+      const dist = Math.hypot(p.x - me.x, p.y - me.y);
+      if (dist > (p.radarSignature || 450)) return;
     }
 
-    ctx.fill();
+    const rx = x + ((p.x / world.width)  - 0.5) * size;
+    const ry = y + ((p.y / world.height) - 0.5) * size;
 
+    // Bomber blip is larger, interceptor is smaller
+    const blipR = p.shipType === "bomber" ? 5 : p.shipType === "interceptor" ? 2.5 : 3.5;
+
+    ctx.beginPath();
+    ctx.arc(rx, ry, blipR, 0, Math.PI * 2);
+    ctx.fillStyle = p.dead ? "#555"
+      : p.id === myId    ? "#00ccff"
+      : p.team === "green" ? "#00ff88"
+      : "#ff3355";
+    ctx.fill();
   });
 
 }
@@ -1121,6 +1209,16 @@ function drawWarningOverlay(me){
 
   ctx.restore();
 }
+const timerEl = document.getElementById("timer");
+function updateTimer(secs){
+  if(secs == null){ timerEl.textContent = "--:--"; return; }
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  timerEl.textContent = String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+  timerEl.classList.toggle("warning", secs <= 60 && secs > 15);
+  timerEl.classList.toggle("danger",  secs <= 15);
+}
+
 function updateHUD(me){
 
   document.getElementById("hp").textContent =
@@ -1260,9 +1358,12 @@ function loop(){
     const cy = canvas.height / 2;
     ctx.textAlign = "center";
 
-    ctx.fillStyle = winner === "green" ? "#00ff88" : "#ff3355";
+    ctx.fillStyle = winner === "draw" ? "#ffcc00" : winner === "green" ? "#00ff88" : "#ff3355";
     ctx.font = "bold 52px 'Courier New', monospace";
-    ctx.fillText("VICTORIA " + winner.toUpperCase(), cx, cy - 90);
+    const resultText = winner === "draw"
+      ? "⬡ EMPATE"
+      : "⬡ " + (winner === "green" ? "VICTORIA VERDE" : "VICTORIA ROJA");
+    ctx.fillText(resultText, cx, cy - 90);
 
     const sorted = Object.values(players).sort((a,b) => (b.kills||0) - (a.kills||0));
 

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Ship Commander · Admin</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080c18;color:#c8d8f0;font-family:'Courier New',monospace;padding:28px 36px;max-width:780px}
+h1{color:#00d4ff;font-size:1.25em;letter-spacing:3px;margin-bottom:24px;border-bottom:1px solid #00d4ff33;padding-bottom:10px}
+h1 span{color:#334;font-size:.7em;margin-left:8px}
+.group{margin-bottom:28px}
+.group h2{color:#00d4ffaa;font-size:.7em;letter-spacing:4px;text-transform:uppercase;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid #1a2540}
+.field{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.field label{width:240px;font-size:.8em;color:#7a8cb0}
+.field input{background:#0d1526;border:1px solid #1e2d4a;color:#c8d8f0;padding:4px 10px;width:110px;font-family:inherit;font-size:.85em;border-radius:2px}
+.field input:focus{outline:none;border-color:#00d4ff55;background:#0f1a30}
+.field .unit{color:#3a4a6a;font-size:.72em;width:90px}
+.actions{margin-top:20px;display:flex;gap:12px;align-items:center}
+button{background:#00d4ff15;border:1px solid #00d4ff55;color:#00d4ff;padding:9px 24px;cursor:pointer;font-family:inherit;font-size:.85em;letter-spacing:1px;border-radius:2px;transition:.15s}
+button:hover{background:#00d4ff30;border-color:#00d4ff}
+button.secondary{border-color:#334;color:#556;background:transparent}
+button.secondary:hover{color:#c8d8f0;border-color:#556}
+#status{font-size:.82em;height:1.2em;transition:.3s}
+.ok{color:#00ff88}.err{color:#ff3355}
+</style>
+</head>
+<body>
+<h1>◈ SHIP COMMANDER <span>— PANEL ADMIN</span></h1>
+<div id="fields"></div>
+<div class="actions">
+  <button id="save">GUARDAR</button>
+  <button class="secondary" id="reset">Resetear defaults</button>
+  <div id="status"></div>
+</div>
+
+<script>
+const GROUPS = [
+  ["Partida", {
+    GAME_DURATION_S: ["Duración de partida", "segundos"],
+  }],
+  ["Física de nave", {
+    TURN_RATE:      ["Velocidad de giro",   "rad/tick"],
+    THRUST:         ["Empuje adelante",      "px/tick²"],
+    THRUST_FUEL:    ["Consumo empuje",       "/tick"],
+    REVERSE_THRUST: ["Empuje retroceso",     "px/tick²"],
+    REVERSE_FUEL:   ["Consumo retroceso",    "/tick"],
+    FUEL_REGEN:     ["Regeneración fuel",    "/tick"],
+    DRAG:           ["Resistencia (drag)",   "0-1"],
+  }],
+  ["Balas", {
+    BULLET_SPEED:    ["Velocidad",           "px/tick"],
+    BULLET_COOLDOWN: ["Cooldown",            "ticks"],
+    BULLET_DAMAGE:   ["Daño",               "HP"],
+    BULLET_RADIUS:   ["Radio de impacto",    "px"],
+  }],
+  ["Misiles", {
+    MISSILE_SPEED_INIT: ["Velocidad inicial",        "px/tick"],
+    MISSILE_SPEED_MAX:  ["Velocidad máxima",          "px/tick"],
+    MISSILE_COOLDOWN:   ["Cooldown",                  "ticks"],
+    MISSILE_LIFE:       ["Duración (vida)",            "ticks"],
+    MISSILE_TURN:       ["Giro máximo/tick",           "rad/tick"],
+    MISSILE_THRUST:     ["Aceleración",               "px/tick²"],
+    MISSILE_DAMAGE:     ["Daño",                      "HP"],
+    MISSILE_RADIUS:     ["Radio de impacto",           "px"],
+    MISSILE_MAX_ACTIVE: ["Máx misiles simultáneos",   ""],
+  }],
+  ["Bengalas", {
+    FLARE_LIFE:     ["Duración",                "ticks"],
+    FLARE_COOLDOWN: ["Cooldown",                "ticks"],
+    FLARE_RADIUS:   ["Radio de atracción",      "px"],
+    FLARE_TURN:     ["Giro misil distraído",    "rad/tick"],
+    FLARE_THRUST:   ["Empuje misil distraído",  "px/tick²"],
+  }],
+  ["Asteroides", {
+    ASTEROID_IMPACT_MIN:    ["Velocidad mínima de daño", "px/tick"],
+    ASTEROID_DAMAGE_FACTOR: ["Factor de daño",           "×"],
+  }],
+  ["Audio", {
+    VOL_MASTER: ["Volumen master",  "0.0 – 1.0"],
+    VOL_MUSIC:  ["Volumen música",  "0.0 – 1.0"],
+  }],
+];
+
+let cfg = {};
+
+async function load() {
+  try {
+    cfg = await fetch("/config").then(r => r.json());
+    render();
+  } catch (e) {
+    status("err", "Error al cargar la configuración");
+  }
+}
+
+function render() {
+  const wrap = document.getElementById("fields");
+  wrap.innerHTML = "";
+  for (const [groupName, fields] of GROUPS) {
+    const g = document.createElement("div");
+    g.className = "group";
+    g.innerHTML = `<h2>${groupName}</h2>`;
+    for (const [key, [label, unit]] of Object.entries(fields)) {
+      const d = document.createElement("div");
+      d.className = "field";
+      d.innerHTML = `
+        <label>${label}</label>
+        <input type="number" id="f_${key}" step="any" value="${cfg[key] ?? ""}">
+        <span class="unit">${unit}</span>`;
+      g.appendChild(d);
+    }
+    wrap.appendChild(g);
+  }
+}
+
+function collectValues() {
+  const updates = {};
+  for (const [, fields] of GROUPS) {
+    for (const key of Object.keys(fields)) {
+      const el = document.getElementById("f_" + key);
+      if (el) updates[key] = parseFloat(el.value);
+    }
+  }
+  return updates;
+}
+
+async function post(data) {
+  const r = await fetch("/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) throw new Error();
+}
+
+function status(type, msg) {
+  const el = document.getElementById("status");
+  el.innerHTML = `<span class="${type}">${msg}</span>`;
+  setTimeout(() => el.innerHTML = "", 3000);
+}
+
+document.getElementById("save").addEventListener("click", async () => {
+  try {
+    await post(collectValues());
+    status("ok", "✓ Guardado correctamente");
+  } catch (e) {
+    status("err", "✗ Error al guardar");
+  }
+});
+
+document.getElementById("reset").addEventListener("click", async () => {
+  if (!confirm("¿Resetear todos los valores a los defaults?")) return;
+  try {
+    await post({ __reset: true });
+    cfg = await fetch("/config").then(r => r.json());
+    render();
+    status("ok", "✓ Valores reseteados");
+  } catch (e) {
+    status("err", "✗ Error");
+  }
+});
+
+load();
+</script>
+</body>
+</html>

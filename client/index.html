@@ -42,6 +42,50 @@
 
       <div id="players"></div>
 
+      <!-- ── SELECTOR DE NAVE ── -->
+      <div id="shipSelector">
+        <div class="selectorLabel">NAVE DE COMBATE</div>
+        <div id="shipCards">
+
+          <button class="shipCard" data-type="interceptor">
+            <canvas class="shipPreview" id="prev-interceptor" width="90" height="54"></canvas>
+            <div class="shipCardName">INTERCEPTOR</div>
+            <div class="shipCardStats">
+              <div class="sc-stat sc-hp">♥ 70</div>
+              <div class="sc-stat sc-spd">⚡ +++</div>
+              <div class="sc-stat sc-msl">⬥ 3</div>
+              <div class="sc-stat sc-radar">◎ −−</div>
+            </div>
+            <div class="shipCardDesc">Muy rápido · Poco armado · Difícil de detectar</div>
+          </button>
+
+          <button class="shipCard selected" data-type="fighter">
+            <canvas class="shipPreview" id="prev-fighter" width="90" height="54"></canvas>
+            <div class="shipCardName">CAZA</div>
+            <div class="shipCardStats">
+              <div class="sc-stat sc-hp">♥ 100</div>
+              <div class="sc-stat sc-spd">⚡ ++</div>
+              <div class="sc-stat sc-msl">⬥ 6</div>
+              <div class="sc-stat sc-radar">◎ −</div>
+            </div>
+            <div class="shipCardDesc">Equilibrado · Polivalente</div>
+          </button>
+
+          <button class="shipCard" data-type="bomber">
+            <canvas class="shipPreview" id="prev-bomber" width="90" height="54"></canvas>
+            <div class="shipCardName">BOMBARDERO</div>
+            <div class="shipCardStats">
+              <div class="sc-stat sc-hp">♥ 160</div>
+              <div class="sc-stat sc-spd">⚡ +</div>
+              <div class="sc-stat sc-msl">⬥ 12</div>
+              <div class="sc-stat sc-radar">◎ +++</div>
+            </div>
+            <div class="shipCardDesc">Muy resistente · Lento · Fácil de detectar</div>
+          </button>
+
+        </div>
+      </div>
+
       <div id="roomActions">
         <button id="ready" disabled>READY</button>
         <button id="switchTeam">Cambiar equipo</button>
@@ -62,6 +106,10 @@
       <div>Speed: <span id="speed">0</span></div>
       <div>K/D: <span id="kd">0/0</span></div>
       <div>MSL: <span id="mslCd">LISTO</span></div>
+    </div>
+
+    <div id="topCenter">
+      <div id="timer">--:--</div>
     </div>
 
     <div id="topRight">
@@ -117,6 +165,27 @@
           </table>
         </div>
 
+        <div class="mobiPane hidden" id="pane-ajustes">
+          <div class="mobiSettingsSection">
+            <div class="mobiSettingsLabel">VOLUMEN MASTER</div>
+            <div class="mobiSettingsRow">
+              <input type="range" id="volMaster" min="0" max="1" step="0.05" value="0.8">
+              <span id="volMasterVal">80%</span>
+            </div>
+            <div class="mobiSettingsLabel">VOLUMEN MÚSICA</div>
+            <div class="mobiSettingsRow">
+              <input type="range" id="volMusic" min="0" max="1" step="0.05" value="0.5">
+              <span id="volMusicVal">50%</span>
+            </div>
+          </div>
+          <div class="mobiSettingsDivider"></div>
+          <div class="mobiSettingsSection">
+            <div class="mobiSettingsLabel">CONFIGURACIÓN AVANZADA</div>
+            <div class="mobiSettingsHint">Velocidades, daño, cooldowns y más parámetros de partida.</div>
+            <button id="openAdminBtn" class="mobiAdminBtn">⬡ Abrir panel admin</button>
+          </div>
+        </div>
+
       </div>
 
       <!-- Barra de tabs inferior (estilo SC) -->
@@ -132,6 +201,10 @@
         <button class="mobiTab" data-pane="controles">
           <span class="tabIcon">▦</span>
           <span class="tabLabel">CONTROLES</span>
+        </button>
+        <button class="mobiTab" data-pane="ajustes">
+          <span class="tabIcon">◎</span>
+          <span class="tabLabel">AJUSTES</span>
         </button>
       </div>
 

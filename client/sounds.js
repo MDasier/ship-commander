@@ -199,3 +199,11 @@ function resetAudio() {
   warningActive = false;
   if (warningTimer) { clearTimeout(warningTimer); warningTimer = null; }
 }
+
+function setMasterVolume(v) {
+  if (masterGain) masterGain.gain.value = Math.max(0, Math.min(1, v));
+}
+
+function setMusicVolume(v) {
+  if (musicGain) musicGain.gain.value = Math.max(0, Math.min(1, v * 0.4));
+}
