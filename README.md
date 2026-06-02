@@ -28,9 +28,10 @@ Combate espacial en tiempo real, en equipo, que funciona completamente en el nav
 
 | Nave | HP | Velocidad | Giro | Misiles | Firma radar |
 |---|---|---|---|---|---|
-| **Interceptor** | 70 | +55% | +65% | 3 | Muy baja (220 u) |
-| **Caza** | 100 | base | base | 6 | Normal (450 u) |
-| **Bombardero** | 160 | −40% | −45% | 12 | Alta (700 u) |
+| **Interceptor** | 70 | +55% | +65% | 3 | Muy baja (700 u) |
+| **Caza** | 100 | base | base | 6 | Normal (1000 u) |
+| **Bombardero** | 160 | −40% | −45% | 12 | Alta (2000 u) |
+| **Tornado** | X | X | X | X | X |
 
 La **firma radar** determina a qué distancia los enemigos pueden verte en el radar y en el HUD. El Interceptor es casi invisible hasta que te tiene encima; el Bombardero se detecta desde lejos.
 
@@ -113,16 +114,6 @@ Abre varias pestañas para probar el multijugador en local.
 
 Abre `http://localhost:8081` para acceder al panel admin y modificar cualquier variable de juego en tiempo real. Los cambios se guardan en `server/config.json`.
 
-### Jugar con amigos (rápido)
-
-Usa [ngrok](https://ngrok.com) para exponer tu servidor local:
-
-```bash
-ngrok http 8080
-```
-
-Comparte la URL pública de ngrok con tus amigos. El cliente se conecta automáticamente al servidor correcto — no hay que cambiar ningún archivo.
-
 ---
 
 ## Controles
@@ -131,10 +122,11 @@ Comparte la URL pública de ngrok con tus amigos. El cliente se conecta automát
 |---|---|
 | `W` | Empuje adelante |
 | `S` | Empuje atrás (más lento) |
-| `A` / `D` | Rotar |
-| `E` | Disparar cañón |
+| `Mouse` | Apuntar / Girar nave |
+| `A` / `D` | Strafe |
+| `Clic izq.` | Disparar cañón |
+| `Clic der.` | Lockear objetivo |
 | `Q` | Lanzar misil (requiere objetivo) |
-| `Tab` | Cambiar objetivo (o cambiar vista en modo espectador) |
 | `F` | Lanzar bengala (contramedida anti-misil) |
 | `T` | Abrir chat |
 | `Supr` | Autodestrucción (mantener 2 s → cuenta atrás 5 s · Supr cancela) |
