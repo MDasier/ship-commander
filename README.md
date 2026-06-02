@@ -176,6 +176,7 @@ El juego es jugable y estable para sesiones locales y con amigos via túnel. Las
 - [ ] Ahora que tenemos una nave para 2 personas, deberíamos hacer una nave aún más grande con 1 piloto y 3 torretas. (Controlar equipos proporcionales).
 - [ ] Si es posible, cuando pulsamos la "c" y activamos el ping, además de ver los asteroides durante 8 segundos, deberíamos ver los enemigos 1 segundo en el radar.
 - [ ] Hay que mejorar el pitido de los misiles porque es molesto si te targetean varios etc. Además en algún caso hemos notado que al morir no para de sonar el pitido. Hay que mejorar el tema del target/lock para hacerlo más fluido. Que sea más fácil el cycle lock y el deslockear.
+- [ ] Añadir efectos visuales a las naves. Cuando tienen menos vida, que le falten partes o algo así. (echar humo?).
 - [ ] Añadir "ruido" como habilidad adicional además del "flare". Una habilidad que hace que no te puedan ver/targetear en unos segundos.
 - [ ] Poder reiniciar datos del servidor para evitar datos corruptos del config.json.
 

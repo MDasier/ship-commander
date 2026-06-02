@@ -190,7 +190,7 @@ const SHIP_SHAPES = {
     uiOffY: -30,
   },
 
-  // Constellation Andromeda — fuselaje largo y estrecho, 4 motores en la popa
+  
   bomber: {
     body: [
       [30, 0],
@@ -205,7 +205,7 @@ const SHIP_SHAPES = {
     uiOffY: -32,
   },
 
-  // RSI Paladin — forma de A: nariz → piernas diagonales → concavidades interiores → popa
+  
   gunship: {
     body: [
       [28, 0],
