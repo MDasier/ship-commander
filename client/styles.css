@@ -330,10 +330,30 @@ input[type="text"]:focus {
   z-index: 1;
   pointer-events: none;
 }
-.mobiCorner.tl { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
-.mobiCorner.tr { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
-.mobiCorner.bl { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; }
-.mobiCorner.br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+.mobiCorner.tl {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+
+.mobiCorner.tr {
+  top: -1px;
+  right: -1px;
+  border-width: 2px 2px 0 0;
+}
+
+.mobiCorner.bl {
+  bottom: -1px;
+  left: -1px;
+  border-width: 0 0 2px 2px;
+}
+
+.mobiCorner.br {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 2px 2px 0;
+}
 
 /* Header */
 #mobiHeader {
@@ -399,8 +419,14 @@ input[type="text"]:focus {
   scrollbar-color: #00ccff18 transparent;
 }
 
-.mobiPane { display: flex; flex-direction: column; }
-.mobiPane.hidden { display: none !important; }
+.mobiPane {
+  display: flex;
+  flex-direction: column;
+}
+
+.mobiPane.hidden {
+  display: none !important;
+}
 
 /* ─ Pane PILOTO ─ */
 .mobiPilotHeader {
@@ -513,7 +539,9 @@ input[type="text"]:focus {
   font-size: 12px;
 }
 
-.mobiPlayerEntry.dead { opacity: 0.28; }
+.mobiPlayerEntry.dead {
+  opacity: 0.28;
+}
 
 .mobiPlayerBullet {
   width: 10px;
@@ -522,9 +550,20 @@ input[type="text"]:focus {
   flex-shrink: 0;
 }
 
-.mobiPlayerName { flex: 1; color: #7a9aaa; }
-.mobiPlayerName.me { color: #00ccff; }
-.mobiPlayerKD { color: #2a4055; font-size: 10px; letter-spacing: 1px; }
+.mobiPlayerName {
+  flex: 1;
+  color: #7a9aaa;
+}
+
+.mobiPlayerName.me {
+  color: #00ccff;
+}
+
+.mobiPlayerKD {
+  color: #2a4055;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
 
 /* ─ Pane CONTROLES ─ */
 .mobiControls {
@@ -587,19 +626,25 @@ kbd {
   position: relative;
 }
 
-.mobiTab:last-child { border-right: none; }
+.mobiTab:last-child {
+  border-right: none;
+}
 
 /* Indicador superior del tab activo */
 .mobiTab::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 2px;
   background: transparent;
   transition: background 0.15s;
 }
 
-.mobiTab.active::before { background: #00ccff; }
+.mobiTab.active::before {
+  background: #00ccff;
+}
 
 .mobiTab .tabIcon {
   font-size: 14px;
@@ -725,8 +770,15 @@ kbd {
 }
 
 @keyframes timerPulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: .5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .5;
+  }
 }
 
 /* ── AJUSTES (MobiGlass pane) ── */
@@ -823,7 +875,7 @@ kbd {
   align-items: center;
   background: #080c18;
   border: 1px solid #1e2d44;
-  color: #5a7585;
+  color: #dddddd;
   padding: 10px 6px 10px;
   cursor: pointer;
   font-family: inherit;
@@ -849,7 +901,9 @@ kbd {
 .shipCard.selected::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 2px;
   background: #00ccff;
 }
@@ -865,32 +919,70 @@ kbd {
   margin-top: 2px;
 }
 
-.shipCardStats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px 6px;
+/* ── STAT BARS (arcade style) ── */
+
+.shipStats {
   width: 100%;
-  padding: 4px 6px;
+  padding: 5px 6px 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.sc-stat {
-  font-size: 9px;
+.sRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sLbl {
+  font-size: 10px;
   letter-spacing: 1px;
-  color: #3a5060;
-  white-space: nowrap;
+  color: #9bc8f1;
+  width: 22px;
+  text-align: right;
+  flex-shrink: 0;
 }
 
-.shipCard.selected .sc-stat { color: #5a8090; }
+.shipCard.selected .sLbl {
+  color: #3a5a70;
+}
 
-.sc-hp    { color: #cc445588; }
-.sc-spd   { color: #ffcc0088; }
-.sc-msl   { color: #4488cc88; }
-.sc-radar { color: #44cc8888; }
+.sBar {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+}
 
-.shipCard.selected .sc-hp    { color: #ff6677; }
-.shipCard.selected .sc-spd   { color: #ffdd44; }
-.shipCard.selected .sc-msl   { color: #66aaff; }
-.shipCard.selected .sc-radar { color: #44ddaa; }
+.ss {
+  display: block;
+  height: 7px;
+  flex: 1;
+  background: #0d1a24;
+  font-style: normal;
+}
+
+.ss.a {
+  background: #1a4a5a;
+}
+
+.shipCard.selected .ss.a {
+  background: #00ccff;
+  box-shadow: 0 0 4px #00ccff44;
+}
+
+.sVal {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  color: #2a4055;
+  min-width: 28px;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.shipCard.selected .sVal {
+  color: #3a6a7a;
+}
 
 .shipCardDesc {
   font-size: 8px;
@@ -901,7 +993,9 @@ kbd {
   padding: 0 2px;
 }
 
-.shipCard.selected .shipCardDesc { color: #3a5568; }
+.shipCard.selected .shipCardDesc {
+  color: #3a5568;
+}
 
 /* Ship type tag in player list */
 .playerShipTag {
@@ -962,8 +1056,15 @@ kbd.bindingError {
 }
 
 @keyframes bindingPulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .bindingChangeBtn {
@@ -1029,6 +1130,62 @@ kbd.bindingError {
   min-width: 130px;
 }
 
+/* ── CREW SLOT (gunship) ── */
+
+.crewSlot {
+  display: flex;
+  align-items: center;
+  padding: 7px 14px 7px 28px;
+  border: 1px solid #1a2a1a;
+  border-top: none;
+  background: #050a05;
+  gap: 10px;
+}
+
+.crewArrow {
+  color: #2a5a2a;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.crewRole {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #2a6a2a;
+  min-width: 72px;
+  flex-shrink: 0;
+}
+
+.crewName {
+  flex: 1;
+  font-size: 13px;
+  color: #aaa;
+}
+
+.crewEmpty {
+  flex: 1;
+  font-size: 12px;
+  color: #333;
+}
+
+.crewBtn {
+  font-size: 10px;
+  padding: 4px 12px;
+  border-color: #00ff8833;
+  color: #00ff8877;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  margin: 0;
+  letter-spacing: 1px;
+  transition: .15s;
+}
+
+.crewBtn:hover {
+  border-color: #00ff88;
+  color: #00ff88;
+}
+
 /* ── HOST BAR (sala de espera) ── */
 
 #hostBar {
@@ -1073,11 +1230,27 @@ kbd.bindingError {
 /* ── NOMBRE REQUERIDO ── */
 
 @keyframes nameShake {
-  0%, 100% { transform: translateX(0); }
-  20%       { transform: translateX(-6px); }
-  40%       { transform: translateX(6px); }
-  60%       { transform: translateX(-4px); }
-  80%       { transform: translateX(4px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-6px);
+  }
+
+  40% {
+    transform: translateX(6px);
+  }
+
+  60% {
+    transform: translateX(-4px);
+  }
+
+  80% {
+    transform: translateX(4px);
+  }
 }
 
 #nameInput.nameRequired {

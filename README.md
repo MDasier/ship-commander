@@ -26,12 +26,12 @@ Combate espacial en tiempo real, en equipo, que funciona completamente en el nav
 
 ### Naves de Combate
 
-| Nave | HP | Velocidad | Giro | Misiles | Firma radar |
+| Nave | HP | Velocidad | Giro | Misiles | Firma radar | Players |
 |---|---|---|---|---|---|
-| **Interceptor** | 70 | +55% | +65% | 3 | Muy baja (700 u) |
-| **Caza** | 100 | base | base | 6 | Normal (1000 u) |
-| **Bombardero** | 160 | −40% | −45% | 12 | Alta (2000 u) |
-| **Tornado** | X | X | X | X | X |
+| **1** | 70 | +55% | +65% | 3 | Muy baja (700 u) | 1 |
+| **2** | 100 | base | base | 6 | Normal (1000 u) | 1 |
+| **3** | 160 | −40% | −45% | 12 | Alta (2000 u) | 1 |
+| **4** | 600 | −40% | −45% | 4-20 | Alta (5000 u) | 2 |
 
 La **firma radar** determina a qué distancia los enemigos pueden verte en el radar y en el HUD. El Interceptor es casi invisible hasta que te tiene encima; el Bombardero se detecta desde lejos.
 
@@ -163,13 +163,24 @@ ship-commander/
 
 ---
 
-## Estado actual (Beta)
+## Tareas pendientes
 
 El juego es jugable y estable para sesiones locales y con amigos via túnel. Las áreas principales aún en desarrollo son:
 
-
-- [ ] Más tipos de nave y personalización visual. Vamos a empezar por una nave nueva que sea para dos jugadores. Hay que controlar que un jugador maneja el movimiento y el disparo de la nave y el otro la torreta con disparos más potentes y misiles. además tenemos que equilibrar el juego entre los equipos asique si hay una de estas en un equipo, el otro equipo tiene que tener también dos jugadores (aun que sean dos naves diferentes).
-
 - [ ] Añadir el campo "daño" en el leaderboard/socoreboard para saber quién ha hecho más daño en la partida. Además añadir KDA completo, kills, deaths y assists.
-
 - [ ] Añadir "ruido" como habilidad adicional además del "flare". Una habilidad que hace que no te puedan ver/targetear en unos segundos.
+
+
+## Estado actual (Beta)
+
+### Nueva nave: Capital
+
+Nave Capital (2 tripulantes)
+
+Piloto: selecciona "CAPITAL" en el selector de naves. Controla movimiento con W/S/A/D y mouse. Disparo principal con clic izquierdo. 4 misiles.
+Artillero: en la sala de espera ve el slot "ARTILLERO ↳ Vacío" debajo de la nave Capital y pulsa "Embarcar". En partida controla la torreta con el mouse (gira independientemente del casco). Clic izquierdo = cañón de torreta (40 dmg, más rápido que el principal). Clic derecho = misiles (20 disponibles).
+La torreta se dibuja en el centro del casco y rota suavemente siguiendo el mouse del artillero, visible para todos los jugadores.
+Muerte compartida: si el piloto muere, el artillero también muere. Al reaparecer, el artillero se eyecta como caza independiente.
+Equipo: el artillero hereda el equipo del piloto automáticamente al embarcar.
+HP en HUD: el artillero ve la HP del casco del piloto, no la suya.
+Stats: 600 HP, muy lento, firma radar enorme (5000u), detectable desde lejos.

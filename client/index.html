@@ -43,48 +43,10 @@
 
       <div id="players"></div>
 
-      <!-- ── SELECTOR DE NAVE ── -->
+      <!-- ── SELECTOR DE NAVE — generado dinámicamente por buildShipCards() ── -->
       <div id="shipSelector">
         <div class="selectorLabel">NAVE DE COMBATE</div>
-        <div id="shipCards">
-
-          <button class="shipCard" data-type="interceptor">
-            <canvas class="shipPreview" id="prev-interceptor" width="90" height="54"></canvas>
-            <div class="shipCardName">INTERCEPTOR</div>
-            <div class="shipCardStats">
-              <div class="sc-stat sc-hp">♥ 70</div>
-              <div class="sc-stat sc-spd">⚡ +++</div>
-              <div class="sc-stat sc-msl">⬥ 3</div>
-              <div class="sc-stat sc-radar">◎ −−</div>
-            </div>
-            <div class="shipCardDesc">Muy rápido · Poco armado · Difícil de detectar</div>
-          </button>
-
-          <button class="shipCard selected" data-type="fighter">
-            <canvas class="shipPreview" id="prev-fighter" width="90" height="54"></canvas>
-            <div class="shipCardName">CAZA</div>
-            <div class="shipCardStats">
-              <div class="sc-stat sc-hp">♥ 100</div>
-              <div class="sc-stat sc-spd">⚡ ++</div>
-              <div class="sc-stat sc-msl">⬥ 6</div>
-              <div class="sc-stat sc-radar">◎ −</div>
-            </div>
-            <div class="shipCardDesc">Equilibrado · Polivalente</div>
-          </button>
-
-          <button class="shipCard" data-type="bomber">
-            <canvas class="shipPreview" id="prev-bomber" width="90" height="54"></canvas>
-            <div class="shipCardName">BOMBARDERO</div>
-            <div class="shipCardStats">
-              <div class="sc-stat sc-hp">♥ 160</div>
-              <div class="sc-stat sc-spd">⚡ +</div>
-              <div class="sc-stat sc-msl">⬥ 12</div>
-              <div class="sc-stat sc-radar">◎ +++</div>
-            </div>
-            <div class="shipCardDesc">Muy resistente · Lento · Fácil de detectar</div>
-          </button>
-
-        </div>
+        <div id="shipCards"></div>
       </div>
 
       <div id="roomActions">

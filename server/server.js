@@ -126,6 +126,11 @@ function createPlayer(id) {
     maxMissiles: CFG.MISSILE_MAX_ACTIVE,
     missileCooldownBase: CFG.MISSILE_COOLDOWN,
     radarSignature: 450,
+    // Crew system
+    pilotingFor:  null,   // id del piloto si este player es artillero
+    gunnerId:     null,   // id del artillero si este player tiene uno
+    turretAngle:  0,      // ángulo de la torreta (actualizado por el artillero)
+    turretCooldown: 0,
   };
 }
 
@@ -171,15 +176,29 @@ function killPlayer(p, killer, weapon, room) {
   room.shipsDestroyed = true;
   if (killer && killer.id !== p.id) killer.kills++;
   pushKill(room, killer || null, p, weapon);
+  // El artillero muere con el piloto
+  if (p.gunnerId) {
+    const gunner = room.players[p.gunnerId];
+    if (gunner && !gunner.dead) {
+      gunner.hp = 0;
+      gunner.dead = true;
+      gunner.deaths++;
+      gunner.deadAt = Date.now();
+      gunner.respawnReadyAt = Date.now() + ((CFG.RESPAWN_DELAY ?? 5) * 1000);
+    }
+  }
 }
 function createAsteroids(count = 40) {
   const arr = [];
-
   for (let i = 0; i < count; i++) {
+    const roll = Math.random();
+    // 50% nivel 0 (colisión), 25% por encima (volar por debajo), 25% por debajo (volar por encima)
+    const z = roll < 0.5 ? 0 : roll < 0.75 ? 1 : -1;
     arr.push({
       x: Math.random() * WORLD_W,
       y: Math.random() * WORLD_H,
-      r: 40 + Math.random() * 100
+      r: 40 + Math.random() * 100,
+      z,
     });
   }
   return arr;
@@ -219,7 +238,7 @@ function startGame(room) {
   room.shipsDestroyed = false;
   room.timeLeft = CFG.GAME_DURATION_S * FPS;
 
-  // Contar equipos ya elegidos en el lobby
+  // ── 1ª pasada: pilotos y jugadores solos (no artilleros)
   let green = 0, red = 0;
   Object.values(room.players).forEach(p => {
     if (p.team === "green") green++;
@@ -227,6 +246,8 @@ function startGame(room) {
   });
 
   Object.values(room.players).forEach(p => {
+    if (p.pilotingFor) return; // artilleros en 2ª pasada
+
     p.dead  = false;
     p.fuel  = 100;
     p.vx    = 0;
@@ -237,8 +258,9 @@ function startGame(room) {
     p.respawnsLeft   = CFG.RESPAWN_COUNT ?? 3;
     p.deadAt         = null;
     p.respawnReadyAt = 0;
+    p.turretAngle    = 0;
+    p.turretCooldown = 0;
 
-    // Respetar equipo del lobby; auto-asignar al más pequeño si no eligió
     if (p.team !== "green" && p.team !== "red") {
       if (green <= red) { p.team = "green"; green++; }
       else              { p.team = "red";   red++;   }
@@ -253,6 +275,31 @@ function startGame(room) {
       p.x = 2500 + Math.random() * 200;
       p.y = 1000 + Math.random() * 500;
     }
+  });
+
+  // ── 2ª pasada: artilleros (posición = piloto, stats de torreta)
+  Object.values(room.players).forEach(p => {
+    if (!p.pilotingFor) return;
+    const pilot = room.players[p.pilotingFor];
+    if (!pilot) { p.pilotingFor = null; return; }
+
+    p.team           = pilot.team;
+    p.dead           = false;
+    p.hp             = 1; p.maxHp = 1; // muere con el piloto
+    p.x = pilot.x;  p.y = pilot.y;
+    p.vx = 0;        p.vy = 0; p.angle = 0;
+    p.kills          = 0; p.deaths = 0;
+    p.maxMissiles    = CFG.GUNNER_MISSILES ?? 20;
+    p.missileCooldownBase = CFG.GUNNER_MISSILE_COOLDOWN ?? 55;
+    p.missileCooldown = 0;
+    p.bulletCooldown  = 0;
+    p.turretCooldown  = 0;
+    p.flaredCooldown  = 0;
+    p.respawnsLeft    = CFG.RESPAWN_COUNT ?? 3;
+    p.deadAt          = null;
+    p.respawnReadyAt  = 0;
+    p.hitFlash        = 0;
+    p.input           = {};
   });
 
   room.gameValid = green > 0 && red > 0;
@@ -299,6 +346,10 @@ function restartRoom(room) {
     p.respawnsLeft    = CFG.RESPAWN_COUNT ?? 3;
     p.deadAt          = null;
     p.respawnReadyAt  = 0;
+    p.pilotingFor     = null;
+    p.gunnerId        = null;
+    p.turretAngle     = 0;
+    p.turretCooldown  = 0;
   });
 
   broadcastRoom(room, { type: "roomRestarted", room });
@@ -308,6 +359,18 @@ function removeFromRoom(player) {
   if (!player.roomId) return;
   const room = rooms[player.roomId];
   if (!room) return;
+
+  // Limpiar vínculos de tripulación
+  if (player.gunnerId) {
+    const gunner = room.players[player.gunnerId];
+    if (gunner) gunner.pilotingFor = null;
+    player.gunnerId = null;
+  }
+  if (player.pilotingFor) {
+    const pilot = room.players[player.pilotingFor];
+    if (pilot) pilot.gunnerId = null;
+    player.pilotingFor = null;
+  }
 
   delete room.players[player.id];
   player.roomId = null;
@@ -339,7 +402,7 @@ wss.on("connection", ws => {
   ws.player    = player;
   clients.set(id, ws);
 
-  send(ws, { type: "init", id });
+  send(ws, { type: "init", id, ships: CFG.SHIP_TYPES });
   send(ws, { type: "rooms", rooms: roomList() });
 
   ws.on("message", raw => {
@@ -451,6 +514,11 @@ wss.on("connection", ws => {
       player.vx     = 0;
       player.vy     = 0;
       player.targetId = null;
+      // Sincronizar equipo del artillero si tiene uno
+      if (player.gunnerId) {
+        const gunner = room.players[player.gunnerId];
+        if (gunner) gunner.team = player.team;
+      }
       broadcastRoom(room, { type: "roomUpdate", room });
       return;
     }
@@ -459,7 +527,38 @@ wss.on("connection", ws => {
       const room = rooms[player.roomId];
       if (!room || room.status !== "waiting") return;
       if (!CFG.SHIP_TYPES[msg.shipType]) return;
+      // Si cambia de Capital a otra nave, expulsa al artillero
+      if (player.gunnerId && player.shipType === "gunship" && msg.shipType !== "gunship") {
+        const gunner = room.players[player.gunnerId];
+        if (gunner) gunner.pilotingFor = null;
+        player.gunnerId = null;
+      }
       player.shipType = msg.shipType;
+      broadcastRoom(room, { type: "roomUpdate", room });
+      return;
+    }
+
+    if (msg.type === "boardShip") {
+      const room = rooms[player.roomId];
+      if (!room || room.status !== "waiting") return;
+      const target = room.players[msg.targetId];
+      if (!target || target.shipType !== "gunship") return;
+      if (target.gunnerId) return;          // ya tiene artillero
+      if (player.pilotingFor) return;       // ya es artillero de otro
+      if (player.id === msg.targetId) return; // no puede ser artillero de sí mismo
+      target.gunnerId  = player.id;
+      player.pilotingFor = target.id;
+      player.team      = target.team;       // mismo equipo que el piloto
+      broadcastRoom(room, { type: "roomUpdate", room });
+      return;
+    }
+
+    if (msg.type === "leaveShip") {
+      const room = rooms[player.roomId];
+      if (!room || !player.pilotingFor) return;
+      const pilot = room.players[player.pilotingFor];
+      if (pilot) pilot.gunnerId = null;
+      player.pilotingFor = null;
       broadcastRoom(room, { type: "roomUpdate", room });
       return;
     }
@@ -487,11 +586,16 @@ wss.on("connection", ws => {
       const active = room.missiles.filter(m => m.ownerId === player.id).length;
       if (active >= (player.maxMissiles ?? CFG.MISSILE_MAX_ACTIVE)) return;
 
+      // Artillero lanza desde la posición del piloto con ángulo de torreta
+      const origin = player.pilotingFor ? room.players[player.pilotingFor] : player;
+      if (!origin || origin.dead) return;
+      const fireAngle = player.pilotingFor ? origin.turretAngle : player.angle;
+
       room.missiles.push({
-        x:        player.x,
-        y:        player.y,
-        vx:       Math.cos(player.angle) * CFG.MISSILE_SPEED_INIT,
-        vy:       Math.sin(player.angle) * CFG.MISSILE_SPEED_INIT,
+        x:        origin.x,
+        y:        origin.y,
+        vx:       Math.cos(fireAngle) * CFG.MISSILE_SPEED_INIT,
+        vy:       Math.sin(fireAngle) * CFG.MISSILE_SPEED_INIT,
         team:     player.team,
         targetId: msg.targetId,
         ownerId:  player.id,
@@ -514,8 +618,15 @@ wss.on("connection", ws => {
       if ((player.respawnsLeft ?? 0) <= 0) return;
       if (Date.now() < (player.respawnReadyAt ?? 0)) return;
       player.respawnsLeft--;
-      player.dead = false;
+      player.dead   = false;
       player.deadAt = null;
+      // Artillero eyectado: sale como caza independiente
+      if (player.pilotingFor) {
+        const pilot = room.players[player.pilotingFor];
+        if (pilot) pilot.gunnerId = null;
+        player.pilotingFor = null;
+        player.shipType    = "fighter";
+      }
       applyShipStats(player);
       player.vx = 0; player.vy = 0; player.angle = 0;
       player.missileCooldown = 0; player.bulletCooldown = 0;
@@ -548,16 +659,33 @@ wss.on("connection", ws => {
 
     if (msg.type === "shoot") {
       const room = rooms[player.roomId];
-      if (!room || player.dead || player.bulletCooldown > 0) return;
-      player.bulletCooldown = CFG.BULLET_COOLDOWN;
-      room.bullets.push({
-        x:  player.x,
-        y:  player.y,
-        vx: Math.cos(player.angle) * CFG.BULLET_SPEED,
-        vy: Math.sin(player.angle) * CFG.BULLET_SPEED,
-        team:    player.team,
-        ownerId: player.id
-      });
+      if (!room || player.dead) return;
+
+      if (player.pilotingFor) {
+        // Artillero: disparo de torreta
+        const pilot = room.players[player.pilotingFor];
+        if (!pilot || pilot.dead) return;
+        if (player.turretCooldown > 0) return;
+        player.turretCooldown = CFG.TURRET_COOLDOWN;
+        room.bullets.push({
+          x: pilot.x, y: pilot.y,
+          vx: Math.cos(pilot.turretAngle) * CFG.TURRET_BULLET_SPEED,
+          vy: Math.sin(pilot.turretAngle) * CFG.TURRET_BULLET_SPEED,
+          team: player.team, ownerId: player.id,
+          damage: CFG.TURRET_DAMAGE,
+        });
+      } else {
+        // Piloto: disparo normal
+        if (player.bulletCooldown > 0) return;
+        player.bulletCooldown = CFG.BULLET_COOLDOWN;
+        room.bullets.push({
+          x: player.x, y: player.y,
+          vx: Math.cos(player.angle) * CFG.BULLET_SPEED,
+          vy: Math.sin(player.angle) * CFG.BULLET_SPEED,
+          team: player.team, ownerId: player.id,
+          damage: CFG.BULLET_DAMAGE,
+        });
+      }
     }
   });
 
@@ -598,6 +726,21 @@ function update() {
     // ── Players
     Object.values(room.players).forEach(p => {
       if (p.dead) return;
+
+      // Artillero: sincronizar al piloto y procesar su turno
+      if (p.pilotingFor) {
+        const pilot = room.players[p.pilotingFor];
+        if (!pilot || pilot.dead) return; // muere con el piloto via killPlayer
+        p.x     = pilot.x;
+        p.y     = pilot.y;
+        p.angle = pilot.angle;
+        if (p.turretCooldown  > 0) p.turretCooldown--;
+        if (p.missileCooldown > 0) p.missileCooldown--;
+        const inp = p.input || {};
+        if (inp.targetAngle != null) pilot.turretAngle = inp.targetAngle;
+        return;
+      }
+
       p.lockedByMissile = false;
       p.lockedOnMe      = 0;
 
@@ -661,7 +804,7 @@ function update() {
       if (p.dead) return;
     
       for (const ast of room.asteroids) {
-    
+        if (ast.z !== 0) continue; // por encima o por debajo → sin colisión
         const dx = p.x - ast.x;
         const dy = p.y - ast.y;
         const dist = Math.hypot(dx, dy);
@@ -723,13 +866,11 @@ function update() {
     for (let i = room.bullets.length - 1; i >= 0; i--) {
       const b = room.bullets[i];
       for (const p of Object.values(room.players)) {
-        if (p.dead || p.team === b.team) continue;
+        if (p.dead || p.team === b.team || p.pilotingFor) continue; // artillero protegido
         if (Math.hypot(p.x - b.x, p.y - b.y) < CFG.BULLET_RADIUS) {
-          p.hp -= CFG.BULLET_DAMAGE;
+          p.hp -= b.damage ?? CFG.BULLET_DAMAGE;
           p.hitFlash = 8;
-          if (p.hp <= 0) {
-            killPlayer(p, room.players[b.ownerId] || null, "bullet", room);
-          }
+          if (p.hp <= 0) killPlayer(p, room.players[b.ownerId] || null, "bullet", room);
           room.bullets.splice(i, 1);
           break;
         }
@@ -799,13 +940,11 @@ function update() {
     for (let i = room.missiles.length - 1; i >= 0; i--) {
       const m = room.missiles[i];
       for (const p of Object.values(room.players)) {
-        if (p.dead || p.team === m.team) continue;
+        if (p.dead || p.team === m.team || p.pilotingFor) continue; // artillero protegido
         if (Math.hypot(p.x - m.x, p.y - m.y) < CFG.MISSILE_RADIUS) {
           p.hp -= CFG.MISSILE_DAMAGE;
           p.hitFlash = 8;
-          if (p.hp <= 0) {
-            killPlayer(p, room.players[m.ownerId] || null, "missile", room);
-          }
+          if (p.hp <= 0) killPlayer(p, room.players[m.ownerId] || null, "missile", room);
           room.missiles.splice(i, 1);
           break;
         }

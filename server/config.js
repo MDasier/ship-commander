@@ -39,14 +39,21 @@ const DEFAULTS = {
   FLARE_THRUST: 0.6,
 
   // ── Reaparición
-  RESPAWN_DELAY: 5,   // segundos hasta poder reaparecer
-  RESPAWN_COUNT: 3,   // vidas extra por partida
+  RESPAWN_DELAY: 5,
+  RESPAWN_COUNT: 3,
+
+  // ── Torreta (nave Capital)
+  TURRET_DAMAGE: 40,
+  TURRET_COOLDOWN: 6,
+  TURRET_BULLET_SPEED: 14,
+  GUNNER_MISSILES: 20,
+  GUNNER_MISSILE_COOLDOWN: 55,
 
   // ── Asteroides
   ASTEROID_IMPACT_MIN: 3,
   ASTEROID_DAMAGE_FACTOR: 4,
 
-  // ── Audio (se envía al cliente via /config)
+  // ── Audio
   VOL_MASTER: 0.8,
   VOL_MUSIC: 0.2,
 
@@ -54,6 +61,7 @@ const DEFAULTS = {
   SHIP_TYPES: {
     interceptor: {
       label: "Interceptor",
+      desc: "Muy rápido · Poco armado · Baja firma radar",
       maxHp: 50,
       thrustMult: 1.55,
       turnMult: 1.65,
@@ -64,18 +72,20 @@ const DEFAULTS = {
       radarSignature: 700,
     },
     fighter: {
-      label: "Caza",
+      label: "L.Fighter",
+      desc: "Equilibrado · Polivalente · Buen punto de partida",
       maxHp: 100,
       thrustMult: 1.0,
       turnMult: 1.0,
-      dragVal: null,   // usa CFG.DRAG
+      dragVal: null,
       fuelRegenMult: 1.0,
       maxMissiles: 6,
       missileCooldown: 150,
       radarSignature: 1000,
     },
     bomber: {
-      label: "Bombardero",
+      label: "Bomber",
+      desc: "Muy resistente · Lento · Alta firma radar · Muchos misiles",
       maxHp: 300,
       thrustMult: 0.60,
       turnMult: 0.55,
@@ -84,6 +94,19 @@ const DEFAULTS = {
       maxMissiles: 12,
       missileCooldown: 85,
       radarSignature: 2000,
+    },
+    gunship: {
+      label: "Gunship",
+      desc: "2 tripulantes · Torreta artillero · Blindaje extremo",
+      maxHp: 600,
+      thrustMult: 0.30,
+      turnMult: 0.20,
+      dragVal: 0.998,
+      fuelRegenMult: 0.35,
+      maxMissiles: 4 + 20,
+      missileCooldown: 240,
+      radarSignature: 5000,
+      crewCapacity: 2,
     },
   },
 };

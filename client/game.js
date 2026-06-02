@@ -3,29 +3,29 @@ const ctx = canvas.getContext("2d");
 
 // ── Keybindings ────────────────────────────────
 const DEFAULT_BINDINGS = {
-  thrust:      "w",
-  reverse:     "s",
-  strafeLeft:  "a",
+  thrust: "w",
+  reverse: "s",
+  strafeLeft: "a",
   strafeRight: "d",
-  shoot:       "e",
-  missile:     "q",
-  flare:       "f",
-  respawn:     "r",
-  chat:        "t",
-  scan:        "c",
+  shoot: "e",
+  missile: "q",
+  flare: "f",
+  respawn: "r",
+  chat: "t",
+  scan: "c",
 };
 
 const BINDING_LABELS = {
-  thrust:      "Propulsión",
-  reverse:     "Retroceso",
-  strafeLeft:  "Strafe izquierda",
+  thrust: "Propulsión",
+  reverse: "Retroceso",
+  strafeLeft: "Strafe izquierda",
   strafeRight: "Strafe derecha",
-  shoot:       "Disparar (teclado)",
-  missile:     "Misil (teclado)",
-  flare:       "Bengala",
-  respawn:     "Reaparecer",
-  chat:        "Chat",
-  scan:        "Escaneo radar",
+  shoot: "Disparar (teclado)",
+  missile: "Misil (teclado)",
+  flare: "Bengala",
+  respawn: "Reaparecer",
+  chat: "Chat",
+  scan: "Escaneo radar",
 };
 
 // Teclas que no se pueden asignar (fijas)
@@ -35,7 +35,7 @@ let bindings = { ...DEFAULT_BINDINGS };
 try {
   const saved = JSON.parse(localStorage.getItem("spacetactics_bindings") || "null");
   if (saved) bindings = { ...DEFAULT_BINDINGS, ...saved };
-} catch (_) {}
+} catch (_) { }
 
 function saveBindings() {
   localStorage.setItem("spacetactics_bindings", JSON.stringify(bindings));
@@ -63,7 +63,7 @@ function startRecording(action, keyEl) {
   recordingAction = action;
   keyEl.innerHTML = `<kbd class="bindingRecording">Presiona...</kbd>`;
 
-  recordingHandler = function(e) {
+  recordingHandler = function (e) {
     if (["shift", "control", "alt", "meta"].includes(e.key.toLowerCase())) return;
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -159,26 +159,68 @@ function renderControlesPane() {
 
 // ── Ship geometry definitions ──────────────────
 const SHIP_SHAPES = {
+
   interceptor: {
-    // Long needle: elongated body, small swept wings at rear
-    body:   [[22,0],[4,-4],[-2,-9],[-12,-4],[-12,4],[-2,9],[4,4]],
-    engine: [[-12,-3],[-20,0],[-12,3]],
-    hpBarW: 30,
-    uiOffY: -20,   // vertical offset for HP bar above ship center
+    body: [
+      [22, 0],
+      [16, -4], [8, -7], [2, -8],
+      [-2, -20], [-10, -26], [-18, -22],
+      [-20, -8], [-22, -4], [-24, 0],
+      [-22, 4], [-20, 8],
+      [-18, 22], [-10, 26], [-2, 20],
+      [2, 8], [8, 7], [16, 4],
+    ],
+    engine: [[-24, -4], [-32, 0], [-24, 4]],
+    hpBarW: 34,
+    uiOffY: -30,
   },
+
   fighter: {
-    // Classic delta wing
-    body:   [[18,0],[-4,-14],[-10,-8],[-8,0],[-10,8],[-4,14]],
-    engine: [[-10,-5],[-18,0],[-10,5]],
-    hpBarW: 40,
-    uiOffY: -28,
+    body: [
+      [22, 0],
+      [16, -5], [10, -9], [4, -14],
+      [-2, -22], [-10, -24], [-16, -18],
+      [-20, -12], [-22, -6], [-24, 0],
+      [-22, 6], [-20, 12],
+      [-16, 18], [-10, 24], [-2, 22],
+      [4, 14], [10, 9], [16, 5],
+    ],
+    engine: [[-24, -6], [-32, 0], [-24, 6]],
+    hpBarW: 44,
+    uiOffY: -30,
   },
+
+  // Constellation Andromeda — fuselaje largo y estrecho, 4 motores en la popa
   bomber: {
-    // Wide flying wing (B-2 style) — very wide, short nose
-    body:   [[14,0],[4,-22],[-4,-26],[-12,-10],[-14,0],[-12,10],[-4,26],[4,22]],
-    engine: [[-14,-7],[-23,0],[-14,7]],
-    hpBarW: 56,
-    uiOffY: -40,
+    body: [
+      [30, 0],
+      [24, -5], [14, -8], [4, -9], [-4, -9], [-10, -9],
+      [-14, -16], [-18, -22], [-22, -18], [-24, -8],
+      [-26, 0],
+      [-24, 8], [-22, 18], [-18, 22], [-14, 16],
+      [-10, 9], [-4, 9], [4, 9], [14, 8], [24, 5],
+    ],
+    engine: [[-26, -12], [-36, 0], [-26, 12]],
+    hpBarW: 62,
+    uiOffY: -32,
+  },
+
+  // RSI Paladin — forma de A: nariz → piernas diagonales → concavidades interiores → popa
+  gunship: {
+    body: [
+      [28, 0],
+      [20, -10], [12, -20], [4, -30], [-8, -36],
+      [-18, -32], [-22, -22],
+      [-16, -14],
+      [-22, -6], [-26, 0], [-22, 6],
+      [-16, 14],
+      [-22, 22],
+      [-18, 32], [-8, 36],
+      [4, 30], [12, 20], [20, 10],
+    ],
+    engine: [[-26, -14], [-38, 0], [-26, 14]],
+    hpBarW: 90,
+    uiOffY: -46,
   },
 };
 
@@ -215,14 +257,23 @@ function drawShipPreviews() {
     pc.save();
     pc.translate(w / 2, h / 2);
 
-    // For the bomber (very tall), rotate 90° so it fits horizontally
-    if (type === "bomber") pc.rotate(-Math.PI / 2);
+    // Paladin: rotar 90° (es más alta que ancha); el resto auto-escala sin rotar
+    const rotated = type === "gunship";
+    if (rotated) pc.rotate(-Math.PI / 2);
+
+    // Auto-escalar para que la silueta llene el canvas sin salirse
+    const xs = shape.body.map(p => p[0]);
+    const ys = shape.body.map(p => p[1]);
+    const bW = rotated ? (Math.max(...ys) - Math.min(...ys)) : (Math.max(...xs) - Math.min(...xs));
+    const bH = rotated ? (Math.max(...xs) - Math.min(...xs)) : (Math.max(...ys) - Math.min(...ys));
+    const sc = Math.min((w * 0.88) / bW, (h * 0.88) / bH);
+    pc.scale(sc, sc);
 
     pc.beginPath();
     buildShipPath(pc, type);
     pc.fillStyle = "#00ccff55";
     pc.strokeStyle = "#00ccff";
-    pc.lineWidth = 1.5;
+    pc.lineWidth = 1.5 / sc;
     pc.fill();
     pc.stroke();
 
@@ -233,7 +284,7 @@ function drawShipPreviews() {
     pc.lineTo(eng[1][0], eng[1][1]);
     pc.lineTo(eng[2][0], eng[2][1]);
     pc.strokeStyle = "#00aaff88";
-    pc.lineWidth = 1;
+    pc.lineWidth = 1 / sc;
     pc.stroke();
 
     pc.restore();
@@ -243,16 +294,16 @@ function drawShipPreviews() {
 canvas.width = innerWidth;
 canvas.height = innerHeight;
 
-addEventListener("resize",()=>{
+addEventListener("resize", () => {
   canvas.width = innerWidth;
   canvas.height = innerHeight;
 });
 
 const _wsProto = location.protocol === "https:" ? "wss:" : "ws:";
-const _wsHost  = location.hostname ? location.host : "localhost:8080";
+const _wsHost = location.hostname ? location.host : "localhost:8080";
 const ws = new WebSocket(_wsProto + "//" + _wsHost);
 
-let uiState = "lobby"; 
+let uiState = "lobby";
 let currentRoomId = null;
 
 let myId = null;
@@ -268,8 +319,8 @@ let flares = [];
 let scanUntil = 0;
 
 let world = {
-  width:6000,
-  height:6000
+  width: 6000,
+  height: 6000
 };
 
 let winner = null;
@@ -277,14 +328,14 @@ let prevWinner = null;
 
 // ── Client-side interpolation ──────────────────
 const INTERP_DELAY = 80;  // ms behind server time (~2.5 ticks at 30fps)
-const MAX_BUFFER   = 12;
-let   stateBuffer  = [];  // [{time, players, bullets, missiles, flares}]
+const MAX_BUFFER = 12;
+let stateBuffer = [];  // [{time, players, bullets, missiles, flares}]
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 function lerpAngle(a, b, t) {
   let d = b - a;
-  while (d >  Math.PI) d -= 2 * Math.PI;
+  while (d > Math.PI) d -= 2 * Math.PI;
   while (d < -Math.PI) d += 2 * Math.PI;
   return a + d * t;
 }
@@ -306,15 +357,15 @@ function applyInterpolatedState() {
   const s1 = stateBuffer[idx + 1];
 
   // Ticks elapsed since the latest state we have (for bullet/missile extrapolation)
-  const latest     = s1 || s0;
+  const latest = s1 || s0;
   const ticksSince = Math.max(0, (Date.now() - latest.time) / (1000 / 30));
 
   if (!s1) {
     // Only one state available — use it directly, extrapolate projectiles
-    players  = s0.players;
-    bullets  = extrapolateArr(s0.bullets,  ticksSince);
+    players = s0.players;
+    bullets = extrapolateArr(s0.bullets, ticksSince);
     missiles = extrapolateArr(s0.missiles, ticksSince);
-    flares   = s0.flares;
+    flares = s0.flares;
     return;
   }
 
@@ -329,15 +380,15 @@ function applyInterpolatedState() {
     if (!p0) { interped[id] = p1; continue; }
     interped[id] = {
       ...p1,
-      x:     lerp(p0.x, p1.x, t),
-      y:     lerp(p0.y, p1.y, t),
+      x: lerp(p0.x, p1.x, t),
+      y: lerp(p0.y, p1.y, t),
       angle: lerpAngle(p0.angle, p1.angle, t),
     };
   }
-  players  = interped;
-  bullets  = extrapolateArr(s1.bullets,  ticksSince);
+  players = interped;
+  bullets = extrapolateArr(s1.bullets, ticksSince);
   missiles = extrapolateArr(s1.missiles, ticksSince);
-  flares   = s1.flares;
+  flares = s1.flares;
 
   // Trim buffer — keep only the last MAX_BUFFER entries
   if (stateBuffer.length > MAX_BUFFER) stateBuffer.splice(0, stateBuffer.length - MAX_BUFFER);
@@ -366,7 +417,7 @@ const playersDiv = document.getElementById("players");
 const hud = document.getElementById("hud");
 
 // ── Mobiglass
-const mobiglassEl  = document.getElementById("mobiglass");
+const mobiglassEl = document.getElementById("mobiglass");
 const mobiPlayerEl = document.getElementById("mobiPlayer");
 const mobiStatusEl = document.getElementById("mobiStatus");
 const mobiPilotBadge = document.getElementById("mobiPilotBadge");
@@ -376,7 +427,7 @@ let mobiActiveTab = "piloto";
 // Tab switching
 document.getElementById("mobiTabBar").addEventListener("click", e => {
   const btn = e.target.closest(".mobiTab");
-  if(!btn) return;
+  if (!btn) return;
   const pane = btn.dataset.pane;
   document.querySelectorAll(".mobiTab").forEach(t => t.classList.remove("active"));
   btn.classList.add("active");
@@ -391,12 +442,12 @@ document.getElementById("mobiCloseBtn").onclick = closeMobiglass;
 
 // Click outside panel closes it
 mobiglassEl.addEventListener("click", e => {
-  if(e.target === mobiglassEl) closeMobiglass();
+  if (e.target === mobiglassEl) closeMobiglass();
 });
 
 function openMobiglass() {
   const me = getMe();
-  if(!me) return;
+  if (!me) return;
   mobiOpen = true;
   mobiglassEl.classList.remove("hidden");
   updateMobiglass();
@@ -408,31 +459,31 @@ function closeMobiglass() {
 }
 
 function updateMobiPane(tab) {
-  if(tab === "piloto")    updateMobiPiloto();
-  if(tab === "partida")   updateMobiPartida();
-  if(tab === "ajustes")   initAjustesPane();
-  if(tab === "controles") renderControlesPane();
+  if (tab === "piloto") updateMobiPiloto();
+  if (tab === "partida") updateMobiPartida();
+  if (tab === "ajustes") initAjustesPane();
+  if (tab === "controles") renderControlesPane();
 }
 
 // ── AJUSTES pane ──────────────────────────────
 let ajustesReady = false;
 
-function initAjustesPane(){
-  if(ajustesReady) return;
+function initAjustesPane() {
+  if (ajustesReady) return;
   ajustesReady = true;
 
   const masterSlider = document.getElementById("volMaster");
-  const masterVal    = document.getElementById("volMasterVal");
-  const musicSlider  = document.getElementById("volMusic");
-  const musicVal     = document.getElementById("volMusicVal");
+  const masterVal = document.getElementById("volMasterVal");
+  const musicSlider = document.getElementById("volMusic");
+  const musicVal = document.getElementById("volMusicVal");
 
   const savedMaster = parseFloat(localStorage.getItem("vol_master") ?? "0.8");
-  const savedMusic  = parseFloat(localStorage.getItem("vol_music")  ?? "0.5");
+  const savedMusic = parseFloat(localStorage.getItem("vol_music") ?? "0.5");
 
   masterSlider.value = savedMaster;
   masterVal.textContent = Math.round(savedMaster * 100) + "%";
-  musicSlider.value  = savedMusic;
-  musicVal.textContent  = Math.round(savedMusic  * 100) + "%";
+  musicSlider.value = savedMusic;
+  musicVal.textContent = Math.round(savedMusic * 100) + "%";
 
   masterSlider.addEventListener("input", () => {
     const v = parseFloat(masterSlider.value);
@@ -453,31 +504,31 @@ function initAjustesPane(){
   });
 }
 
-function applyStoredVolumes(){
+function applyStoredVolumes() {
   const master = parseFloat(localStorage.getItem("vol_master") ?? "0.8");
-  const music  = parseFloat(localStorage.getItem("vol_music")  ?? "0.5");
+  const music = parseFloat(localStorage.getItem("vol_music") ?? "0.5");
   setMasterVolume(master);
   setMusicVolume(music);
 }
 
 function updateMobiglass() {
   const me = getMe();
-  if(!me) return;
+  if (!me) return;
   mobiPilotBadge.textContent = me.name || "Pilot";
   updateMobiPane(mobiActiveTab);
 }
 
 function updateMobiPiloto() {
   const me = getMe();
-  if(!me) return;
+  if (!me) return;
   const teamColor = me.team === "green" ? "#00ff88" : "#ff3355";
-  const teamName  = me.team === "green" ? "VERDE"   : "ROJO";
-  const hp   = Math.max(0, Math.floor(me.hp));
+  const teamName = me.team === "green" ? "VERDE" : "ROJO";
+  const hp = Math.max(0, Math.floor(me.hp));
   const fuel = Math.max(0, Math.floor(me.fuel));
   const hpColor = hp > 50 ? "#00ff88" : hp > 25 ? "#ffaa00" : "#ff3355";
   const spd = Math.floor(Math.hypot(me.vx || 0, me.vy || 0));
   const msl = me.missileCooldown > 0
-    ? `<span style="color:#ff6644">${Math.ceil(me.missileCooldown/30)}s</span>`
+    ? `<span style="color:#ff6644">${Math.ceil(me.missileCooldown / 30)}s</span>`
     : `<span style="color:#00ff88">LISTO</span>`;
 
   mobiPlayerEl.innerHTML = `
@@ -532,7 +583,7 @@ function updateMobiPiloto() {
   `;
 
   const switchBtn = document.getElementById("mobiSwitchTeamBtn");
-  if(switchBtn){
+  if (switchBtn) {
     switchBtn.onmouseenter = () => switchBtn.style.borderColor = "#00ccff55";
     switchBtn.onmouseleave = () => switchBtn.style.borderColor = "#ffffff22";
     switchBtn.onclick = () => ws.send(JSON.stringify({ type: "switchTeam" }));
@@ -540,8 +591,8 @@ function updateMobiPiloto() {
 }
 
 function updateMobiPartida() {
-  const green = Object.values(players).filter(p => p.team === "green").sort((a,b)=>(b.kills||0)-(a.kills||0));
-  const red   = Object.values(players).filter(p => p.team === "red").sort((a,b)=>(b.kills||0)-(a.kills||0));
+  const green = Object.values(players).filter(p => p.team === "green").sort((a, b) => (b.kills || 0) - (a.kills || 0));
+  const red = Object.values(players).filter(p => p.team === "red").sort((a, b) => (b.kills || 0) - (a.kills || 0));
 
   const renderTeam = (list, color, label) => {
     const alive = list.filter(p => !p.dead).length;
@@ -555,7 +606,7 @@ function updateMobiPartida() {
           <div class="mobiPlayerEntry ${p.dead ? 'dead' : ''}">
             <span class="mobiPlayerBullet" style="color:${p.dead ? '#222' : color}">${p.dead ? '✕' : '●'}</span>
             <span class="mobiPlayerName ${p.id === myId ? 'me' : ''}">${p.name || 'Pilot'}</span>
-            <span class="mobiPlayerKD">${p.kills||0}K · ${p.deaths||0}D</span>
+            <span class="mobiPlayerKD">${p.kills || 0}K · ${p.deaths || 0}D</span>
           </div>
         `).join('')}
       </div>
@@ -578,7 +629,7 @@ function updateMobiPartida() {
 
   mobiStatusEl.innerHTML =
     renderTeam(green, "#00ff88", "EQUIPO VERDE") +
-    renderTeam(red,   "#ff3355", "EQUIPO ROJO") +
+    renderTeam(red, "#ff3355", "EQUIPO ROJO") +
     hostHtml;
 
   const mobiToggle = document.getElementById("mobiToggleMidGame");
@@ -586,16 +637,16 @@ function updateMobiPartida() {
 }
 
 // ── Game Over
-const gameOverEl  = document.getElementById("gameOver");
-const restartBtn  = document.getElementById("restartBtn");
+const gameOverEl = document.getElementById("gameOver");
+const restartBtn = document.getElementById("restartBtn");
 
 function showGameOver() {
   gameOverEl.classList.remove("hidden");
   const isHost = roomData && roomData.ownerId === myId;
   restartBtn.classList.toggle("hidden", !isHost);
-  const hostHint  = document.getElementById("gameOverHostHint");
+  const hostHint = document.getElementById("gameOverHostHint");
   const guestHint = document.getElementById("gameOverGuestHint");
-  if (hostHint)  hostHint.classList.toggle("hidden", !isHost);
+  if (hostHint) hostHint.classList.toggle("hidden", !isHost);
   if (guestHint) guestHint.classList.toggle("hidden", isHost);
   playVictorySound();
   stopMusic();
@@ -612,6 +663,7 @@ function resetClientState() {
   stateBuffer = [];
   specTargetId = null; deadIds = new Set(); killFeed = []; chatLog = [];
   shakeMag = 0;
+  asteroidCache.clear();
   cancelSd();
 }
 
@@ -638,8 +690,8 @@ document.getElementById("backToLobby").onclick = () => {
 
 // ── Chat
 const chatContainer = document.getElementById("chatContainer");
-const chatInput     = document.getElementById("chatInput");
-let chatInputOpen   = false;
+const chatInput = document.getElementById("chatInput");
+let chatInputOpen = false;
 
 function openChat() {
   chatInputOpen = true;
@@ -656,12 +708,12 @@ function closeChat() {
 
 chatInput.addEventListener("keydown", e => {
   e.stopPropagation();
-  if(e.key === "Enter"){
+  if (e.key === "Enter") {
     const text = chatInput.value.trim();
-    if(text) ws.send(JSON.stringify({ type: "chat", text }));
+    if (text) ws.send(JSON.stringify({ type: "chat", text }));
     closeChat();
   }
-  if(e.key === "Escape") closeChat();
+  if (e.key === "Escape") closeChat();
 });
 
 canvas.addEventListener("mousemove", e => {
@@ -691,39 +743,39 @@ canvas.addEventListener("mousedown", e => {
 // ── Spectator
 function cycleSpectator() {
   const living = Object.values(players).filter(p => !p.dead && p.id !== myId);
-  if(living.length === 0){ specTargetId = null; return; }
-  if(!specTargetId){ specTargetId = living[0].id; return; }
+  if (living.length === 0) { specTargetId = null; return; }
+  if (!specTargetId) { specTargetId = living[0].id; return; }
   const idx = living.findIndex(p => p.id === specTargetId);
   specTargetId = living[(idx + 1) % living.length].id;
 }
 
 // ── Self-destruct
-let sdState      = null;  // null | "charging" | "countdown"
-let sdHoldTimer  = null;
-let sdInterval   = null;
-let sdCountdown  = 0;
-let sdHoldStart  = 0;
+let sdState = null;  // null | "charging" | "countdown"
+let sdHoldTimer = null;
+let sdInterval = null;
+let sdCountdown = 0;
+let sdHoldStart = 0;
 
 function startSdCharge() {
   const me = getMe();
-  if(!me || me.dead || sdState) return;
-  sdState     = "charging";
+  if (!me || me.dead || sdState) return;
+  sdState = "charging";
   sdHoldStart = Date.now();
   sdHoldTimer = setTimeout(startSdCountdown, 2000);
 }
 
 function startSdCountdown() {
-  sdState    = "countdown";
+  sdState = "countdown";
   sdCountdown = 5;
   playSelfDestructBeep(5);
   sdInterval = setInterval(() => {
     sdCountdown--;
-    if(sdCountdown > 0){
+    if (sdCountdown > 0) {
       playSelfDestructBeep(sdCountdown);
     } else {
       clearInterval(sdInterval);
       sdInterval = null;
-      sdState    = null;
+      sdState = null;
       ws.send(JSON.stringify({ type: "selfDestruct" }));
     }
   }, 1000);
@@ -732,9 +784,9 @@ function startSdCountdown() {
 function cancelSd() {
   clearTimeout(sdHoldTimer);
   clearInterval(sdInterval);
-  sdState     = null;
+  sdState = null;
   sdHoldTimer = null;
-  sdInterval  = null;
+  sdInterval = null;
   sdCountdown = 0;
 }
 
@@ -742,13 +794,13 @@ function cancelSd() {
 const nameInput = document.getElementById("nameInput");
 
 const savedName = localStorage.getItem("spacetactics_name");
-if(savedName) nameInput.value = savedName;
+if (savedName) nameInput.value = savedName;
 
-function applyName(){
+function applyName() {
   const name = nameInput.value.trim() || "Pilot";
   nameInput.value = name;
   localStorage.setItem("spacetactics_name", name);
-  if(ws.readyState === 1){
+  if (ws.readyState === 1) {
     ws.send(JSON.stringify({ type: "setName", name }));
   }
 }
@@ -756,7 +808,7 @@ function applyName(){
 document.getElementById("setNameBtn").onclick = applyName;
 
 nameInput.addEventListener("keydown", e => {
-  if(e.key === "Enter") applyName();
+  if (e.key === "Enter") applyName();
 });
 
 function requireName() {
@@ -806,53 +858,54 @@ document.getElementById("switchTeam").onclick = () => {
   }));
 };
 
-ws.onmessage = e=>{
+ws.onmessage = e => {
 
   const data = JSON.parse(e.data);
 
-  if(data.type==="init"){
+  if (data.type === "init") {
 
     myId = data.id;
+    if (data.ships) buildShipCards(data.ships);
     applyName();
 
   }
 
-  if(data.type==="rooms"){
+  if (data.type === "rooms") {
 
     renderRooms(data.rooms);
 
   }
 
-  if(data.type==="roomJoined"){
+  if (data.type === "roomJoined") {
 
     currentRoomId = data.roomId;
     uiState = "inRoom";
-  
+
     lobbyDiv.classList.add("hidden");
     roomDiv.classList.remove("hidden");
     updateUI();
   }
 
-  if(data.type==="roomUpdate"){
+  if (data.type === "roomUpdate") {
     roomData = data.room;
     renderPlayers();
   }
 
-  if(data.type==="gameStarted"){
+  if (data.type === "gameStarted") {
 
-    menu.style.display="none";
+    menu.style.display = "none";
     hud.classList.remove("hidden");
     deadIds = new Set();
     startMusic();
 
   }
 
-  if(data.type === "chat"){
+  if (data.type === "chat") {
     chatLog.push({ name: data.name, team: data.team, text: data.text, ts: Date.now() });
-    if(chatLog.length > 8) chatLog.shift();
+    if (chatLog.length > 8) chatLog.shift();
   }
 
-  if(data.type === "roomRestarted"){
+  if (data.type === "roomRestarted") {
     resetClientState();
     roomData = data.room;
     uiState = "inRoom";
@@ -868,60 +921,60 @@ ws.onmessage = e=>{
     updateUI();
   }
 
-  if(data.type==="state"){
+  if (data.type === "state") {
     const incoming = data.players || {};
 
     // Detect newly dead → explosion + shake
     Object.values(incoming).forEach(p => {
-      if(p.dead && !deadIds.has(p.id)){
+      if (p.dead && !deadIds.has(p.id)) {
         deadIds.add(p.id);
         spawnExplosion(p.x, p.y, p.team);
         playExplosionSound();
-        if(p.id === myId) { cancelSd(); clientDeadAt = Date.now(); }
+        if (p.id === myId) { cancelSd(); clientDeadAt = Date.now(); }
         const myP = players[myId];
-        if(myP){
+        if (myP) {
           const dist = Math.hypot(p.x - myP.x, p.y - myP.y);
           shakeMag = Math.max(shakeMag, Math.max(0, (500 - dist) / 500) * 14);
         }
       }
       // Detectar respawn (dead → alive)
-      if(!p.dead && deadIds.has(p.id)){
+      if (!p.dead && deadIds.has(p.id)) {
         deadIds.delete(p.id);
-        if(p.id === myId) clientDeadAt = null;
+        if (p.id === myId) clientDeadAt = null;
       }
     });
 
     // Detect damage taken → shake
     const myPrev = players[myId];
     const myNext = incoming[myId];
-    if(myPrev && myNext && myNext.hp < myPrev.hp && myNext.hp > 0){
+    if (myPrev && myNext && myNext.hp < myPrev.hp && myNext.hp > 0) {
       shakeMag = Math.max(shakeMag, (myPrev.hp - myNext.hp) * 0.45);
     }
 
     // Push to interpolation buffer — positions are applied each RAF frame
     stateBuffer.push({
-      time:     Date.now(),
-      players:  incoming,
-      bullets:  data.bullets  || [],
+      time: Date.now(),
+      players: incoming,
+      bullets: data.bullets || [],
       missiles: data.missiles || [],
-      flares:   data.flare    || [],
+      flares: data.flare || [],
     });
 
     // Non-interpolated state: apply immediately
     asteroids = data.asteroids || [];
-    world     = data.world    || world;
-    winner    = data.winner;
-    killFeed  = data.killFeed || [];
+    world = data.world || world;
+    winner = data.winner;
+    killFeed = data.killFeed || [];
     updateTimer(data.timeLeft);
   }
 
 };
 
-function renderRooms(list){
+function renderRooms(list) {
 
   roomsDiv.innerHTML = "";
 
-  if(list.length === 0){
+  if (list.length === 0) {
     roomsDiv.innerHTML = '<div style="color:#444;font-size:12px;padding:12px 0">No hay salas. Crea una.</div>';
     return;
   }
@@ -938,13 +991,13 @@ function renderRooms(list){
     if (playing && room.allowJoinMidGame) statusText = "EN PARTIDA · ABIERTA";
 
     div.innerHTML = `
-      <span class="roomId">#${room.id.slice(0,6)}</span>
+      <span class="roomId">#${room.id.slice(0, 6)}</span>
       <span class="roomStatus ${playing ? 'playing' : ''} ${playing && room.allowJoinMidGame ? 'open' : ''}">${statusText}</span>
       <span class="roomPlayers">${room.players}/20</span>
       <button ${canJoin ? '' : 'disabled'}>Unirse</button>
     `;
 
-    if(canJoin){
+    if (canJoin) {
       div.querySelector("button").onclick = () => {
         if (!requireName()) return;
         initAudio();
@@ -958,7 +1011,71 @@ function renderRooms(list){
   });
 
 }
-const SHIP_LABELS = { interceptor: "INT", fighter: "CAZA", bomber: "BMB" };
+// Etiquetas cortas para la lista de jugadores — se actualizan dinámicamente
+const SHIP_LABELS = { interceptor: "RAZOR", fighter: "GLADIUS", bomber: "ANDRMD", gunship: "PALADIN" };
+
+function speedRating(mult) {
+  if (mult >= 1.4) return "+++";
+  if (mult >= 0.9) return "++";
+  if (mult >= 0.5) return "+";
+  return "−−−";
+}
+
+function radarRating(sig) {
+  if (sig >= 3000) return "+++";   // muy visible
+  if (sig >= 1500) return "++";
+  if (sig >= 800)  return "+";
+  return "−−";                     // firma baja = difícil de detectar
+}
+
+function buildShipCards(ships) {
+  for (const [type, ship] of Object.entries(ships)) {
+    const words = (ship.label || type).split(" ");
+    SHIP_LABELS[type] = words[words.length - 1].toUpperCase().slice(0, 7);
+  }
+
+  const vals = Object.values(ships);
+  const maxHp    = Math.max(...vals.map(s => s.maxHp));
+  const maxSpeed = Math.max(...vals.map(s => s.thrustMult));
+  const maxMsl   = Math.max(...vals.map(s => s.maxMissiles));
+  const maxRadar = Math.max(...vals.map(s => s.radarSignature));
+
+  function segs(value, max, invert = false, n = 10) {
+    const filled = Math.round((value / max) * n);
+    const active = invert ? n - filled : filled;
+    return Array.from({ length: n }, (_, i) =>
+      `<i class="ss ${i < active ? 'a' : ''}"></i>`
+    ).join('');
+  }
+
+  const container = document.getElementById("shipCards");
+  container.innerHTML = "";
+
+  for (const [type, ship] of Object.entries(ships)) {
+    const btn = document.createElement("button");
+    btn.className = "shipCard" + (type === "fighter" ? " selected" : "");
+    btn.dataset.type = type;
+
+    const mslDisplay = ship.crewCapacity > 1 ? `${ship.maxMissiles}+20` : ship.maxMissiles;
+    const velDisplay  = Math.round(ship.thrustMult * 100) + "%";
+
+    btn.innerHTML = `
+      <canvas class="shipPreview" id="prev-${type}" width="90" height="54"></canvas>
+      <div class="shipCardName">${ship.label || type.toUpperCase()}</div>
+      <div class="shipStats">
+        <div class="sRow"><span class="sLbl">HP</span><div class="sBar">${segs(ship.maxHp, maxHp)}</div><span class="sVal">${ship.maxHp}</span></div>
+        <div class="sRow"><span class="sLbl">VEL</span><div class="sBar">${segs(ship.thrustMult, maxSpeed)}</div><span class="sVal">${velDisplay}</span></div>
+        <div class="sRow"><span class="sLbl">MSL</span><div class="sBar">${segs(ship.maxMissiles, maxMsl)}</div><span class="sVal">${mslDisplay}</span></div>
+        <div class="sRow"><span class="sLbl">SIG</span><div class="sBar">${segs(ship.radarSignature, maxRadar)}</div><span class="sVal">${ship.radarSignature}</span></div>
+      </div>
+      <div class="shipCardDesc">${ship.desc || ""}</div>
+    `;
+
+    container.appendChild(btn);
+  }
+
+  drawShipPreviews();
+}
 
 function renderPlayers() {
   if (!roomData) return;
@@ -986,11 +1103,11 @@ function renderPlayers() {
     const div = document.createElement("div");
     div.className = "playerRow" + (player.id === myId ? " me" : "");
 
-    const team       = player.team || "none";
-    const youTag     = player.id === myId ? '<span class="you">(tú)</span>' : "";
+    const team = player.team || "none";
+    const youTag = player.id === myId ? '<span class="you">(tú)</span>' : "";
     const readyClass = player.ready ? "ready" : "";
-    const readyText  = player.ready ? "LISTO" : "ESPERA";
-    const shipLabel  = SHIP_LABELS[player.shipType] || "CAZA";
+    const readyText = player.ready ? "LISTO" : "ESPERA";
+    const shipLabel = SHIP_LABELS[player.shipType] || "CAZA";
 
     div.innerHTML = `
       <span class="teamDot ${team}"></span>
@@ -1000,11 +1117,48 @@ function renderPlayers() {
     `;
 
     playersDiv.appendChild(div);
+
+    // Slot de tripulación para naves Capital
+    if (player.shipType === "gunship") {
+      const slotDiv = document.createElement("div");
+      slotDiv.className = "crewSlot";
+      const gunner = player.gunnerId ? roomData.players[player.gunnerId] : null;
+      const myP = roomData.players[myId];
+      const amGunnerElsewhere = myP && !!myP.pilotingFor;
+      const iAmPilot = player.id === myId;
+
+      if (gunner) {
+        const isMe = player.gunnerId === myId;
+        slotDiv.innerHTML = `
+          <span class="crewArrow">↳</span>
+          <span class="crewRole">ARTILLERO</span>
+          <span class="crewName">${gunner.name || "Pilot"}${isMe ? ' <span class="you">(tú)</span>' : ''}</span>
+          ${isMe ? '<button class="crewBtn leaveShipBtn">Salir</button>' : ''}
+        `;
+        if (isMe) slotDiv.querySelector(".leaveShipBtn").onclick = () => ws.send(JSON.stringify({ type: "leaveShip" }));
+      } else {
+        const canBoard = !iAmPilot && !amGunnerElsewhere;
+        slotDiv.innerHTML = `
+          <span class="crewArrow">↳</span>
+          <span class="crewRole">ARTILLERO</span>
+          <span class="crewEmpty">Vacío</span>
+          ${canBoard ? `<button class="crewBtn boardBtn" data-pid="${player.id}">Embarcar</button>` : ''}
+        `;
+        if (canBoard) {
+          slotDiv.querySelector(".boardBtn").onclick = () =>
+            ws.send(JSON.stringify({ type: "boardShip", targetId: player.id }));
+        }
+      }
+      playersDiv.appendChild(slotDiv);
+    }
   });
 
-  // Sync ship selector highlight with this player's current choice
+  // Artillero: ocultar selector de nave (está en la nave del piloto)
   const myPlayer = roomData.players[myId];
-  if (myPlayer) syncShipSelector(myPlayer.shipType || "fighter");
+  const isGunner = !!(myPlayer && myPlayer.pilotingFor);
+  document.getElementById("shipSelector").style.display = isGunner ? "none" : "";
+
+  if (myPlayer && !isGunner) syncShipSelector(myPlayer.shipType || "fighter");
 }
 
 function syncShipSelector(type) {
@@ -1021,10 +1175,9 @@ document.getElementById("shipCards").addEventListener("click", e => {
   syncShipSelector(card.dataset.type);
 });
 
-// Draw preview silhouettes once
-drawShipPreviews();
+// Las previews se dibujan en buildShipCards() al recibir el init del servidor
 
-addEventListener("keydown",e=>{
+addEventListener("keydown", e => {
   const tag = document.activeElement?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return;
 
@@ -1115,25 +1268,25 @@ setInterval(() => {
   if (!me || me.dead) return;
   const targetAngle = Math.atan2(mouseY - canvas.height / 2, mouseX - canvas.width / 2);
   ws.send(JSON.stringify({
-    type:        "input",
-    thrust:      !!(bindings.thrust      && keys[bindings.thrust]),
-    reverse:     !!(bindings.reverse     && keys[bindings.reverse]),
-    strafeLeft:  !!(bindings.strafeLeft  && keys[bindings.strafeLeft]),
+    type: "input",
+    thrust: !!(bindings.thrust && keys[bindings.thrust]),
+    reverse: !!(bindings.reverse && keys[bindings.reverse]),
+    strafeLeft: !!(bindings.strafeLeft && keys[bindings.strafeLeft]),
     strafeRight: !!(bindings.strafeRight && keys[bindings.strafeRight]),
     targetAngle
   }));
 }, 33);
 
-function getMe(){
+function getMe() {
 
   return players[myId];
 
 }
 
-function worldToScreen(x,y,camX,camY){
+function worldToScreen(x, y, camX, camY) {
   return {
-    x:x-camX+canvas.width/2,
-    y:y-camY+canvas.height/2
+    x: x - camX + canvas.width / 2,
+    y: y - camY + canvas.height / 2
   };
 }
 //LIMITES Y GRID DEL MAPA
@@ -1143,14 +1296,14 @@ function drawWorldBounds(camX, camY) {
 
   const WARNING_DIST = 1000;
 
-  const leftDist   = me.x;
-  const rightDist  = 6000 - me.x;
-  const topDist    = me.y;
+  const leftDist = me.x;
+  const rightDist = 6000 - me.x;
+  const topDist = me.y;
   const bottomDist = 6000 - me.y;
 
-  const leftX   = worldToScreen(0, 0, camX, camY).x;
-  const rightX  = worldToScreen(6000, 0, camX, camY).x;
-  const topY    = worldToScreen(0, 0, camX, camY).y;
+  const leftX = worldToScreen(0, 0, camX, camY).x;
+  const rightX = worldToScreen(6000, 0, camX, camY).x;
+  const topY = worldToScreen(0, 0, camX, camY).y;
   const bottomY = worldToScreen(0, 6000, camX, camY).y;
 
   ctx.lineWidth = 4;
@@ -1197,7 +1350,7 @@ function drawWorldBounds(camX, camY) {
 
   ctx.globalAlpha = 1;
 }
-function drawGrid(camX,camY){
+function drawGrid(camX, camY) {
   return;
   ctx.strokeStyle = "#111";
   ctx.lineWidth = 0;
@@ -1207,20 +1360,20 @@ function drawGrid(camX,camY){
   const startX = -camX % size;
   const startY = -camY % size;
 
-  for(let x=startX;x<canvas.width;x+=size){
+  for (let x = startX; x < canvas.width; x += size) {
 
     ctx.beginPath();
-    ctx.moveTo(x,0);
-    ctx.lineTo(x,canvas.height);
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
     ctx.stroke();
 
   }
 
-  for(let y=startY;y<canvas.height;y+=size){
+  for (let y = startY; y < canvas.height; y += size) {
 
     ctx.beginPath();
-    ctx.moveTo(0,y);
-    ctx.lineTo(canvas.width,y);
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
     ctx.stroke();
 
   }
@@ -1230,13 +1383,13 @@ function drawGrid(camX,camY){
 function drawpingEffect(camX, camY) {
   const now = performance.now();
 
-  for(let i = pingEffect.length - 1; i >= 0; i--){
+  for (let i = pingEffect.length - 1; i >= 0; i--) {
     const emp = pingEffect[i];
     const t =
       (now - emp.start) /
       emp.duration;
 
-    if(t >= 1){
+    if (t >= 1) {
       pingEffect.splice(i, 1);
       continue;
     }
@@ -1295,50 +1448,120 @@ function drawpingEffect(camX, camY) {
   }
 }
 
-//ASTEROIDS
-function drawAsteroids(camX,camY){
+// ── Asteroid rendering ─────────────────────────
 
-  asteroids.forEach(a=>{
+// LCG pseudo-random con semilla para formas consistentes entre clientes
+function seededRand(seed) {
+  let s = (seed | 0) >>> 0;
+  return () => {
+    s = Math.imul(s, 1664525) + 1013904223 | 0;
+    return (s >>> 0) / 4294967296;
+  };
+}
 
-    const pos = worldToScreen(
-      a.x,
-      a.y,
-      camX,
-      camY
-    );
+const asteroidCache = new Map(); // key → { pts, colorIdx }
 
-    ctx.beginPath();
+function getAsteroidProps(ast) {
+  const key = `${Math.round(ast.x)}_${Math.round(ast.y)}`;
+  if (asteroidCache.has(key)) return asteroidCache.get(key);
 
-    ctx.arc(
-      pos.x,
-      pos.y,
-      a.r,
-      0,
-      Math.PI*2
-    );
+  const seed = Math.abs(Math.round(ast.x) * 73856093 ^ Math.round(ast.y) * 19349663);
+  const rand = seededRand(seed);
 
-    ctx.fillStyle="#333";
+  const numPts = 7 + Math.floor(rand() * 5); // 7–11 vértices
+  const pts = [];
+  for (let i = 0; i < numPts; i++) {
+    const baseAngle = (i / numPts) * Math.PI * 2;
+    const jitter    = (rand() - 0.5) * (Math.PI * 2 / numPts) * 0.55;
+    const r         = ast.r * (0.52 + rand() * 0.48);
+    pts.push([Math.cos(baseAngle + jitter) * r, Math.sin(baseAngle + jitter) * r]);
+  }
 
-    ctx.fill();
+  const colorIdx = Math.floor(rand() * 5);
+  const props = { pts, colorIdx };
+  asteroidCache.set(key, props);
+  return props;
+}
 
-    ctx.strokeStyle="#666";
+const ASTEROID_PALETTES = [
+  { fill: '#2c2c2c', hi: '#404040', lo: '#181818', stroke: '#3a3a3a' },
+  { fill: '#363636', hi: '#4c4c4c', lo: '#202020', stroke: '#464646' },
+  { fill: '#424242', hi: '#5a5a5a', lo: '#2a2a2a', stroke: '#525252' },
+  { fill: '#4e4e4e', hi: '#666666', lo: '#343434', stroke: '#5e5e5e' },
+  { fill: '#5a5a5a', hi: '#727272', lo: '#3e3e3e', stroke: '#6a6a6a' },
+];
 
-    ctx.stroke();
+function drawOneAsteroid(a, camX, camY) {
+  const { pts, colorIdx } = getAsteroidProps(a);
+  const pal = ASTEROID_PALETTES[colorIdx];
+  const pos = worldToScreen(a.x, a.y, camX, camY);
+  const isAbove = a.z === 1;
+  const isBelow = a.z === -1;
 
+  ctx.save();
+  ctx.translate(pos.x, pos.y);
+
+  if (isBelow) ctx.globalAlpha = 0.36;
+
+  // Sombra proyectada para asteroides flotantes (z=1)
+  if (isAbove) {
+    ctx.shadowColor = 'rgba(0,0,0,0.75)';
+    ctx.shadowBlur  = 16;
+    ctx.shadowOffsetX = 6;
+    ctx.shadowOffsetY = 8;
+  }
+
+  // Silueta irregular
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+
+  // Gradiente radial descentrado → efecto 3D
+  const hlX = -a.r * 0.28;
+  const hlY = -a.r * 0.32;
+  const grad = ctx.createRadialGradient(hlX, hlY, a.r * 0.05, 0, 0, a.r);
+  grad.addColorStop(0,    pal.hi);
+  grad.addColorStop(0.55, pal.fill);
+  grad.addColorStop(1,    pal.lo);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Apagar sombra para el trazo
+  ctx.shadowColor    = 'transparent';
+  ctx.shadowBlur     = 0;
+  ctx.shadowOffsetX  = 0;
+  ctx.shadowOffsetY  = 0;
+
+  ctx.strokeStyle = isBelow ? '#1c1c1c' : isAbove ? '#585858' : pal.stroke;
+  ctx.lineWidth   = isAbove ? 1.2 : isBelow ? 0.5 : 0.8;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// Llamar con above=false antes de las naves, above=true después
+function drawAsteroids(camX, camY, above = false) {
+  asteroids.forEach(a => {
+    const isAbove = (a.z ?? 0) === 1;
+    if (above !== isAbove) return;
+    drawOneAsteroid(a, camX, camY);
   });
-
 }
 
 function drawShip(player, camX, camY) {
-  const pos   = worldToScreen(player.x, player.y, camX, camY);
+  // Los artilleros están dentro del gunship, no se dibujan como nave independiente
+  if (player.pilotingFor) return;
+
+  const pos = worldToScreen(player.x, player.y, camX, camY);
   const shape = getShapeDef(player.shipType);
-  const eng   = shape.engine;
+  const eng = shape.engine;
   const maxHp = player.maxHp || 100;
 
   // ── Detection check for HUD elements ──────────
   const me = getMe();
-  const isEnemy  = me && player.team !== me.team;
-  const dist     = me ? Math.hypot(player.x - me.x, player.y - me.y) : 0;
+  const isEnemy = me && player.team !== me.team;
+  const dist = me ? Math.hypot(player.x - me.x, player.y - me.y) : 0;
   const detected = !isEnemy || dist <= (player.radarSignature || 450);
 
   // ── Ship body ──────────────────────────────────
@@ -1374,15 +1597,37 @@ function drawShip(player, camX, camY) {
     ctx.lineTo(eng[1][0], eng[1][1]);
     ctx.lineTo(eng[2][0], eng[2][1]);
     ctx.strokeStyle = "#00aaff";
-    ctx.lineWidth   = 1.5;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
   }
 
   ctx.restore();
 
+  // ── Torreta del Capital (independiente del ángulo del casco)
+  if (player.shipType === "gunship" && !player.dead) {
+    const hasGunner = !!player.gunnerId;
+    const tAngle = player.turretAngle ?? 0;
+    const tColor = player.team === "green" ? "#00ff88" : "#ff3355";
+    ctx.save();
+    ctx.translate(pos.x, pos.y);
+    // Base de la torreta
+    ctx.beginPath();
+    ctx.arc(0, 0, 11, 0, Math.PI * 2);
+    ctx.fillStyle = "#111";
+    ctx.fill();
+    ctx.strokeStyle = hasGunner ? tColor : "#333";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Cañón de la torreta
+    ctx.rotate(tAngle);
+    ctx.fillStyle = hasGunner ? tColor : "#2a2a2a";
+    ctx.fillRect(4, -3.5, 28, 7);
+    ctx.restore();
+  }
+
   // ── HUD elements (only if detected) ───────────
   if (!player.dead && detected) {
-    const hw  = shape.hpBarW;
+    const hw = shape.hpBarW;
     const offY = shape.uiOffY;   // negative = above ship
 
     // HP bar background
@@ -1402,7 +1647,7 @@ function drawShip(player, camX, camY) {
     // Callsign
     ctx.save();
     ctx.fillStyle = player.id === myId ? "#00ccff" : "rgba(255,255,255,0.6)";
-    ctx.font      = "11px 'Courier New', monospace";
+    ctx.font = "11px 'Courier New', monospace";
     ctx.textAlign = "center";
     ctx.fillText(player.name || "Pilot", pos.x, pos.y + offY - 6);
     ctx.restore();
@@ -1413,12 +1658,12 @@ function drawShip(player, camX, camY) {
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, 28, 0, Math.PI * 2);
     ctx.strokeStyle = "#ffff00";
-    ctx.lineWidth   = 2;
+    ctx.lineWidth = 2;
     ctx.stroke();
   }
 }
 
-function drawVelocityVector(player,camX,camY){
+function drawVelocityVector(player, camX, camY) {
 
   const speed =
     Math.hypot(
@@ -1426,7 +1671,7 @@ function drawVelocityVector(player,camX,camY){
       player.vy
     );
 
-  if(speed<0.5) return;
+  if (speed < 0.5) return;
 
   const pos = worldToScreen(
     player.x,
@@ -1443,19 +1688,19 @@ function drawVelocityVector(player,camX,camY){
   );
 
   ctx.lineTo(
-    pos.x + player.vx*20,
-    pos.y + player.vy*20
+    pos.x + player.vx * 20,
+    pos.y + player.vy * 20
   );
 
-  ctx.strokeStyle="#ffffff44";
+  ctx.strokeStyle = "#ffffff44";
 
   ctx.stroke();
 
 }
 
-function drawBullets(camX,camY){
+function drawBullets(camX, camY) {
 
-  bullets.forEach(b=>{
+  bullets.forEach(b => {
 
     const pos = worldToScreen(
       b.x,
@@ -1471,13 +1716,13 @@ function drawBullets(camX,camY){
       pos.y,
       3,
       0,
-      Math.PI*2
+      Math.PI * 2
     );
 
-    ctx.fillStyle=
-      b.team==="green"
-      ? "#00ff88"
-      : "#ff3355";
+    ctx.fillStyle =
+      b.team === "green"
+        ? "#00ff88"
+        : "#ff3355";
 
     ctx.fill();
 
@@ -1491,32 +1736,32 @@ function radarVisibleEnemies() {
   const me = players[myId];
   if (!me) return [];
   return Object.values(players).filter(p =>
-    !p.dead && p.team !== me.team &&
+    !p.dead && p.team !== me.team && !p.pilotingFor &&
     Math.hypot(p.x - me.x, p.y - me.y) <= (p.radarSignature || 450)
   );
 }
 
-function cycleTarget(){
+function cycleTarget() {
   const enemies = radarVisibleEnemies();
-  if(enemies.length === 0){ targetId = null; return; }
-  if(!targetId){ targetId = enemies[0].id; return; }
+  if (enemies.length === 0) { targetId = null; return; }
+  if (!targetId) { targetId = enemies[0].id; return; }
   const idx = enemies.findIndex(e => e.id === targetId);
-  if(idx === -1){ targetId = enemies[0].id; return; }
-  if(idx === enemies.length - 1){ targetId = null; return; }
+  if (idx === -1) { targetId = enemies[0].id; return; }
+  if (idx === enemies.length - 1) { targetId = null; return; }
   targetId = enemies[idx + 1].id;
 }
 
-function cycleTargetByRadar(){
+function cycleTargetByRadar() {
   const enemies = radarVisibleEnemies();
-  if(enemies.length === 0){ targetId = null; return; }
-  if(!targetId){ targetId = enemies[0].id; return; }
+  if (enemies.length === 0) { targetId = null; return; }
+  if (!targetId) { targetId = enemies[0].id; return; }
   const idx = enemies.findIndex(e => e.id === targetId);
-  if(idx === -1){ targetId = enemies[0].id; return; }
+  if (idx === -1) { targetId = enemies[0].id; return; }
   targetId = enemies[(idx + 1) % enemies.length].id;
 }
-function drawMissiles(camX,camY){
+function drawMissiles(camX, camY) {
 
-  missiles.forEach(m=>{
+  missiles.forEach(m => {
 
     const pos = worldToScreen(m.x, m.y, camX, camY);
     const angle = Math.atan2(m.vy, m.vx);
@@ -1526,24 +1771,24 @@ function drawMissiles(camX,camY){
     ctx.rotate(angle);
 
     // Exhaust glow
-    const grad = ctx.createRadialGradient(-7,0,0,-7,0,9);
-    grad.addColorStop(0,"rgba(255,120,0,0.85)");
-    grad.addColorStop(1,"rgba(255,60,0,0)");
+    const grad = ctx.createRadialGradient(-7, 0, 0, -7, 0, 9);
+    grad.addColorStop(0, "rgba(255,120,0,0.85)");
+    grad.addColorStop(1, "rgba(255,60,0,0)");
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.ellipse(-6,0,9,4,0,0,Math.PI*2);
+    ctx.ellipse(-6, 0, 9, 4, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Body
     ctx.fillStyle = "#ffcc44";
     ctx.beginPath();
-    ctx.ellipse(0,0,9,3,0,0,Math.PI*2);
+    ctx.ellipse(0, 0, 9, 3, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Tip
     ctx.fillStyle = "#ffffff";
     ctx.beginPath();
-    ctx.arc(8,0,2,0,Math.PI*2);
+    ctx.arc(8, 0, 2, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
@@ -1551,7 +1796,7 @@ function drawMissiles(camX,camY){
   });
 
 }
-function drawFlares(camX, camY){
+function drawFlares(camX, camY) {
 
   flares.forEach(f => {
 
@@ -1646,21 +1891,21 @@ function drawRadar() {
 
     const blipR =
       p.shipType === "bomber" ? 5 :
-      p.shipType === "interceptor" ? 2.5 :
-      3.5;
+        p.shipType === "interceptor" ? 2.5 :
+          3.5;
 
     ctx.beginPath();
     ctx.arc(rx, ry, blipR, 0, Math.PI * 2);
 
     ctx.fillStyle =
       p.dead ? "#555" :
-      p.id === myId ? "#00ccff" :
-      p.team === "green" ? "#00ff88" :
-      "#ff3355";
+        p.id === myId ? "#00ccff" :
+          p.team === "green" ? "#00ff88" :
+            "#ff3355";
 
     ctx.fill();
   });
-  if (scanning){
+  if (scanning) {
     // ── Asteroids on radar
     asteroids.forEach(a => {
 
@@ -1674,7 +1919,7 @@ function drawRadar() {
       ctx.fill();
     });
   }
-  
+
 }
 function drawRadarPulse(x, y, radius) {
 
@@ -1701,10 +1946,10 @@ function drawRadarPulse(x, y, radius) {
   ctx.stroke();
 }
 
-function drawWarningOverlay(me){
+function drawWarningOverlay(me) {
 
-  if(!me || !me.lockedByMissile) return;
-  if(!me || me.lockedOnMe <= 0) return;
+  if (!me || !me.lockedByMissile) return;
+  if (!me || me.lockedOnMe <= 0) return;
 
   const t = Date.now() * 0.01;
   const pulse = (Math.sin(t) + 1) / 2; // 0 → 1
@@ -1751,25 +1996,27 @@ function drawWarningOverlay(me){
   ctx.restore();
 }
 const timerEl = document.getElementById("timer");
-function updateTimer(secs){
-  if(secs == null){ timerEl.textContent = "--:--"; return; }
+function updateTimer(secs) {
+  if (secs == null) { timerEl.textContent = "--:--"; return; }
   const m = Math.floor(secs / 60);
   const s = secs % 60;
-  timerEl.textContent = String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+  timerEl.textContent = String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
   timerEl.classList.toggle("warning", secs <= 60 && secs > 15);
-  timerEl.classList.toggle("danger",  secs <= 15);
+  timerEl.classList.toggle("danger", secs <= 15);
 }
 
-function updateHUD(me){
+function updateHUD(me) {
+  // Artillero: muestra stats del casco del piloto
+  const ship = me.pilotingFor ? (players[me.pilotingFor] || me) : me;
 
   document.getElementById("hp").textContent =
-    Math.floor(me.hp);
+    Math.floor(ship.hp);
 
   document.getElementById("fuel").textContent =
-    Math.floor(me.fuel);
+    Math.floor(ship.fuel);
 
   document.getElementById("speed").textContent =
-    Math.floor(Math.hypot(me.vx, me.vy));
+    Math.floor(Math.hypot(ship.vx, ship.vy));
 
   document.getElementById("kd").textContent =
     (me.kills || 0) + "/" + (me.deaths || 0);
@@ -1781,34 +2028,34 @@ function updateHUD(me){
 
   const alive =
     Object.values(players)
-      .filter(p=>!p.dead)
+      .filter(p => !p.dead)
       .length;
 
   document.getElementById("alive").textContent =
     "Vivos: " + alive;
 
-  if(targetId){
+  if (targetId) {
 
     const t = players[targetId];
-  
-    if(t){
-  
-      ctx.fillStyle="yellow";
-  
-      ctx.font="20px Arial";
-  
+
+    if (t) {
+
+      ctx.fillStyle = "yellow";
+
+      ctx.font = "20px Arial";
+
       ctx.fillText(
         "LOCK: " + (t.name || t.id.slice(0, 6)),
         40,
         220
       );
-  
+
     }
-  
+
   }
 }
 
-function loop(){
+function loop() {
 
   applyInterpolatedState();   // compute positions interpolated to now - INTERP_DELAY
 
@@ -1818,16 +2065,16 @@ function loop(){
 
   // ── Camera: spectator or normal
   let camX, camY;
-  if(me && me.dead){
+  if (me && me.dead) {
     let spec = specTargetId ? players[specTargetId] : null;
-    if(!spec || spec.dead){
+    if (!spec || spec.dead) {
       const living = Object.values(players).filter(p => !p.dead && p.id !== myId);
       spec = living[0] || null;
       specTargetId = spec ? spec.id : null;
     }
     camX = spec ? spec.x : me.x;
     camY = spec ? spec.y : me.y;
-  } else if(me){
+  } else if (me) {
     camX = me.x;
     camY = me.y;
     specTargetId = null;
@@ -1836,7 +2083,7 @@ function loop(){
   }
 
   // ── Screen shake
-  if(shakeMag > 0.5){
+  if (shakeMag > 0.5) {
     camX += (Math.random() - 0.5) * shakeMag;
     camY += (Math.random() - 0.5) * shakeMag;
     shakeMag *= 0.82;
@@ -1844,8 +2091,8 @@ function loop(){
     shakeMag = 0;
   }
 
-  // ── Thrust particles for local player
-  if(me && !me.dead && bindings.thrust && keys[bindings.thrust]){
+  // ── Thrust particles for local player (no para artilleros)
+  if (me && !me.dead && !me.pilotingFor && bindings.thrust && keys[bindings.thrust]) {
     spawnThrustParticle(me.x, me.y, me.angle);
   }
 
@@ -1855,11 +2102,11 @@ function loop(){
 
   drawStars(ctx, camX, camY);
 
-  if(me) drawWarningOverlay(me);
+  if (me) drawWarningOverlay(me);
 
   drawWorldBounds(camX, camY);
   drawGrid(camX, camY);
-  drawAsteroids(camX, camY);
+  drawAsteroids(camX, camY, false); // z=0 y z=-1 (debajo de las naves)
 
   Object.values(players).forEach(p => drawVelocityVector(p, camX, camY));
   Object.values(players).forEach(p => drawShip(p, camX, camY));
@@ -1869,19 +2116,22 @@ function loop(){
   drawMissiles(camX, camY);
   drawFlares(camX, camY);
 
+  drawAsteroids(camX, camY, true);  // z=1 (por encima de las naves)
+
   drawpingEffect(camX, camY);
 
   drawRadar();
 
-  if(me){
+  if (me) {
     updateHUD(me);
-    setMissileWarning(!!me.lockedByMissile);
+    const pilot = me.pilotingFor ? players[me.pilotingFor] : null;
+    setMissileWarning(!!(me.lockedByMissile || pilot?.lockedByMissile));
 
-    if(me.dead){
+    if (me.dead) {
       ctx.fillStyle = "rgba(255,255,255,0.85)";
       ctx.font = "bold 40px 'Courier New', monospace";
       ctx.textAlign = "center";
-      ctx.fillText("DESTRUIDO", canvas.width/2, canvas.height/2 - 30);
+      ctx.fillText("DESTRUIDO", canvas.width / 2, canvas.height / 2 - 30);
       const respawnsLeft = me.respawnsLeft ?? 0;
       if (respawnsLeft > 0) {
         const elapsed = clientDeadAt ? Date.now() - clientDeadAt : 99999;
@@ -1889,26 +2139,26 @@ function loop(){
         ctx.font = "15px 'Courier New', monospace";
         if (remaining > 0) {
           ctx.fillStyle = "#aaa";
-          ctx.fillText(`Reapareciendo en ${remaining}s...`, canvas.width/2, canvas.height/2 + 16);
+          ctx.fillText(`Reapareciendo en ${remaining}s...`, canvas.width / 2, canvas.height / 2 + 16);
         } else {
           ctx.fillStyle = "#00ff88";
-          ctx.fillText(`[R] Reaparecer · ${respawnsLeft} reapariciu(s)`, canvas.width/2, canvas.height/2 + 16);
+          ctx.fillText(`[R] Reaparecer · ${respawnsLeft} reapariciu(s)`, canvas.width / 2, canvas.height / 2 + 16);
         }
       } else {
         ctx.font = "13px 'Courier New', monospace";
         ctx.fillStyle = "#666";
-        ctx.fillText("Sin vidas extra · Esperando resultado...", canvas.width/2, canvas.height/2 + 16);
+        ctx.fillText("Sin vidas extra · Esperando resultado...", canvas.width / 2, canvas.height / 2 + 16);
       }
       ctx.textAlign = "left";
     }
   }
 
-  if(winner){
+  if (winner) {
 
-    if(winner !== prevWinner){
+    if (winner !== prevWinner) {
       prevWinner = winner;
       setTimeout(showGameOver, 2500);
-      if(mobiOpen) closeMobiglass();
+      if (mobiOpen) closeMobiglass();
     }
 
     ctx.fillStyle = "rgba(0,0,0,0.7)";
@@ -1925,7 +2175,7 @@ function loop(){
       : "⬡ " + (winner === "green" ? "VICTORIA EQUIPO VERDE" : "VICTORIA EQUIPO ROJO");
     ctx.fillText(resultText, cx, cy - 90);
 
-    const sorted = Object.values(players).sort((a,b) => (b.kills||0) - (a.kills||0));
+    const sorted = Object.values(players).sort((a, b) => (b.kills || 0) - (a.kills || 0));
 
     ctx.font = "12px 'Courier New', monospace";
     ctx.fillStyle = "#444";
@@ -1938,7 +2188,7 @@ function loop(){
       const name = (p.name || "Pilot").slice(0, 16).padEnd(16);
       const me_marker = p.id === myId ? " ◄" : "";
       ctx.fillText(
-        name + "          " + String(p.kills||0).padStart(2) + "     " + String(p.deaths||0).padStart(2) + me_marker,
+        name + "          " + String(p.kills || 0).padStart(2) + "     " + String(p.deaths || 0).padStart(2) + me_marker,
         cx,
         cy - 6 + i * 26
       );
@@ -1948,7 +2198,7 @@ function loop(){
   }
 
   // ── Self-destruct UI
-  if(sdState === "charging"){
+  if (sdState === "charging") {
     const progress = Math.min(1, (Date.now() - sdHoldStart) / 2000);
     const cx = canvas.width / 2;
     const cy = canvas.height / 2 + 80;
@@ -1966,7 +2216,7 @@ function loop(){
     ctx.restore();
   }
 
-  if(sdState === "countdown"){
+  if (sdState === "countdown") {
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
     ctx.save();
@@ -1996,26 +2246,26 @@ function loop(){
   // ── Kill feed (top-right, below alive counter)
   const now = Date.now();
   const recentKills = killFeed.filter(e => now - e.time < 5000);
-  if(recentKills.length > 0){
+  if (recentKills.length > 0) {
     ctx.save();
     ctx.font = "12px 'Courier New', monospace";
     ctx.textAlign = "right";
     recentKills.forEach((e, i) => {
-      const age   = now - e.time;
+      const age = now - e.time;
       const alpha = age < 3500 ? 1 : 1 - (age - 3500) / 1500;
       ctx.globalAlpha = Math.max(0, alpha);
       const kColor = e.killerTeam === "green" ? "#00ff88" : (e.killerTeam === "red" ? "#ff3355" : "#888");
       const vColor = e.victimTeam === "green" ? "#00ff88" : "#ff3355";
-      const icons = { missile:"⬥", asteroid:"✦", self:"☠", bullet:"·" };
-      const icon  = icons[e.weapon] || "·";
-      const y     = 90 + i * 20;
+      const icons = { missile: "⬥", asteroid: "✦", self: "☠", bullet: "·" };
+      const icon = icons[e.weapon] || "·";
+      const y = 90 + i * 20;
 
-      if(e.weapon === "self"){
+      if (e.weapon === "self") {
         ctx.fillStyle = vColor;
         ctx.fillText(e.victimName, canvas.width - 24, y);
         ctx.fillStyle = "#555";
         ctx.fillText(" ☠", canvas.width - 24 - ctx.measureText(e.victimName).width, y);
-      } else if(e.killerName){
+      } else if (e.killerName) {
         ctx.fillStyle = "#555";
         ctx.fillText(icon, canvas.width - 16, y);
         ctx.fillStyle = vColor;
@@ -2037,13 +2287,13 @@ function loop(){
   // ── Chat log (bottom-left)
   const recentChat = chatLog.filter(m => now - m.ts < 7000);
 
-  if(recentChat.length > 0){
+  if (recentChat.length > 0) {
     ctx.save();
     ctx.font = "12px 'Courier New', monospace";
     ctx.textAlign = "left";
 
     recentChat.forEach((m, i) => {
-      const age   = now - m.ts;
+      const age = now - m.ts;
       const alpha = age < 5000 ? 0.9 : 0.9 * (1 - (age - 5000) / 2000);
 
       ctx.globalAlpha = Math.max(0, alpha);
@@ -2095,21 +2345,21 @@ function loop(){
   }
 
   // ── Spectator indicator
-  if(me && me.dead && specTargetId){
+  if (me && me.dead && specTargetId) {
     const spec = players[specTargetId];
-    if(spec){
+    if (spec) {
       ctx.save();
       ctx.font = "12px 'Courier New', monospace";
       ctx.textAlign = "center";
       ctx.fillStyle = "rgba(0,0,0,0.5)";
-      ctx.fillRect(canvas.width/2 - 180, canvas.height - 44, 360, 24);
+      ctx.fillRect(canvas.width / 2 - 180, canvas.height - 44, 360, 24);
       ctx.fillStyle = "#aaa";
-      ctx.fillText("ESPECTADOR · " + (spec.name || "Pilot") + " · [TAB] cambiar", canvas.width/2, canvas.height - 27);
+      ctx.fillText("ESPECTADOR · " + (spec.name || "Pilot") + " · [TAB] cambiar", canvas.width / 2, canvas.height - 27);
       ctx.restore();
     }
   }
 
-  if(mobiOpen) updateMobiglass();
+  if (mobiOpen) updateMobiglass();
 
   // ── Scoreboard (Tab mantenido)
   if (showScoreboard && !winner) {
@@ -2130,13 +2380,13 @@ function loop(){
     ctx.fillStyle = "#444";
     ctx.fillText("PILOTO                  K   D  NAVE", cx, by + 42);
 
-    const sorted = Object.values(players).sort((a,b) => (b.kills||0) - (a.kills||0));
+    const sorted = Object.values(players).sort((a, b) => (b.kills || 0) - (a.kills || 0));
     sorted.forEach((p, i) => {
       const color = p.dead ? "#555" : p.team === "green" ? "#00ff88" : "#ff3355";
       ctx.fillStyle = color;
-      const name = (p.name || "Pilot").slice(0,14).padEnd(14);
-      const kd   = String(p.kills||0).padStart(3) + String(p.deaths||0).padStart(4);
-      const ship  = (p.shipType||"?").slice(0,3).toUpperCase();
+      const name = (p.name || "Pilot").slice(0, 14).padEnd(14);
+      const kd = String(p.kills || 0).padStart(3) + String(p.deaths || 0).padStart(4);
+      const ship = (p.shipType || "?").slice(0, 3).toUpperCase();
       const me_marker = p.id === myId ? " ◄" : "";
       ctx.fillText(name + "         " + kd + "  " + ship + me_marker, cx, by + 62 + i * 26);
     });
