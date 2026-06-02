@@ -1,6 +1,162 @@
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
+// ── Keybindings ────────────────────────────────
+const DEFAULT_BINDINGS = {
+  thrust:      "w",
+  reverse:     "s",
+  strafeLeft:  "a",
+  strafeRight: "d",
+  shoot:       "e",
+  missile:     "q",
+  flare:       "f",
+  respawn:     "r",
+  chat:        "t",
+  scan:        "c",
+};
+
+const BINDING_LABELS = {
+  thrust:      "Propulsión",
+  reverse:     "Retroceso",
+  strafeLeft:  "Strafe izquierda",
+  strafeRight: "Strafe derecha",
+  shoot:       "Disparar (teclado)",
+  missile:     "Misil (teclado)",
+  flare:       "Bengala",
+  respawn:     "Reaparecer",
+  chat:        "Chat",
+  scan:        "Escaneo radar",
+};
+
+// Teclas que no se pueden asignar (fijas)
+const RESERVED_KEYS = new Set(["tab", "f1", "delete", "escape"]);
+
+let bindings = { ...DEFAULT_BINDINGS };
+try {
+  const saved = JSON.parse(localStorage.getItem("spacetactics_bindings") || "null");
+  if (saved) bindings = { ...DEFAULT_BINDINGS, ...saved };
+} catch (_) {}
+
+function saveBindings() {
+  localStorage.setItem("spacetactics_bindings", JSON.stringify(bindings));
+}
+
+function displayKey(k) {
+  if (!k) return "—";
+  const map = { " ": "Espacio", "arrowleft": "←", "arrowright": "→", "arrowup": "↑", "arrowdown": "↓" };
+  return map[k] || k.toUpperCase();
+}
+
+let recordingAction = null;
+let recordingHandler = null;
+
+function cancelRecording() {
+  if (recordingHandler) {
+    document.removeEventListener("keydown", recordingHandler, true);
+    recordingHandler = null;
+  }
+  recordingAction = null;
+}
+
+function startRecording(action, keyEl) {
+  cancelRecording();
+  recordingAction = action;
+  keyEl.innerHTML = `<kbd class="bindingRecording">Presiona...</kbd>`;
+
+  recordingHandler = function(e) {
+    if (["shift", "control", "alt", "meta"].includes(e.key.toLowerCase())) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    const newKey = e.key.toLowerCase();
+
+    if (RESERVED_KEYS.has(newKey)) {
+      keyEl.innerHTML = `<kbd class="bindingError">Reservada</kbd>`;
+      setTimeout(() => {
+        keyEl.innerHTML = `<kbd>${displayKey(bindings[action])}</kbd>`;
+      }, 1200);
+      cancelRecording();
+      return;
+    }
+
+    // Desvincula la tecla si ya estaba asignada a otra acción
+    for (const [k, v] of Object.entries(bindings)) {
+      if (k !== action && v === newKey) {
+        bindings[k] = null;
+        const otherEl = document.querySelector(`.bindingKeyCell[data-action="${k}"]`);
+        if (otherEl) otherEl.innerHTML = `<kbd>—</kbd>`;
+      }
+    }
+
+    bindings[action] = newKey;
+    saveBindings();
+    keyEl.innerHTML = `<kbd>${displayKey(newKey)}</kbd>`;
+    cancelRecording();
+  };
+
+  document.addEventListener("keydown", recordingHandler, true);
+}
+
+function renderControlesPane() {
+  cancelRecording();
+  const pane = document.getElementById("pane-controles");
+  pane.innerHTML = "";
+
+  const table = document.createElement("table");
+  table.className = "mobiControls bindingTable";
+
+  for (const [action, label] of Object.entries(BINDING_LABELS)) {
+    const tr = document.createElement("tr");
+
+    const tdLabel = document.createElement("td");
+    tdLabel.textContent = label;
+
+    const tdKey = document.createElement("td");
+    tdKey.className = "bindingKeyCell";
+    tdKey.dataset.action = action;
+    tdKey.innerHTML = `<kbd>${displayKey(bindings[action])}</kbd>`;
+
+    const tdBtn = document.createElement("td");
+    const btn = document.createElement("button");
+    btn.className = "bindingChangeBtn";
+    btn.textContent = "Cambiar";
+    btn.onclick = () => startRecording(action, tdKey);
+    tdBtn.appendChild(btn);
+
+    tr.appendChild(tdLabel);
+    tr.appendChild(tdKey);
+    tr.appendChild(tdBtn);
+    table.appendChild(tr);
+  }
+
+  const resetBtn = document.createElement("button");
+  resetBtn.className = "bindingChangeBtn";
+  resetBtn.style.marginTop = "14px";
+  resetBtn.textContent = "↺ Restaurar por defecto";
+  resetBtn.onclick = () => {
+    bindings = { ...DEFAULT_BINDINGS };
+    saveBindings();
+    renderControlesPane();
+  };
+
+  const fixedDiv = document.createElement("div");
+  fixedDiv.innerHTML = `
+    <div class="bindingFixedTitle">FIJOS</div>
+    <table class="mobiControls" style="color:#3a5060">
+      <tr><td><kbd>Mouse</kbd></td><td>Apuntar / girar</td></tr>
+      <tr><td><kbd>Clic Izq.</kbd></td><td>Disparar</td></tr>
+      <tr><td><kbd>Clic Der.</kbd></td><td>Lockear / Misil</td></tr>
+      <tr><td><kbd>Tab ⟨mantener⟩</kbd></td><td>Marcador</td></tr>
+      <tr><td><kbd>F1</kbd></td><td>MobiGlass</td></tr>
+      <tr><td><kbd>Del</kbd></td><td>Autodestrucción</td></tr>
+    </table>
+  `;
+
+  pane.appendChild(table);
+  pane.appendChild(resetBtn);
+  pane.appendChild(fixedDiv);
+}
+
 // ── Ship geometry definitions ──────────────────
 const SHIP_SHAPES = {
   interceptor: {
@@ -192,6 +348,11 @@ let specTargetId = null;
 let killFeed = [];
 let chatLog = [];
 let shakeMag = 0;
+let clientDeadAt = null;
+let showScoreboard = false;
+
+let mouseX = 0;
+let mouseY = 0;
 
 const keys = {};
 
@@ -247,9 +408,10 @@ function closeMobiglass() {
 }
 
 function updateMobiPane(tab) {
-  if(tab === "piloto")  updateMobiPiloto();
-  if(tab === "partida") updateMobiPartida();
-  if(tab === "ajustes") initAjustesPane();
+  if(tab === "piloto")    updateMobiPiloto();
+  if(tab === "partida")   updateMobiPartida();
+  if(tab === "ajustes")   initAjustesPane();
+  if(tab === "controles") renderControlesPane();
 }
 
 // ── AJUSTES pane ──────────────────────────────
@@ -400,9 +562,27 @@ function updateMobiPartida() {
     `;
   };
 
+  let hostHtml = "";
+  if (roomData && roomData.ownerId === myId) {
+    const mjOn = roomData.allowJoinMidGame;
+    hostHtml = `
+      <div class="mobiDivider"></div>
+      <div class="mobiStatRow" style="margin-top:4px">
+        <span class="mobiStatLabel">UNIRSE EN PARTIDA</span>
+        <button id="mobiToggleMidGame" style="font-size:11px;padding:4px 12px;border-color:${mjOn ? '#00ff8855' : '#ffffff11'};color:${mjOn ? '#00ff88' : '#555'};background:transparent;font-family:inherit;cursor:pointer">
+          ${mjOn ? 'ACTIVADO' : 'DESACTIVADO'}
+        </button>
+      </div>
+    `;
+  }
+
   mobiStatusEl.innerHTML =
     renderTeam(green, "#00ff88", "EQUIPO VERDE") +
-    renderTeam(red,   "#ff3355", "EQUIPO ROJO");
+    renderTeam(red,   "#ff3355", "EQUIPO ROJO") +
+    hostHtml;
+
+  const mobiToggle = document.getElementById("mobiToggleMidGame");
+  if (mobiToggle) mobiToggle.onclick = () => ws.send(JSON.stringify({ type: "toggleMidGameJoin" }));
 }
 
 // ── Game Over
@@ -411,12 +591,12 @@ const restartBtn  = document.getElementById("restartBtn");
 
 function showGameOver() {
   gameOverEl.classList.remove("hidden");
-  // Show restart button only to the room owner
-  if(roomData && roomData.ownerId === myId){
-    restartBtn.classList.remove("hidden");
-  } else {
-    restartBtn.classList.add("hidden");
-  }
+  const isHost = roomData && roomData.ownerId === myId;
+  restartBtn.classList.toggle("hidden", !isHost);
+  const hostHint  = document.getElementById("gameOverHostHint");
+  const guestHint = document.getElementById("gameOverGuestHint");
+  if (hostHint)  hostHint.classList.toggle("hidden", !isHost);
+  if (guestHint) guestHint.classList.toggle("hidden", isHost);
   playVictorySound();
   stopMusic();
 }
@@ -482,6 +662,30 @@ chatInput.addEventListener("keydown", e => {
     closeChat();
   }
   if(e.key === "Escape") closeChat();
+});
+
+canvas.addEventListener("mousemove", e => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+});
+
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+canvas.addEventListener("mousedown", e => {
+  if (hud.classList.contains("hidden")) return;
+  const me = getMe();
+  if (!me || me.dead) return;
+  if (e.button === 0) {
+    ws.send(JSON.stringify({ type: "shoot" }));
+    playShootSound();
+  } else if (e.button === 2) {
+    if (targetId && players[targetId] && !players[targetId].dead) {
+      ws.send(JSON.stringify({ type: "missile", targetId }));
+      playMissileSound();
+    } else {
+      cycleTargetByRadar();
+    }
+  }
 });
 
 // ── Spectator
@@ -555,12 +759,23 @@ nameInput.addEventListener("keydown", e => {
   if(e.key === "Enter") applyName();
 });
 
-document.getElementById("createRoom").onclick = ()=>{
+function requireName() {
+  const name = nameInput.value.trim();
+  if (!name) {
+    nameInput.focus();
+    nameInput.classList.add("nameRequired");
+    setTimeout(() => nameInput.classList.remove("nameRequired"), 1500);
+    return false;
+  }
+  applyName();
+  return true;
+}
+
+document.getElementById("createRoom").onclick = () => {
+  if (!requireName()) return;
   initAudio();
   applyStoredVolumes();
-  ws.send(JSON.stringify({
-    type:"createRoom"
-  }));
+  ws.send(JSON.stringify({ type: "createRoom" }));
 };
 
 document.getElementById("refreshRooms").onclick = () => {
@@ -662,12 +877,17 @@ ws.onmessage = e=>{
         deadIds.add(p.id);
         spawnExplosion(p.x, p.y, p.team);
         playExplosionSound();
-        if(p.id === myId) cancelSd();
+        if(p.id === myId) { cancelSd(); clientDeadAt = Date.now(); }
         const myP = players[myId];
         if(myP){
           const dist = Math.hypot(p.x - myP.x, p.y - myP.y);
           shakeMag = Math.max(shakeMag, Math.max(0, (500 - dist) / 500) * 14);
         }
+      }
+      // Detectar respawn (dead → alive)
+      if(!p.dead && deadIds.has(p.id)){
+        deadIds.delete(p.id);
+        if(p.id === myId) clientDeadAt = null;
       }
     });
 
@@ -712,16 +932,21 @@ function renderRooms(list){
     div.className = "roomItem";
 
     const playing = room.status === "playing";
+    const canJoin = !playing || room.allowJoinMidGame;
+
+    let statusText = playing ? "EN PARTIDA" : "EN ESPERA";
+    if (playing && room.allowJoinMidGame) statusText = "EN PARTIDA · ABIERTA";
 
     div.innerHTML = `
       <span class="roomId">#${room.id.slice(0,6)}</span>
-      <span class="roomStatus ${playing ? 'playing' : ''}">${playing ? 'EN PARTIDA' : 'EN ESPERA'}</span>
-      <span class="roomPlayers">${room.players}/6</span>
-      <button ${playing ? 'disabled' : ''}>Unirse</button>
+      <span class="roomStatus ${playing ? 'playing' : ''} ${playing && room.allowJoinMidGame ? 'open' : ''}">${statusText}</span>
+      <span class="roomPlayers">${room.players}/20</span>
+      <button ${canJoin ? '' : 'disabled'}>Unirse</button>
     `;
 
-    if(!playing){
+    if(canJoin){
       div.querySelector("button").onclick = () => {
+        if (!requireName()) return;
         initAudio();
         applyStoredVolumes();
         ws.send(JSON.stringify({ type: "joinRoom", roomId: room.id }));
@@ -739,6 +964,23 @@ function renderPlayers() {
   if (!roomData) return;
 
   playersDiv.innerHTML = "";
+
+  // Toggle mid-game join (solo visible al host)
+  if (roomData.ownerId === myId) {
+    const hostBar = document.createElement("div");
+    hostBar.id = "hostBar";
+    const mjOn = roomData.allowJoinMidGame;
+    hostBar.innerHTML = `
+      <span class="hostBarLabel">Unirse en partida</span>
+      <button id="toggleMidGameJoin" class="hostToggleBtn ${mjOn ? 'on' : ''}">
+        ${mjOn ? 'Activado' : 'Desactivado'}
+      </button>
+    `;
+    hostBar.querySelector("#toggleMidGameJoin").onclick = () => {
+      ws.send(JSON.stringify({ type: "toggleMidGameJoin" }));
+    };
+    playersDiv.appendChild(hostBar);
+  }
 
   Object.values(roomData.players).forEach(player => {
     const div = document.createElement("div");
@@ -784,109 +1026,103 @@ drawShipPreviews();
 
 addEventListener("keydown",e=>{
   const tag = document.activeElement?.tagName;
-
-  if (
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    document.activeElement?.isContentEditable
-  ) {
-    return;
-  }
+  if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return;
 
   const key = e.key.toLowerCase();
-
   keys[key] = true;
 
-  if (key === "c") {
-    const me = getMe();  
+  if (bindings.scan && key === bindings.scan) {
+    const me = getMe();
     if (me && !me.dead) {
-      scanUntil = performance.now() + 8000; // 8 segundos de "radar/ping"
+      scanUntil = performance.now() + 8000;
       triggerPingEffect(me.x, me.y);
     }
   }
 
-  if(key==="e" || key===" "){
-    ws.send(JSON.stringify({
-      type:"shoot"
-    }));
+  // Fallback teclado: shoot / missile
+  if (bindings.shoot && key === bindings.shoot) {
+    ws.send(JSON.stringify({ type: "shoot" }));
     playShootSound();
   }
-
-  if(e.key === "Tab"){
-    e.preventDefault();
-    const meNow = getMe();
-    if(meNow && meNow.dead) cycleSpectator();
-    else cycleTarget();
+  if (bindings.missile && key === bindings.missile && targetId) {
+    ws.send(JSON.stringify({ type: "missile", targetId }));
+    playMissileSound();
   }
 
-  if(key === "t" && !chatInputOpen){
+  // Tab: scoreboard (mantener) — en modo espectador cicla cámaras
+  if (e.key === "Tab") {
     e.preventDefault();
     const meNow = getMe();
-    if(meNow && !meNow.dead) openChat();
-  }
-
-  if(key==="q"){
-    if(targetId){
-      ws.send(JSON.stringify({
-        type:"missile",
-        targetId
-      }));
-      playMissileSound();
+    if (meNow && meNow.dead) {
+      cycleSpectator();
+    } else {
+      showScoreboard = true;
     }
   }
 
-  if(key === "f"){
-    ws.send(JSON.stringify({
-      type: "flare"
-    }));
+  if (bindings.respawn && key === bindings.respawn) {
+    const meNow = getMe();
+    if (meNow && meNow.dead && (meNow.respawnsLeft ?? 0) > 0) {
+      const elapsed = clientDeadAt ? Date.now() - clientDeadAt : 99999;
+      if (elapsed >= (CFG_RESPAWN_DELAY * 1000)) {
+        ws.send(JSON.stringify({ type: "respawn" }));
+      }
+    }
   }
 
-  if(e.key === "F1"){
+  if (bindings.chat && key === bindings.chat && !chatInputOpen) {
+    e.preventDefault();
+    const meNow = getMe();
+    if (meNow && !meNow.dead) openChat();
+  }
+
+  if (bindings.flare && key === bindings.flare) {
+    ws.send(JSON.stringify({ type: "flare" }));
+  }
+
+  if (e.key === "F1") {
     e.preventDefault();
     initAudio();
-    if(mobiOpen) closeMobiglass();
+    if (mobiOpen) closeMobiglass();
     else openMobiglass();
   }
 
-  if(e.key === "Delete"){
-    if(e.repeat) return;
+  if (e.key === "Delete") {
+    if (e.repeat) return;
     e.preventDefault();
-    if(chatInputOpen) return;
+    if (chatInputOpen) return;
     const meNow = getMe();
-    if(!meNow || meNow.dead) return;
-    if(sdState === "countdown") cancelSd();
-    else if(!sdState) startSdCharge();
+    if (!meNow || meNow.dead) return;
+    if (sdState === "countdown") cancelSd();
+    else if (!sdState) startSdCharge();
   }
-
 });
 
-addEventListener("keyup",e=>{
+addEventListener("keyup", e => {
   const tag = document.activeElement?.tagName;
-
-  if (
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    document.activeElement?.isContentEditable
-  ) {
-    return;
-  }
+  if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return;
   keys[e.key.toLowerCase()] = false;
 
-  if(e.key === "Delete" && sdState === "charging") cancelSd();
-
+  if (e.key === "Tab") showScoreboard = false;
+  if (e.key === "Delete" && sdState === "charging") cancelSd();
 });
 
-setInterval(()=>{
+const CFG_RESPAWN_DELAY = 5; // debe coincidir con server config RESPAWN_DELAY
 
+setInterval(() => {
+  if (hud.classList.contains("hidden")) return;
+  const me = getMe();
+  if (!me || me.dead) return;
+  const targetAngle = Math.atan2(mouseY - canvas.height / 2, mouseX - canvas.width / 2);
   ws.send(JSON.stringify({
-    type:"input",
-    thrust:  keys["w"],
-    reverse: keys["s"],
-    left:    keys["a"],
-    right:   keys["d"]
+    type:        "input",
+    thrust:      !!(bindings.thrust      && keys[bindings.thrust]),
+    reverse:     !!(bindings.reverse     && keys[bindings.reverse]),
+    strafeLeft:  !!(bindings.strafeLeft  && keys[bindings.strafeLeft]),
+    strafeRight: !!(bindings.strafeRight && keys[bindings.strafeRight]),
+    targetAngle
   }));
-
-},33);
+}, 33);
 
 function getMe(){
 
@@ -1251,43 +1487,32 @@ function drawBullets(camX,camY){
 
 
 //MISILES
-function cycleTarget(){
-
+function radarVisibleEnemies() {
   const me = players[myId];
-  if(!me) return;
+  if (!me) return [];
+  return Object.values(players).filter(p =>
+    !p.dead && p.team !== me.team &&
+    Math.hypot(p.x - me.x, p.y - me.y) <= (p.radarSignature || 450)
+  );
+}
 
-  const enemies = Object.values(players)
-    .filter(p => !p.dead && p.team !== me.team);
+function cycleTarget(){
+  const enemies = radarVisibleEnemies();
+  if(enemies.length === 0){ targetId = null; return; }
+  if(!targetId){ targetId = enemies[0].id; return; }
+  const idx = enemies.findIndex(e => e.id === targetId);
+  if(idx === -1){ targetId = enemies[0].id; return; }
+  if(idx === enemies.length - 1){ targetId = null; return; }
+  targetId = enemies[idx + 1].id;
+}
 
-  // 🔥 si no hay enemigos → siempre null
-  if(enemies.length === 0){
-    targetId = null;
-    return;
-  }
-
-  // si no hay target actual → seleccionar primero
-  if(!targetId){
-
-    targetId = enemies[0].id;
-    return;
-  }
-
-  const currentIndex = enemies.findIndex(e => e.id === targetId);
-
-  // 🔥 si el target ya no existe → reset
-  if(currentIndex === -1){
-    targetId = enemies[0].id;
-    return;
-  }
-
-  // 🔥 si pulsas TAB en último enemigo → deselecciona
-  if(currentIndex === enemies.length - 1){
-    targetId = null;
-    return;
-  }
-
-  // siguiente target
-  targetId = enemies[currentIndex + 1].id;
+function cycleTargetByRadar(){
+  const enemies = radarVisibleEnemies();
+  if(enemies.length === 0){ targetId = null; return; }
+  if(!targetId){ targetId = enemies[0].id; return; }
+  const idx = enemies.findIndex(e => e.id === targetId);
+  if(idx === -1){ targetId = enemies[0].id; return; }
+  targetId = enemies[(idx + 1) % enemies.length].id;
 }
 function drawMissiles(camX,camY){
 
@@ -1620,7 +1845,7 @@ function loop(){
   }
 
   // ── Thrust particles for local player
-  if(me && !me.dead && keys["w"]){
+  if(me && !me.dead && bindings.thrust && keys[bindings.thrust]){
     spawnThrustParticle(me.x, me.y, me.angle);
   }
 
@@ -1657,9 +1882,23 @@ function loop(){
       ctx.font = "bold 40px 'Courier New', monospace";
       ctx.textAlign = "center";
       ctx.fillText("DESTRUIDO", canvas.width/2, canvas.height/2 - 30);
-      ctx.font = "13px 'Courier New', monospace";
-      ctx.fillStyle = "#666";
-      ctx.fillText("Esperando resultado...", canvas.width/2, canvas.height/2 + 10);
+      const respawnsLeft = me.respawnsLeft ?? 0;
+      if (respawnsLeft > 0) {
+        const elapsed = clientDeadAt ? Date.now() - clientDeadAt : 99999;
+        const remaining = Math.max(0, Math.ceil((CFG_RESPAWN_DELAY * 1000 - elapsed) / 1000));
+        ctx.font = "15px 'Courier New', monospace";
+        if (remaining > 0) {
+          ctx.fillStyle = "#aaa";
+          ctx.fillText(`Reapareciendo en ${remaining}s...`, canvas.width/2, canvas.height/2 + 16);
+        } else {
+          ctx.fillStyle = "#00ff88";
+          ctx.fillText(`[R] Reaparecer · ${respawnsLeft} reapariciu(s)`, canvas.width/2, canvas.height/2 + 16);
+        }
+      } else {
+        ctx.font = "13px 'Courier New', monospace";
+        ctx.fillStyle = "#666";
+        ctx.fillText("Sin vidas extra · Esperando resultado...", canvas.width/2, canvas.height/2 + 16);
+      }
       ctx.textAlign = "left";
     }
   }
@@ -1668,7 +1907,7 @@ function loop(){
 
     if(winner !== prevWinner){
       prevWinner = winner;
-      showGameOver();
+      setTimeout(showGameOver, 2500);
       if(mobiOpen) closeMobiglass();
     }
 
@@ -1871,6 +2110,38 @@ function loop(){
   }
 
   if(mobiOpen) updateMobiglass();
+
+  // ── Scoreboard (Tab mantenido)
+  if (showScoreboard && !winner) {
+    const cx = canvas.width / 2;
+    const bw = 460, bh = 60 + Object.keys(players).length * 26 + 20;
+    const bx = cx - bw / 2, by = 60;
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.82)";
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle = "#00ccff44";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, bw, bh);
+    ctx.textAlign = "center";
+    ctx.font = "bold 13px 'Courier New', monospace";
+    ctx.fillStyle = "#00ccff";
+    ctx.fillText("MARCADOR", cx, by + 22);
+    ctx.font = "11px 'Courier New', monospace";
+    ctx.fillStyle = "#444";
+    ctx.fillText("PILOTO                  K   D  NAVE", cx, by + 42);
+
+    const sorted = Object.values(players).sort((a,b) => (b.kills||0) - (a.kills||0));
+    sorted.forEach((p, i) => {
+      const color = p.dead ? "#555" : p.team === "green" ? "#00ff88" : "#ff3355";
+      ctx.fillStyle = color;
+      const name = (p.name || "Pilot").slice(0,14).padEnd(14);
+      const kd   = String(p.kills||0).padStart(3) + String(p.deaths||0).padStart(4);
+      const ship  = (p.shipType||"?").slice(0,3).toUpperCase();
+      const me_marker = p.id === myId ? " ◄" : "";
+      ctx.fillText(name + "         " + kd + "  " + ship + me_marker, cx, by + 62 + i * 26);
+    });
+    ctx.restore();
+  }
 
   requestAnimationFrame(loop);
 

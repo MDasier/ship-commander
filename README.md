@@ -175,12 +175,13 @@ ship-commander/
 
 El juego es jugable y estable para sesiones locales y con amigos via túnel. Las áreas principales aún en desarrollo son:
 
-- [ ] Mejor control de "fin de partida" y "reinicio"
-- [ ] Obligar a cambio de nombre mientras no haya uno guardado en localStorage
-- [ ] Añadir a la pantalla de lobby la lista de controles actuales para recordar al player como se juega etc
-- [ ] Automatizar el listado de rooms, que no haga falta el botón de "actualizar" en el lobby
-- [ ] Posibilidad de configurar las teclas de control del cliente
-- [ ] Controlar que solo puedas targetear/lockear al enemigo si lo ves en el radar. + Controlar disparos de misil/distancia
+- [ ] Controlar que solo puedas targetear/lockear al enemigo si lo ves en el radar. + Controlar disparos de misil/distancia. La nave debería ir buscando el cursor del mouse en el movimiento en lugar de A/D para girar como ahora. A/D debería ser algo como en STAR CITIZEN, movimiento lateral para ayudar a ser dificil de dar con los disparos. Además,así los disparos pueden activarse con click izquierdo y para loquear con click derecho. (si tenemos lock/target disparar misiles). 
+
+- [ ] Mejor control de "fin de partida" y "reinicio". Hay que hacer que sea claro el reinicio y que no falle. Un player puede elegir seguir jugando o no. El "host" puede elegir reiniciar o terminar la partida (volver al lobby cerrando el "room").
+- [ ] Obligar a cambio de nombre mientras no haya uno guardado en localStorage.
+- [ ] Añadir a la pantalla de lobby la lista de controles actuales para recordar al player como se juega etc.
+- [ ] Automatizar el listado de rooms, que no haga falta el botón de "actualizar" en el lobby. Socket para actualizar la lista de rooms.
+- [ ] Posibilidad de configurar las teclas de control del cliente. (Configurar sonido, movimiento, habilidades, etc)
 - [ ] Reaparición en modo equipo
 - [ ] Añadir un "Leaderboard" de puntuación (con damge, kills, time, etc)
 - [ ] Añadir "ruido" además del "flare". Una habilidad que hace que no te puedan ver/targetear

@@ -16,42 +16,43 @@ body {
 #menu {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.88);
+  background: rgba(0, 0, 0, 0.9);
   z-index: 100;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 30px 16px 30px;
+  padding: 48px 16px 40px;
   overflow-y: auto;
   box-sizing: border-box;
 }
 
 h1 {
   color: #00ccff;
-  letter-spacing: 10px;
-  font-size: clamp(22px, 4vw, 36px);
-  margin: 0 0 24px 0;
-  text-shadow: 0 0 24px #00ccff55;
+  letter-spacing: 4px;
+  font-size: clamp(26px, 4vw, 38px);
+  margin: 0 0 28px 0;
+  text-shadow: 0 0 32px #00ccff44;
   text-align: center;
+  font-weight: bold;
 }
 
 h2 {
-  color: #555;
-  font-size: 10px;
-  letter-spacing: 4px;
+  color: #888;
+  font-size: 12px;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  margin: 20px 0 8px 0;
+  margin: 22px 0 10px 0;
 }
 
 button {
   background: transparent;
   border: 1px solid #444;
   color: #ccc;
-  padding: 8px 18px;
+  padding: 10px 22px;
   margin: 4px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 1px;
   transition: border-color 0.15s, color 0.15s;
 }
@@ -70,9 +71,9 @@ input[type="text"] {
   background: #0d0d0d;
   border: 1px solid #333;
   color: white;
-  padding: 8px 12px;
+  padding: 10px 14px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
   outline: none;
   transition: border-color 0.15s;
 }
@@ -99,22 +100,21 @@ input[type="text"]:focus {
   align-items: center;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  color: #555;
-  font-size: 12px;
-  letter-spacing: 1px;
+  gap: 10px;
+  margin-bottom: 20px;
+  color: #aaa;
+  font-size: 14px;
 }
 
 #nameInput {
-  width: 150px;
+  width: 180px;
 }
 
 #lobbyActions {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 4px;
+  gap: 8px;
 }
 
 #rooms {
@@ -126,25 +126,25 @@ input[type="text"]:focus {
   justify-content: space-between;
   align-items: center;
   border: 1px solid #222;
-  padding: 10px 14px;
-  margin-top: 6px;
+  padding: 12px 16px;
+  margin-top: 8px;
   background: #080808;
-  gap: 12px;
+  gap: 14px;
 }
 
 .roomItem:hover {
-  border-color: #444;
+  border-color: #555;
 }
 
 .roomId {
-  color: #555;
-  font-size: 12px;
+  color: #888;
+  font-size: 14px;
   flex: 1;
 }
 
 .roomStatus {
-  font-size: 11px;
-  letter-spacing: 2px;
+  font-size: 13px;
+  letter-spacing: 1px;
   color: #00ff88;
 }
 
@@ -152,18 +152,21 @@ input[type="text"]:focus {
   color: #ff6644;
 }
 
+.roomStatus.open {
+  color: #ffaa00;
+}
+
 .roomPlayers {
-  color: #555;
-  font-size: 12px;
-  min-width: 30px;
+  color: #888;
+  font-size: 14px;
+  min-width: 34px;
   text-align: right;
 }
 
 #lobbyHint {
-  color: #888888;
-  font-size: 11px;
-  letter-spacing: 1px;
-  margin-top: 16px;
+  color: #777;
+  font-size: 13px;
+  margin-top: 18px;
   text-align: center;
 }
 
@@ -179,22 +182,22 @@ input[type="text"]:focus {
 .roomHeader {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
 }
 
 #players {
-  width: min(380px, 92vw);
+  width: min(400px, 92vw);
   margin: 4px 0;
 }
 
 .playerRow {
   display: flex;
   align-items: center;
-  padding: 9px 14px;
+  padding: 11px 16px;
   border: 1px solid #1a1a1a;
-  margin-top: 5px;
+  margin-top: 6px;
   background: #080808;
-  gap: 10px;
+  gap: 12px;
 }
 
 .playerRow.me {
@@ -223,20 +226,20 @@ input[type="text"]:focus {
 
 .playerName {
   flex: 1;
-  font-size: 13px;
+  font-size: 14px;
   color: #ddd;
 }
 
 .playerName .you {
   color: #00ccff;
-  font-size: 11px;
-  margin-left: 6px;
+  font-size: 12px;
+  margin-left: 8px;
 }
 
 .playerReady {
-  font-size: 11px;
-  letter-spacing: 2px;
-  color: #444;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #555;
 }
 
 .playerReady.ready {
@@ -247,15 +250,14 @@ input[type="text"]:focus {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 4px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 14px;
 }
 
 #roomHint {
-  color: #444;
-  font-size: 11px;
-  letter-spacing: 1px;
-  margin-top: 12px;
+  color: #777;
+  font-size: 13px;
+  margin-top: 14px;
   text-align: center;
 }
 
@@ -909,4 +911,193 @@ kbd {
   border: 1px solid #00ccff22;
   padding: 1px 5px;
   margin-right: 4px;
+}
+
+/* ── KEYBINDING UI ── */
+
+.bindingTable {
+  width: 100%;
+}
+
+.bindingTable td {
+  padding: 4px 6px;
+  vertical-align: middle;
+}
+
+.bindingTable td:first-child {
+  color: #5a7585;
+  font-size: 12px;
+  width: 55%;
+}
+
+.bindingKeyCell {
+  text-align: center;
+  width: 28%;
+}
+
+.bindingKeyCell kbd {
+  display: inline-block;
+  min-width: 32px;
+  padding: 2px 8px;
+  background: #0a1520;
+  border: 1px solid #00ccff33;
+  color: #00ccff;
+  font-size: 11px;
+  letter-spacing: 1px;
+  font-family: inherit;
+  transition: background .15s;
+}
+
+kbd.bindingRecording {
+  background: #1a0a00;
+  border-color: #ffaa00;
+  color: #ffaa00;
+  animation: bindingPulse 0.6s infinite;
+}
+
+kbd.bindingError {
+  background: #1a0000;
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
+@keyframes bindingPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+.bindingChangeBtn {
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-color: #00ccff22;
+  color: #00ccff55;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  transition: .15s;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.bindingChangeBtn:hover {
+  border-color: #00ccff66;
+  color: #00ccff;
+  background: #00ccff0a;
+}
+
+.bindingFixedTitle {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: #2a4055;
+  margin: 16px 0 8px;
+}
+
+/* ── LOBBY CONTROLS ── */
+
+#lobbyControls {
+  width: min(480px, 92vw);
+  margin: 12px 0 0;
+  border: 1px solid #1a2a3a;
+  padding: 12px 16px;
+  background: #05080f;
+}
+
+.lobbyControlsTitle {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #555;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.lobbyControlsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: #777;
+}
+
+.lobbyControlsTable td {
+  padding: 5px 8px 5px 0;
+  vertical-align: top;
+}
+
+.lobbyControlsTable td:first-child {
+  color: #00ccff88;
+  white-space: nowrap;
+  min-width: 130px;
+}
+
+/* ── HOST BAR (sala de espera) ── */
+
+#hostBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  margin-bottom: 6px;
+  border: 1px solid #00ccff15;
+  background: #05080f;
+}
+
+.hostBarLabel {
+  font-size: 12px;
+  color: #556;
+  letter-spacing: 1px;
+}
+
+.hostToggleBtn {
+  font-size: 11px;
+  padding: 4px 14px;
+  border-color: #ffffff11;
+  color: #555;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: .15s;
+  margin: 0;
+}
+
+.hostToggleBtn.on {
+  border-color: #00ff8855;
+  color: #00ff88;
+}
+
+.hostToggleBtn:hover {
+  border-color: #00ccff55;
+  color: #00ccff;
+}
+
+/* ── NOMBRE REQUERIDO ── */
+
+@keyframes nameShake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  40%       { transform: translateX(6px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+
+#nameInput.nameRequired {
+  border-color: #ff4444 !important;
+  box-shadow: 0 0 8px #ff444466;
+  animation: nameShake 0.4s ease;
+}
+
+/* ── GAME OVER HINTS ── */
+
+.gameOverHint {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #555;
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+#gameOver {
+  flex-direction: column;
+  gap: 0;
+  align-items: center;
 }

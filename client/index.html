@@ -12,31 +12,32 @@
   <!-- ── MENU ── -->
   <div id="menu">
 
-    <h1>Bienvenido a Ship Commander</h1>
+    <h1>Ship Commander</h1>
 
     <div id="lobby">
 
       <div id="nameSection">
-        <span>Piloto:</span>
-        <input id="nameInput" type="text" maxlength="16" placeholder="Pilot" autocomplete="off" spellcheck="false">
-        <button id="setNameBtn">Aplicar</button>
+        <span>Tu nombre de piloto</span>
+        <input id="nameInput" type="text" maxlength="16" placeholder="Escribe tu nombre..." autocomplete="off"
+          spellcheck="false">
+        <button id="setNameBtn">Guardar</button>
       </div>
 
       <div id="lobbyActions">
-        <button id="createRoom">+ Crear Sala</button>
-        <button id="refreshRooms">↺ Actualizar</button>
+        <button id="createRoom">Crear sala</button>
       </div>
 
       <h2>Salas disponibles</h2>
+      <button id="refreshRooms">↺</button>
       <div id="rooms"></div>
-      <div id="lobbyHint">Selecciona o crea una sala para empezar.</div>
+      <div id="lobbyHint">Crea una sala o únete a una existente para empezar.</div>
 
     </div>
 
     <div id="room" class="hidden">
 
       <div class="roomHeader">
-        <h2>Sala</h2>
+        <h2>Sala de espera</h2>
         <button id="leaveRoom">Salir</button>
       </div>
 
@@ -87,8 +88,58 @@
       </div>
 
       <div id="roomActions">
-        <button id="ready" disabled>READY</button>
+        <button id="ready" disabled>Listo</button>
         <button id="switchTeam">Cambiar equipo</button>
+      </div>
+
+      <div id="lobbyControls">
+        <div class="lobbyControlsTitle">CONTROLES</div>
+        <table class="lobbyControlsTable">
+          <tr>
+            <td>Mouse</td>
+            <td>Apuntar / Girar nave</td>
+          </tr>
+          <tr>
+            <td>Clic Izq.</td>
+            <td>Disparar cañón</td>
+          </tr>
+          <tr>
+            <td>Clic Der.</td>
+            <td>Lockear objetivo · Clic Der. de nuevo = Misil</td>
+          </tr>
+          <tr>
+            <td>W / S</td>
+            <td>Propulsión / Retroceso</td>
+          </tr>
+          <tr>
+            <td>A / D</td>
+            <td>Strafe lateral</td>
+          </tr>
+          <tr>
+            <td>Tab (mantener)</td>
+            <td>Ver marcador</td>
+          </tr>
+          <tr>
+            <td>F</td>
+            <td>Bengala</td>
+          </tr>
+          <tr>
+            <td>R</td>
+            <td>Reaparecer (tras morir, con cooldown)</td>
+          </tr>
+          <tr>
+            <td>T</td>
+            <td>Chat</td>
+          </tr>
+          <tr>
+            <td>Del</td>
+            <td>Autodestrucción (mantener 2s)</td>
+          </tr>
+          <tr>
+            <td>F1</td>
+            <td>MobiGlass</td>
+          </tr>
+        </table>
       </div>
 
       <div id="roomHint">Esperando jugadores...</div>
@@ -151,18 +202,7 @@
         </div>
 
         <div class="mobiPane hidden" id="pane-controles">
-          <table class="mobiControls">
-            <tr><td><kbd>W</kbd></td><td>Propulsión</td></tr>
-            <tr><td><kbd>S</kbd></td><td>Retroceso</td></tr>
-            <tr><td><kbd>A / D</kbd></td><td>Rotar</td></tr>
-            <tr><td><kbd>E</kbd></td><td>Disparar</td></tr>
-            <tr><td><kbd>Q</kbd></td><td>Lanzar misil</td></tr>
-            <tr><td><kbd>Tab</kbd></td><td>Seleccionar / cambiar objetivo</td></tr>
-            <tr><td><kbd>F</kbd></td><td>Bengala</td></tr>
-            <tr><td><kbd>T</kbd></td><td>Chat</td></tr>
-            <tr><td><kbd>Del</kbd></td><td>Autodestrucción (mantener 2s · Del cancela)</td></tr>
-            <tr><td><kbd>F1</kbd></td><td>MobiGlass</td></tr>
-          </table>
+          <!-- Generado dinámicamente por renderControlesPane() en game.js -->
         </div>
 
         <div class="mobiPane hidden" id="pane-ajustes">
@@ -213,6 +253,8 @@
 
   <!-- ── GAME OVER ── -->
   <div id="gameOver" class="hidden">
+    <div id="gameOverHostHint" class="hidden gameOverHint">Como host puedes reiniciar para todos</div>
+    <div id="gameOverGuestHint" class="hidden gameOverHint">Esperando al host para reiniciar...</div>
     <button id="restartBtn" class="hidden">↺ Reiniciar partida</button>
     <button id="backToLobby">↩ Volver al lobby</button>
   </div>

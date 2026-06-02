@@ -154,6 +154,24 @@ function broadcastRoom(room, data) {
     if (ws && ws.readyState === 1) ws.send(payload);
   });
 }
+
+function broadcastRoomList() {
+  const payload = JSON.stringify({ type: "rooms", rooms: roomList() });
+  for (const [, ws] of clients) {
+    if (ws.readyState === 1 && !ws.player?.roomId) ws.send(payload);
+  }
+}
+
+function killPlayer(p, killer, weapon, room) {
+  p.hp = 0;
+  p.dead = true;
+  p.deaths++;
+  p.deadAt = Date.now();
+  p.respawnReadyAt = Date.now() + ((CFG.RESPAWN_DELAY ?? 5) * 1000);
+  room.shipsDestroyed = true;
+  if (killer && killer.id !== p.id) killer.kills++;
+  pushKill(room, killer || null, p, weapon);
+}
 function createAsteroids(count = 40) {
   const arr = [];
 
@@ -181,7 +199,8 @@ function createRoom(ownerId) {
     asteroids: asteroids,
     winner:  null,
     killFeed: [],
-    timeLeft: 0
+    timeLeft: 0,
+    allowJoinMidGame: false,
   };
   return rooms[id];
 }
@@ -200,25 +219,39 @@ function startGame(room) {
   room.shipsDestroyed = false;
   room.timeLeft = CFG.GAME_DURATION_S * FPS;
 
+  // Contar equipos ya elegidos en el lobby
   let green = 0, red = 0;
+  Object.values(room.players).forEach(p => {
+    if (p.team === "green") green++;
+    else if (p.team === "red") red++;
+  });
+
   Object.values(room.players).forEach(p => {
     p.dead  = false;
     p.fuel  = 100;
     p.vx    = 0;
     p.vy    = 0;
     p.angle = 0;
-    applyShipStats(p); // sets hp, maxHp, thrustVal, etc.
+    p.kills  = 0;
+    p.deaths = 0;
+    p.respawnsLeft   = CFG.RESPAWN_COUNT ?? 3;
+    p.deadAt         = null;
+    p.respawnReadyAt = 0;
 
-    if (green <= red) {
-      p.team = "green";
+    // Respetar equipo del lobby; auto-asignar al más pequeño si no eligió
+    if (p.team !== "green" && p.team !== "red") {
+      if (green <= red) { p.team = "green"; green++; }
+      else              { p.team = "red";   red++;   }
+    }
+
+    applyShipStats(p);
+
+    if (p.team === "green") {
       p.x = 300  + Math.random() * 200;
       p.y = 1000 + Math.random() * 500;
-      green++;
     } else {
-      p.team = "red";
       p.x = 2500 + Math.random() * 200;
       p.y = 1000 + Math.random() * 500;
-      red++;
     }
   });
 
@@ -263,6 +296,9 @@ function restartRoom(room) {
     p.missileCooldown = 0;
     p.bulletCooldown  = 0;
     p.flaredCooldown  = 0;
+    p.respawnsLeft    = CFG.RESPAWN_COUNT ?? 3;
+    p.deadAt          = null;
+    p.respawnReadyAt  = 0;
   });
 
   broadcastRoom(room, { type: "roomRestarted", room });
@@ -283,11 +319,14 @@ function removeFromRoom(player) {
   }
 }
 
+const MAX_PLAYERS = 20;
+
 function roomList() {
   return Object.values(rooms).map(r => ({
-    id:      r.id,
-    players: Object.keys(r.players).length,
-    status:  r.status
+    id:               r.id,
+    players:          Object.keys(r.players).length,
+    status:           r.status,
+    allowJoinMidGame: r.allowJoinMidGame,
   }));
 }
 
@@ -320,24 +359,65 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (msg.type === "leaveRoom") { removeFromRoom(player); return; }
+    if (msg.type === "leaveRoom") {
+      removeFromRoom(player);
+      broadcastRoomList();
+      return;
+    }
 
     if (msg.type === "createRoom") {
       const room = createRoom(id);
       joinRoom(player, room);
       send(ws, { type: "roomJoined", roomId: room.id });
       broadcastRoom(room, { type: "roomUpdate", room });
+      broadcastRoomList();
       return;
     }
 
     if (msg.type === "joinRoom") {
       const room = rooms[msg.roomId];
       if (!room) return;
-      if (room.status !== "waiting") return;
-      if (Object.keys(room.players).length >= 6) return;
+      if (room.status === "playing" && !room.allowJoinMidGame) return;
+      if (Object.keys(room.players).length >= MAX_PLAYERS) return;
       joinRoom(player, room);
       send(ws, { type: "roomJoined", roomId: room.id });
       broadcastRoom(room, { type: "roomUpdate", room });
+      broadcastRoomList();
+
+      // Mid-game spawn: inicializar el jugador directamente en partida
+      if (room.status === "playing") {
+        const allP = Object.values(room.players);
+        const greenCount = allP.filter(p => p.team === "green" && !p.dead).length;
+        const redCount   = allP.filter(p => p.team === "red"   && !p.dead).length;
+        if (player.team !== "green" && player.team !== "red") {
+          player.team = greenCount <= redCount ? "green" : "red";
+        }
+        applyShipStats(player);
+        player.dead = false;
+        player.fuel = 100;
+        player.vx = 0; player.vy = 0; player.angle = 0;
+        player.kills = 0; player.deaths = 0;
+        player.respawnsLeft = CFG.RESPAWN_COUNT ?? 3;
+        player.deadAt = null; player.respawnReadyAt = 0;
+        player.missileCooldown = 0; player.bulletCooldown = 0;
+        if (player.team === "green") {
+          player.x = 300  + Math.random() * 200;
+          player.y = 1000 + Math.random() * 500;
+        } else {
+          player.x = 2500 + Math.random() * 200;
+          player.y = 1000 + Math.random() * 500;
+        }
+        send(ws, { type: "gameStarted" });
+      }
+      return;
+    }
+
+    if (msg.type === "toggleMidGameJoin") {
+      const room = rooms[player.roomId];
+      if (!room || room.ownerId !== player.id) return;
+      room.allowJoinMidGame = !room.allowJoinMidGame;
+      broadcastRoom(room, { type: "roomUpdate", room });
+      broadcastRoomList();
       return;
     }
 
@@ -349,7 +429,10 @@ wss.on("connection", ws => {
       broadcastRoom(room, { type: "roomUpdate", room });
 
       const list = Object.values(room.players);
-      if (list.length >= 1 && list.every(p => p.ready)) startGame(room);
+      if (list.length >= 1 && list.every(p => p.ready)) {
+        startGame(room);
+        broadcastRoomList();
+      }
       return;
     }
 
@@ -421,11 +504,28 @@ wss.on("connection", ws => {
     if (msg.type === "selfDestruct") {
       const room = rooms[player.roomId];
       if (!room || room.status !== "playing" || player.dead) return;
-      player.dead = true;
-      player.hp   = 0;
-      player.deaths++;
-      room.shipsDestroyed = true;
-      pushKill(room, null, player, "self");
+      killPlayer(player, null, "self", room);
+      return;
+    }
+
+    if (msg.type === "respawn") {
+      const room = rooms[player.roomId];
+      if (!room || room.status !== "playing" || !player.dead) return;
+      if ((player.respawnsLeft ?? 0) <= 0) return;
+      if (Date.now() < (player.respawnReadyAt ?? 0)) return;
+      player.respawnsLeft--;
+      player.dead = false;
+      player.deadAt = null;
+      applyShipStats(player);
+      player.vx = 0; player.vy = 0; player.angle = 0;
+      player.missileCooldown = 0; player.bulletCooldown = 0;
+      if (player.team === "green") {
+        player.x = 300  + Math.random() * 200;
+        player.y = 1000 + Math.random() * 500;
+      } else {
+        player.x = 2500 + Math.random() * 200;
+        player.y = 1000 + Math.random() * 500;
+      }
       return;
     }
 
@@ -433,6 +533,7 @@ wss.on("connection", ws => {
       const room = rooms[player.roomId];
       if (!room || room.ownerId !== player.id || room.status !== "playing") return;
       restartRoom(room);
+      broadcastRoomList();
       return;
     }
 
@@ -463,6 +564,7 @@ wss.on("connection", ws => {
   ws.on("close", () => {
     removeFromRoom(player);
     clients.delete(id);
+    broadcastRoomList();
   });
 });
 
@@ -505,19 +607,45 @@ function update() {
       if (p.flaredCooldown  > 0) p.flaredCooldown--;
 
       const i = p.input || {};
-      if (i.left)  p.angle -= (p.turnRateVal    ?? CFG.TURN_RATE);
-      if (i.right) p.angle += (p.turnRateVal    ?? CFG.TURN_RATE);
+
+      // Rotación: mouse aim (targetAngle) o fallback teclado
+      if (i.targetAngle != null) {
+        let diff = i.targetAngle - p.angle;
+        while (diff >  Math.PI) diff -= 2 * Math.PI;
+        while (diff < -Math.PI) diff += 2 * Math.PI;
+        const maxTurn = p.turnRateVal ?? CFG.TURN_RATE;
+        p.angle += Math.max(-maxTurn, Math.min(maxTurn, diff));
+      } else {
+        if (i.left)  p.angle -= (p.turnRateVal ?? CFG.TURN_RATE);
+        if (i.right) p.angle += (p.turnRateVal ?? CFG.TURN_RATE);
+      }
+
+      const thrustVal   = p.thrustVal        ?? CFG.THRUST;
+      const reverseVal  = p.reverseThrustVal ?? CFG.REVERSE_THRUST;
+      const strafeVal   = thrustVal * 0.7;
 
       if (i.thrust && p.fuel > 0) {
-        p.vx  += Math.cos(p.angle) * (p.thrustVal        ?? CFG.THRUST);
-        p.vy  += Math.sin(p.angle) * (p.thrustVal        ?? CFG.THRUST);
+        p.vx  += Math.cos(p.angle) * thrustVal;
+        p.vy  += Math.sin(p.angle) * thrustVal;
         p.fuel = Math.max(0, p.fuel - CFG.THRUST_FUEL);
       } else if (i.reverse && p.fuel > 0) {
-        p.vx  -= Math.cos(p.angle) * (p.reverseThrustVal ?? CFG.REVERSE_THRUST);
-        p.vy  -= Math.sin(p.angle) * (p.reverseThrustVal ?? CFG.REVERSE_THRUST);
+        p.vx  -= Math.cos(p.angle) * reverseVal;
+        p.vy  -= Math.sin(p.angle) * reverseVal;
         p.fuel = Math.max(0, p.fuel - CFG.REVERSE_FUEL);
       } else if (p.fuel < 100) {
-        p.fuel = Math.min(100, p.fuel + (p.fuelRegenVal  ?? CFG.FUEL_REGEN));
+        p.fuel = Math.min(100, p.fuel + (p.fuelRegenVal ?? CFG.FUEL_REGEN));
+      }
+
+      // Strafe lateral (A/D) — perpendicular izquierda/derecha en canvas (Y↓)
+      if (i.strafeLeft && p.fuel > 0) {
+        p.vx += Math.sin(p.angle) * strafeVal;
+        p.vy -= Math.cos(p.angle) * strafeVal;
+        p.fuel = Math.max(0, p.fuel - CFG.THRUST_FUEL * 0.5);
+      }
+      if (i.strafeRight && p.fuel > 0) {
+        p.vx -= Math.sin(p.angle) * strafeVal;
+        p.vy += Math.cos(p.angle) * strafeVal;
+        p.fuel = Math.max(0, p.fuel - CFG.THRUST_FUEL * 0.5);
       }
 
       p.vx *= (p.dragVal ?? CFG.DRAG);
@@ -577,11 +705,7 @@ function update() {
               p.hitFlash = 8;
     
               if (p.hp <= 0) {
-                p.hp = 0;
-                p.dead = true;
-                p.deaths++;
-                room.shipsDestroyed = true;
-                pushKill(room, null, p, "asteroid");
+                killPlayer(p, null, "asteroid", room);
               }
             }
           }
@@ -604,11 +728,7 @@ function update() {
           p.hp -= CFG.BULLET_DAMAGE;
           p.hitFlash = 8;
           if (p.hp <= 0) {
-            p.dead = true; p.hp = 0; p.deaths++;
-            room.shipsDestroyed = true;
-            const killer = room.players[b.ownerId];
-            if (killer && killer.id !== p.id) killer.kills++;
-            pushKill(room, killer || null, p, "bullet");
+            killPlayer(p, room.players[b.ownerId] || null, "bullet", room);
           }
           room.bullets.splice(i, 1);
           break;
@@ -684,11 +804,7 @@ function update() {
           p.hp -= CFG.MISSILE_DAMAGE;
           p.hitFlash = 8;
           if (p.hp <= 0) {
-            p.hp = 0; p.dead = true; p.deaths++;
-            room.shipsDestroyed = true;
-            const killer = room.players[m.ownerId];
-            if (killer && killer.id !== p.id) killer.kills++;
-            pushKill(room, killer || null, p, "missile");
+            killPlayer(p, room.players[m.ownerId] || null, "missile", room);
           }
           room.missiles.splice(i, 1);
           break;
@@ -709,8 +825,10 @@ function update() {
 
     if (!room.winner) {
       if (room.gameValid && room.shipsDestroyed) {
-        if (greenAlive === 0) room.winner = "red";
-        if (redAlive   === 0) room.winner = "green";
+        const greenAllOut = greenAlive === 0 && !allPlayers.some(p => p.team === "green" && p.dead && (p.respawnsLeft ?? 0) > 0);
+        const redAllOut   = redAlive   === 0 && !allPlayers.some(p => p.team === "red"   && p.dead && (p.respawnsLeft ?? 0) > 0);
+        if (greenAllOut) room.winner = "red";
+        if (redAllOut)   room.winner = "green";
       }
 
       // Time's up
