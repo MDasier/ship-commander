@@ -2175,23 +2175,26 @@ function loop() {
       : "⬡ " + (winner === "green" ? "VICTORIA EQUIPO VERDE" : "VICTORIA EQUIPO ROJO");
     ctx.fillText(resultText, cx, cy - 90);
 
-    const sorted = Object.values(players).sort((a, b) => (b.kills || 0) - (a.kills || 0));
+    const sorted = Object.values(players).sort((a, b) => {
+      if (a.team !== b.team) return a.team === winner ? -1 : 1;
+      return (b.kills||0) - (a.kills||0);
+    });
 
-    ctx.font = "12px 'Courier New', monospace";
+    ctx.font = "11px 'Courier New', monospace";
+    ctx.fillStyle = "#333";
+    ctx.fillText("──────────────────────────────────────────────", cx, cy - 48);
     ctx.fillStyle = "#444";
-    ctx.fillText("─────────────────────────────────────", cx, cy - 48);
-    ctx.fillStyle = "#555";
-    ctx.fillText("NOMBRE                    K      D", cx, cy - 32);
+    ctx.fillText("PILOTO             K   D   A    DMG", cx, cy - 32);
 
     sorted.forEach((p, i) => {
       ctx.fillStyle = p.team === "green" ? "#00ff88" : "#ff3355";
-      const name = (p.name || "Pilot").slice(0, 16).padEnd(16);
-      const me_marker = p.id === myId ? " ◄" : "";
-      ctx.fillText(
-        name + "          " + String(p.kills || 0).padStart(2) + "     " + String(p.deaths || 0).padStart(2) + me_marker,
-        cx,
-        cy - 6 + i * 26
-      );
+      const name = (p.name || "Pilot").slice(0, 12).padEnd(12);
+      const k    = String(p.kills   || 0).padStart(3);
+      const d    = String(p.deaths  || 0).padStart(3);
+      const a    = String(p.assists || 0).padStart(3);
+      const dmg  = String(Math.round(p.damageDealt || 0)).padStart(5);
+      const me_m = p.id === myId ? " ◄" : "";
+      ctx.fillText(name + "    " + k + " " + d + " " + a + " " + dmg + me_m, cx, cy - 6 + i * 24);
     });
 
     ctx.textAlign = "left";
@@ -2362,34 +2365,113 @@ function loop() {
   if (mobiOpen) updateMobiglass();
 
   // ── Scoreboard (Tab mantenido)
-  if (showScoreboard && !winner) {
-    const cx = canvas.width / 2;
-    const bw = 460, bh = 60 + Object.keys(players).length * 26 + 20;
-    const bx = cx - bw / 2, by = 60;
+  if (showScoreboard) {
+    const green = Object.values(players).filter(p => p.team === "green").sort((a,b)=>(b.kills||0)-(a.kills||0));
+    const red   = Object.values(players).filter(p => p.team === "red"  ).sort((a,b)=>(b.kills||0)-(a.kills||0));
+    const maxRows = Math.max(green.length, red.length, 1);
+    const rowH = 22, titleH = 44, teamH = 28, colH = 18;
+    const bh = titleH + teamH + colH + maxRows * rowH + 14;
+    const bw = Math.min(canvas.width * 0.9, 900);
+    const bx = (canvas.width - bw) / 2;
+    const by = Math.max(30, (canvas.height - bh) / 2);
+    const colW = bw / 2;
+
     ctx.save();
-    ctx.fillStyle = "rgba(0,0,0,0.82)";
+
+    // Panel
+    ctx.fillStyle = "rgba(0,2,8,0.92)";
     ctx.fillRect(bx, by, bw, bh);
-    ctx.strokeStyle = "#00ccff44";
+    ctx.strokeStyle = "#00ccff18";
     ctx.lineWidth = 1;
     ctx.strokeRect(bx, by, bw, bh);
-    ctx.textAlign = "center";
-    ctx.font = "bold 13px 'Courier New', monospace";
-    ctx.fillStyle = "#00ccff";
-    ctx.fillText("MARCADOR", cx, by + 22);
-    ctx.font = "11px 'Courier New', monospace";
-    ctx.fillStyle = "#444";
-    ctx.fillText("PILOTO                  K   D  NAVE", cx, by + 42);
 
-    const sorted = Object.values(players).sort((a, b) => (b.kills || 0) - (a.kills || 0));
-    sorted.forEach((p, i) => {
-      const color = p.dead ? "#555" : p.team === "green" ? "#00ff88" : "#ff3355";
-      ctx.fillStyle = color;
-      const name = (p.name || "Pilot").slice(0, 14).padEnd(14);
-      const kd = String(p.kills || 0).padStart(3) + String(p.deaths || 0).padStart(4);
-      const ship = (p.shipType || "?").slice(0, 3).toUpperCase();
-      const me_marker = p.id === myId ? " ◄" : "";
-      ctx.fillText(name + "         " + kd + "  " + ship + me_marker, cx, by + 62 + i * 26);
+    // Divisor central
+    ctx.beginPath();
+    ctx.moveTo(bx + colW, by + titleH);
+    ctx.lineTo(bx + colW, by + bh);
+    ctx.strokeStyle = "#ffffff08";
+    ctx.stroke();
+
+    // Título
+    ctx.textAlign = "center";
+    ctx.font = "11px 'Courier New', monospace";
+    ctx.fillStyle = "#00ccff44";
+    ctx.fillText("MARCADOR  ·  Suelta Tab para cerrar", canvas.width / 2, by + 16);
+
+    // Totales por equipo
+    const sum = (arr, key) => arr.reduce((s,p) => s + (p[key]||0), 0);
+    const gAlive = green.filter(p=>!p.dead).length;
+    const rAlive = red.filter(p=>!p.dead).length;
+    ctx.font = "bold 11px 'Courier New', monospace";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#00ff88";
+    ctx.fillText(`▶ VERDE  ${gAlive}/${green.length} vivos  ${sum(green,"kills")}K  ${sum(green,"assists")}A  ${Math.round(sum(green,"damageDealt"))}dmg`, bx + 10, by + 34);
+    ctx.fillStyle = "#ff3355";
+    ctx.textAlign = "right";
+    ctx.fillText(`${sum(red,"kills")}K  ${sum(red,"assists")}A  ${Math.round(sum(red,"damageDealt"))}dmg  ${rAlive}/${red.length} vivos  ROJO ◀`, bx + bw - 10, by + 34);
+
+    // Cabeceras de columna
+    const hy = by + titleH + teamH + colH - 4;
+    ctx.font = "9px 'Courier New', monospace";
+    ctx.fillStyle = "#1e3a4a";
+    ctx.textAlign = "left";
+    ctx.fillText("PILOTO", bx + 22, hy);
+    ctx.textAlign = "right";
+    ctx.fillText("K   D   A    DMG", bx + colW - 10, hy);
+    ctx.textAlign = "left";
+    ctx.fillText("PILOTO", bx + colW + 22, hy);
+    ctx.textAlign = "right";
+    ctx.fillText("K   D   A    DMG", bx + bw - 10, hy);
+
+    // Separador
+    ctx.beginPath();
+    ctx.moveTo(bx, hy + 4); ctx.lineTo(bx + bw, hy + 4);
+    ctx.strokeStyle = "#ffffff08"; ctx.stroke();
+
+    const rowStart = by + titleH + teamH + colH;
+
+    [green, red].forEach((team, ti) => {
+      const lx = ti === 0 ? bx + 10    : bx + colW + 10;
+      const rx = ti === 0 ? bx + colW - 10 : bx + bw - 10;
+      const tColor = ti === 0 ? "#00ff88" : "#ff3355";
+
+      team.forEach((p, i) => {
+        const ry = rowStart + i * rowH + rowH * 0.72;
+        const isMe = p.id === myId;
+
+        // Fondo propio
+        if (isMe) {
+          ctx.fillStyle = "rgba(0,204,255,0.05)";
+          ctx.fillRect(ti === 0 ? bx : bx + colW, rowStart + i * rowH, colW, rowH);
+        }
+
+        ctx.globalAlpha = p.dead ? 0.38 : 1;
+
+        // Estado + nombre
+        ctx.textAlign = "left";
+        ctx.font = "10px 'Courier New', monospace";
+        ctx.fillStyle = p.dead ? "#444" : tColor;
+        ctx.fillText(p.dead ? "✕" : "●", lx, ry);
+
+        ctx.font = (isMe ? "bold " : "") + "11px 'Courier New', monospace";
+        ctx.fillStyle = isMe ? "#00ccff" : (p.dead ? "#444" : "#ccc");
+        ctx.fillText((p.name || "Pilot").slice(0, 11), lx + 14, ry);
+
+        // KDA + DMG
+        ctx.textAlign = "right";
+        ctx.font = "11px 'Courier New', monospace";
+        ctx.fillStyle = p.dead ? "#444" : "#9ab";
+        const k   = String(p.kills   || 0).padStart(2);
+        const d   = String(p.deaths  || 0).padStart(2);
+        const a   = String(p.assists || 0).padStart(2);
+        const dmg = String(Math.round(p.damageDealt || 0)).padStart(4);
+        ctx.fillText(`${k}  ${d}  ${a}  ${dmg}`, rx, ry);
+
+        ctx.globalAlpha = 1;
+      });
     });
+
+    ctx.textAlign = "left";
     ctx.restore();
   }
 

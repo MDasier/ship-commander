@@ -127,10 +127,14 @@ function createPlayer(id) {
     missileCooldownBase: CFG.MISSILE_COOLDOWN,
     radarSignature: 450,
     // Crew system
-    pilotingFor:  null,   // id del piloto si este player es artillero
-    gunnerId:     null,   // id del artillero si este player tiene uno
-    turretAngle:  0,      // ángulo de la torreta (actualizado por el artillero)
+    pilotingFor:  null,
+    gunnerId:     null,
+    turretAngle:  0,
     turretCooldown: 0,
+    // Stats competitivos
+    damageDealt:       0,
+    assists:           0,
+    recentDamageFrom:  [],   // [{attackerId, time}] — solo server, para calcular assists
   };
 }
 
@@ -167,7 +171,25 @@ function broadcastRoomList() {
   }
 }
 
+function updateDamageLog(victim, attackerId) {
+  const now = Date.now();
+  victim.recentDamageFrom = (victim.recentDamageFrom || []).filter(e => now - e.time < 10000);
+  const existing = victim.recentDamageFrom.find(e => e.attackerId === attackerId);
+  if (existing) existing.time = now;
+  else victim.recentDamageFrom.push({ attackerId, time: now });
+}
+
 function killPlayer(p, killer, weapon, room) {
+  // Assists: jugadores que dañaron a la víctima en los últimos 10s (≠ killer, ≠ víctima, equipo enemigo)
+  const now = Date.now();
+  for (const entry of (p.recentDamageFrom || [])) {
+    if (entry.attackerId === killer?.id) continue;
+    if (now - entry.time > 10000) continue;
+    const assister = room.players[entry.attackerId];
+    if (assister && assister.team !== p.team) assister.assists = (assister.assists || 0) + 1;
+  }
+  p.recentDamageFrom = [];
+
   p.hp = 0;
   p.dead = true;
   p.deaths++;
@@ -175,7 +197,6 @@ function killPlayer(p, killer, weapon, room) {
   p.respawnReadyAt = Date.now() + ((CFG.RESPAWN_DELAY ?? 5) * 1000);
   room.shipsDestroyed = true;
   if (killer && killer.id !== p.id) killer.kills++;
-  pushKill(room, killer || null, p, weapon);
   // El artillero muere con el piloto
   if (p.gunnerId) {
     const gunner = room.players[p.gunnerId];
@@ -260,6 +281,9 @@ function startGame(room) {
     p.respawnReadyAt = 0;
     p.turretAngle    = 0;
     p.turretCooldown = 0;
+    p.damageDealt    = 0;
+    p.assists        = 0;
+    p.recentDamageFrom = [];
 
     if (p.team !== "green" && p.team !== "red") {
       if (green <= red) { p.team = "green"; green++; }
@@ -343,13 +367,16 @@ function restartRoom(room) {
     p.missileCooldown = 0;
     p.bulletCooldown  = 0;
     p.flaredCooldown  = 0;
-    p.respawnsLeft    = CFG.RESPAWN_COUNT ?? 3;
-    p.deadAt          = null;
-    p.respawnReadyAt  = 0;
-    p.pilotingFor     = null;
-    p.gunnerId        = null;
-    p.turretAngle     = 0;
-    p.turretCooldown  = 0;
+    p.respawnsLeft     = CFG.RESPAWN_COUNT ?? 3;
+    p.deadAt           = null;
+    p.respawnReadyAt   = 0;
+    p.pilotingFor      = null;
+    p.gunnerId         = null;
+    p.turretAngle      = 0;
+    p.turretCooldown   = 0;
+    p.damageDealt      = 0;
+    p.assists          = 0;
+    p.recentDamageFrom = [];
   });
 
   broadcastRoom(room, { type: "roomRestarted", room });
@@ -866,11 +893,14 @@ function update() {
     for (let i = room.bullets.length - 1; i >= 0; i--) {
       const b = room.bullets[i];
       for (const p of Object.values(room.players)) {
-        if (p.dead || p.team === b.team || p.pilotingFor) continue; // artillero protegido
+        if (p.dead || p.team === b.team || p.pilotingFor) continue;
         if (Math.hypot(p.x - b.x, p.y - b.y) < CFG.BULLET_RADIUS) {
-          p.hp -= b.damage ?? CFG.BULLET_DAMAGE;
+          const dmg = b.damage ?? CFG.BULLET_DAMAGE;
+          p.hp -= dmg;
           p.hitFlash = 8;
-          if (p.hp <= 0) killPlayer(p, room.players[b.ownerId] || null, "bullet", room);
+          const attacker = room.players[b.ownerId];
+          if (attacker) { attacker.damageDealt += dmg; updateDamageLog(p, attacker.id); }
+          if (p.hp <= 0) killPlayer(p, attacker || null, "bullet", room);
           room.bullets.splice(i, 1);
           break;
         }
@@ -940,11 +970,13 @@ function update() {
     for (let i = room.missiles.length - 1; i >= 0; i--) {
       const m = room.missiles[i];
       for (const p of Object.values(room.players)) {
-        if (p.dead || p.team === m.team || p.pilotingFor) continue; // artillero protegido
+        if (p.dead || p.team === m.team || p.pilotingFor) continue;
         if (Math.hypot(p.x - m.x, p.y - m.y) < CFG.MISSILE_RADIUS) {
           p.hp -= CFG.MISSILE_DAMAGE;
           p.hitFlash = 8;
-          if (p.hp <= 0) killPlayer(p, room.players[m.ownerId] || null, "missile", room);
+          const attacker = room.players[m.ownerId];
+          if (attacker) { attacker.damageDealt += CFG.MISSILE_DAMAGE; updateDamageLog(p, attacker.id); }
+          if (p.hp <= 0) killPlayer(p, attacker || null, "missile", room);
           room.missiles.splice(i, 1);
           break;
         }
