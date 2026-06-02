@@ -167,7 +167,17 @@ ship-commander/
 
 El juego es jugable y estable para sesiones locales y con amigos via túnel. Las áreas principales aún en desarrollo son:
 
+- [ ] Deberíamos poder cambiar de nave cuando morimos en la partida.
+- [ ] Cambiar el abrir el char con 'Enter' en lugar de con 't'.
+- [ ] Tenemos que compensar los equipos en el lobby para que la partida esté bien configurada. Que no haya mayor diferencia que 1 persona demás entre los equipos.
+- [ ] Las naves deberían tener escudos de energía como en el StarCitizen. Primero le hacemos daño al escudo y después a la nave. Los escudos tienen un tiempo de "cooldown".
+- [ ] Las naves tienen una sensación rara de inercia a veces. Tenemos que mejorar el movimiento de las naves. Poder dejar pulsado el clic de disparar pero añadir algún control de cooldown para que no se dispare tan rápido. Además de que tengamos el efecto de "calentamiento" de arma cuando se mantiene pulsado. Debería ser un poco mejor a la larga "pulsar y soltar" que mantener pulsado.
+- [ ] El daño de la nave multitripulada se guarda mal. Le cuenta todo a un solo jugador. Además no debería salir una nave extra al explotar. Cuando la nace se destruye mueren ambos jugadores. Y ambos deberían seleccionar volver a la nave o seleccionar otra diferente.
+- [ ] Ahora que tenemos una nave para 2 personas, deberíamos hacer una nave aún más grande con 1 piloto y 3 torretas. (Controlar equipos proporcionales).
+- [ ] Si es posible, cuando pulsamos la "c" y activamos el ping, además de ver los asteroides durante 8 segundos, deberíamos ver los enemigos 1 segundo en el radar.
+- [ ] Hay que mejorar el pitido de los misiles porque es molesto si te targetean varios etc. Además en algún caso hemos notado que al morir no para de sonar el pitido. Hay que mejorar el tema del target/lock para hacerlo más fluido. Que sea más fácil el cycle lock y el deslockear.
 - [ ] Añadir "ruido" como habilidad adicional además del "flare". Una habilidad que hace que no te puedan ver/targetear en unos segundos.
+- [ ] Poder reiniciar datos del servidor para evitar datos corruptos del config.json.
 
 
 ## Estado actual (Beta)

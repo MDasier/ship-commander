@@ -1012,7 +1012,7 @@ function renderRooms(list) {
 
 }
 // Etiquetas cortas para la lista de jugadores — se actualizan dinámicamente
-const SHIP_LABELS = { interceptor: "RAZOR", fighter: "GLADIUS", bomber: "ANDRMD", gunship: "PALADIN" };
+const SHIP_LABELS = { interceptor: "INTERCEPTOR", fighter: "L.FIGHTER", bomber: "BOMBER", gunship: "GUNSHIP" };
 
 function speedRating(mult) {
   if (mult >= 1.4) return "+++";
