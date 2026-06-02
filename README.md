@@ -167,18 +167,17 @@ ship-commander/
 
 El juego es jugable y estable para sesiones locales y con amigos via túnel. Las áreas principales aún en desarrollo son:
 
-- [ ] Añadir el campo "daño" en el leaderboard/socoreboard para saber quién ha hecho más daño en la partida. Además añadir KDA completo, kills, deaths y assists.
 - [ ] Añadir "ruido" como habilidad adicional además del "flare". Una habilidad que hace que no te puedan ver/targetear en unos segundos.
 
 
 ## Estado actual (Beta)
 
-### Nueva nave: Capital
+### Nueva nave: Gunner
 
-Nave Capital (2 tripulantes)
+Nave Gunner (2 tripulantes)
 
-Piloto: selecciona "CAPITAL" en el selector de naves. Controla movimiento con W/S/A/D y mouse. Disparo principal con clic izquierdo. 4 misiles.
-Artillero: en la sala de espera ve el slot "ARTILLERO ↳ Vacío" debajo de la nave Capital y pulsa "Embarcar". En partida controla la torreta con el mouse (gira independientemente del casco). Clic izquierdo = cañón de torreta (40 dmg, más rápido que el principal). Clic derecho = misiles (20 disponibles).
+Piloto: selecciona "GUNNER" en el selector de naves. Controla movimiento con W/S/A/D y mouse. Disparo principal con clic izquierdo. 4 misiles.
+Artillero: en la sala de espera ve el slot "ARTILLERO ↳ Vacío" debajo de la nave Gunner y pulsa "Embarcar". En partida controla la torreta con el mouse (gira independientemente del casco). Clic izquierdo = cañón de torreta (40 dmg, más rápido que el principal). Clic derecho = misiles (20 disponibles).
 La torreta se dibuja en el centro del casco y rota suavemente siguiendo el mouse del artillero, visible para todos los jugadores.
 Muerte compartida: si el piloto muere, el artillero también muere. Al reaparecer, el artillero se eyecta como caza independiente.
 Equipo: el artillero hereda el equipo del piloto automáticamente al embarcar.

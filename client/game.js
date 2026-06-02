@@ -1607,7 +1607,7 @@ function drawShip(player, camX, camY) {
   if (player.shipType === "gunship" && !player.dead) {
     const hasGunner = !!player.gunnerId;
     const tAngle = player.turretAngle ?? 0;
-    const tColor = player.team === "green" ? "#00ff88" : "#ff3355";
+    const tColor = player.team === "green" ? "#007744" : "#881122";
     ctx.save();
     ctx.translate(pos.x, pos.y);
     // Base de la torreta
