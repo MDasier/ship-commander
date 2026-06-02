@@ -175,15 +175,9 @@ ship-commander/
 
 El juego es jugable y estable para sesiones locales y con amigos via túnel. Las áreas principales aún en desarrollo son:
 
-- [ ] Controlar que solo puedas targetear/lockear al enemigo si lo ves en el radar. + Controlar disparos de misil/distancia. La nave debería ir buscando el cursor del mouse en el movimiento en lugar de A/D para girar como ahora. A/D debería ser algo como en STAR CITIZEN, movimiento lateral para ayudar a ser dificil de dar con los disparos. Además,así los disparos pueden activarse con click izquierdo y para loquear con click derecho. (si tenemos lock/target disparar misiles). 
 
-- [ ] Mejor control de "fin de partida" y "reinicio". Hay que hacer que sea claro el reinicio y que no falle. Un player puede elegir seguir jugando o no. El "host" puede elegir reiniciar o terminar la partida (volver al lobby cerrando el "room").
-- [ ] Obligar a cambio de nombre mientras no haya uno guardado en localStorage.
-- [ ] Añadir a la pantalla de lobby la lista de controles actuales para recordar al player como se juega etc.
-- [ ] Automatizar el listado de rooms, que no haga falta el botón de "actualizar" en el lobby. Socket para actualizar la lista de rooms.
-- [ ] Posibilidad de configurar las teclas de control del cliente. (Configurar sonido, movimiento, habilidades, etc)
-- [ ] Reaparición en modo equipo
-- [ ] Añadir un "Leaderboard" de puntuación (con damge, kills, time, etc)
-- [ ] Añadir "ruido" además del "flare". Una habilidad que hace que no te puedan ver/targetear
-- [ ] Estadísticas persistentes entre sesiones
-- [ ] Más tipos de nave y personalización visual
+- [ ] Más tipos de nave y personalización visual. Vamos a empezar por una nave nueva que sea para dos jugadores. Hay que controlar que un jugador maneja el movimiento y el disparo de la nave y el otro la torreta con disparos más potentes y misiles. además tenemos que equilibrar el juego entre los equipos asique si hay una de estas en un equipo, el otro equipo tiene que tener también dos jugadores (aun que sean dos naves diferentes).
+
+- [ ] Añadir el campo "daño" en el leaderboard/socoreboard para saber quién ha hecho más daño en la partida. Además añadir KDA completo, kills, deaths y assists.
+
+- [ ] Añadir "ruido" como habilidad adicional además del "flare". Una habilidad que hace que no te puedan ver/targetear en unos segundos.
