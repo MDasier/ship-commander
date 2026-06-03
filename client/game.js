@@ -1169,7 +1169,7 @@ function renderRooms(list) {
   roomsDiv.innerHTML = "";
 
   if (list.length === 0) {
-    roomsDiv.innerHTML = '<div style="color:#444;font-size:12px;padding:12px 0">No hay salas. Crea una.</div>';
+    //roomsDiv.innerHTML = '<div style="color:#444;font-size:12px;padding:12px 0">No hay salas. Crea una.</div>';
     return;
   }
 
