@@ -1333,6 +1333,54 @@ kbd.bindingError {
   justify-content: space-between;
 }
 
+/* ── SELECTOR DE TAMAÑO DE MUNDO ── */
+
+.worldSizeRow {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.worldSizeBtns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.worldSizeBtn {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  padding: 5px 10px;
+  border-color: #ffffff11;
+  color: #555;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  line-height: 1.4;
+  text-align: center;
+  transition: .15s;
+}
+
+.worldSizeBtn.on {
+  border-color: #00ccff66;
+  color: #00ccff;
+}
+
+.worldSizeBtn:hover {
+  border-color: #00ccff44;
+  color: #7bbccc;
+}
+
+.worldSizeSub {
+  font-size: 9px;
+  color: #334;
+  letter-spacing: 0.5px;
+}
+
+.worldSizeBtn.on .worldSizeSub {
+  color: #336677;
+}
+
 /* ── BARRA DE EQUILIBRIO ── */
 
 #balanceBar {

@@ -124,7 +124,28 @@ const DEFAULTS = {
       shieldRegenRate: 10,
       shieldRegenDelay: 6,
     },
+    capital: {
+      label: "Capital",
+      desc: "4 tripulantes · 3 torretas independientes · Blindaje máximo",
+      maxHp: 1500,
+      thrustMult: 0.18,
+      turnMult: 0.10,
+      dragVal: 0.999,
+      fuelRegenMult: 0.20,
+      maxMissiles: 6,
+      missileCooldown: 360,
+      radarSignature: 9000,
+      crewCapacity: 4,
+      // Escudos — dreadnought
+      maxShield: 500,
+      shieldRegenRate: 14,
+      shieldRegenDelay: 8,
+    },
   },
+
+  // ── Artilleros de Capital (3 torretas)
+  CAPITAL_GUNNER_MISSILES:       15,
+  CAPITAL_GUNNER_MISSILE_COOLDOWN: 70,
 };
 
 const cfgPath = path.join(__dirname, "config.json");

@@ -226,6 +226,28 @@ const SHIP_SHAPES = {
     uiOffY: -46,
     shieldR: 58,
   },
+
+  capital: {
+    body: [
+      [42, 0],
+      [32, -14], [18, -28], [4, -42], [-12, -52],
+      [-28, -50], [-38, -38], [-44, -22],
+      [-48, 0],
+      [-44, 22], [-38, 38],
+      [-28, 50], [-12, 52],
+      [4, 42], [18, 28], [32, 14],
+    ],
+    engine: [[-48, -24], [-64, 0], [-48, 24]],
+    hpBarW: 130,
+    uiOffY: -62,
+    shieldR: 72,
+    // Posiciones de las 3 torretas en coordenadas locales de nave
+    turretHardpoints: [
+      [12, -36],   // torreta izquierda
+      [12,  36],   // torreta derecha
+      [-32,  0],   // torreta trasera
+    ],
+  },
 };
 
 const pingEffect = [];
@@ -1047,8 +1069,11 @@ function renderRooms(list) {
     const playing = room.status === "playing";
     const canJoin = !playing || room.allowJoinMidGame;
 
+    const sizeLabels = { small: "3K", medium: "6K", large: "10K", huge: "15K" };
+    const sizeLabel  = sizeLabels[room.worldSize] || "6K";
     let statusText = playing ? "EN PARTIDA" : "EN ESPERA";
     if (playing && room.allowJoinMidGame) statusText = "EN PARTIDA · ABIERTA";
+    statusText += ` · ${sizeLabel}`;
 
     div.innerHTML = `
       <span class="roomId">${room.name || '#' + room.id.slice(0, 6)}</span>
@@ -1173,12 +1198,19 @@ function renderPlayers() {
     playersDiv.appendChild(nameBar);
   }
 
-  // ── Panel host: dos toggles ───────────────────
+  // ── Panel host: toggles + tamaño de mundo ────
   if (isHost) {
     const hostBar = document.createElement("div");
     hostBar.id = "hostBar";
     const mjOn = roomData.allowJoinMidGame;
     const ebOn = roomData.enforceBalance;
+    const ws_  = roomData.worldSize || "medium";
+    const SIZES = [
+      { key: "small",  label: "Pequeño 3K",  sub: "15 ast."  },
+      { key: "medium", label: "Medio 6K",    sub: "40 ast."  },
+      { key: "large",  label: "Grande 10K",  sub: "80 ast."  },
+      { key: "huge",   label: "Enorme 15K",  sub: "130 ast." },
+    ];
     hostBar.innerHTML = `
       <div class="hostToggleRow">
         <span class="hostBarLabel">Unirse en partida</span>
@@ -1188,11 +1220,24 @@ function renderPlayers() {
         <span class="hostBarLabel">Equipos equilibrados</span>
         <button id="toggleEnforceBalance" class="hostToggleBtn ${ebOn ? 'on' : ''}">${ebOn ? 'ON' : 'OFF'}</button>
       </div>
+      <div class="hostToggleRow worldSizeRow">
+        <span class="hostBarLabel">Tamaño del escenario</span>
+        <div class="worldSizeBtns">
+          ${SIZES.map(s => `
+            <button class="worldSizeBtn ${ws_ === s.key ? 'on' : ''}" data-size="${s.key}">
+              ${s.label}<br><span class="worldSizeSub">${s.sub}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
     `;
     hostBar.querySelector("#toggleMidGameJoin").onclick = () =>
       ws.send(JSON.stringify({ type: "toggleMidGameJoin" }));
     hostBar.querySelector("#toggleEnforceBalance").onclick = () =>
       ws.send(JSON.stringify({ type: "toggleEnforceBalance" }));
+    hostBar.querySelectorAll(".worldSizeBtn").forEach(btn => {
+      btn.onclick = () => ws.send(JSON.stringify({ type: "setWorldSize", size: btn.dataset.size }));
+    });
     playersDiv.appendChild(hostBar);
   }
 
@@ -1233,14 +1278,15 @@ function renderPlayers() {
 
     playersDiv.appendChild(div);
 
-    // Slot de tripulación para naves Capital
+    // Slots de tripulación — Gunship (1 artillero) y Capital (3 artilleros)
+    const myP = roomData.players[myId];
+    const amGunnerElsewhere = myP && !!myP.pilotingFor;
+    const iAmPilot = player.id === myId;
+
     if (player.shipType === "gunship") {
       const slotDiv = document.createElement("div");
       slotDiv.className = "crewSlot";
       const gunner = player.gunnerId ? roomData.players[player.gunnerId] : null;
-      const myP = roomData.players[myId];
-      const amGunnerElsewhere = myP && !!myP.pilotingFor;
-      const iAmPilot = player.id === myId;
 
       if (gunner) {
         const isMe = player.gunnerId === myId;
@@ -1259,12 +1305,44 @@ function renderPlayers() {
           <span class="crewEmpty">Vacío</span>
           ${canBoard ? `<button class="crewBtn boardBtn" data-pid="${player.id}">Embarcar</button>` : ''}
         `;
-        if (canBoard) {
+        if (canBoard)
           slotDiv.querySelector(".boardBtn").onclick = () =>
             ws.send(JSON.stringify({ type: "boardShip", targetId: player.id }));
-        }
       }
       playersDiv.appendChild(slotDiv);
+    }
+
+    if (player.shipType === "capital") {
+      const gunnerIds = player.gunnerIds || [null, null, null];
+      const roleNames = ["TORRETA I", "TORRETA II", "TORRETA III"];
+      gunnerIds.forEach((gid, idx) => {
+        const slotDiv = document.createElement("div");
+        slotDiv.className = "crewSlot";
+        const gunner = gid ? roomData.players[gid] : null;
+        const isMe   = gid === myId;
+
+        if (gunner) {
+          slotDiv.innerHTML = `
+            <span class="crewArrow">↳</span>
+            <span class="crewRole">${roleNames[idx]}</span>
+            <span class="crewName">${gunner.name || "Pilot"}${isMe ? ' <span class="you">(tú)</span>' : ''}</span>
+            ${isMe ? '<button class="crewBtn leaveShipBtn">Salir</button>' : ''}
+          `;
+          if (isMe) slotDiv.querySelector(".leaveShipBtn").onclick = () => ws.send(JSON.stringify({ type: "leaveShip" }));
+        } else {
+          const canBoard = !iAmPilot && !amGunnerElsewhere;
+          slotDiv.innerHTML = `
+            <span class="crewArrow">↳</span>
+            <span class="crewRole">${roleNames[idx]}</span>
+            <span class="crewEmpty">Vacío</span>
+            ${canBoard ? `<button class="crewBtn boardBtn" data-pid="${player.id}">Embarcar</button>` : ''}
+          `;
+          if (canBoard)
+            slotDiv.querySelector(".boardBtn").onclick = () =>
+              ws.send(JSON.stringify({ type: "boardShip", targetId: player.id }));
+        }
+        playersDiv.appendChild(slotDiv);
+      });
     }
   });
 
@@ -1812,14 +1890,13 @@ function drawShip(player, camX, camY) {
 
   ctx.restore();
 
-  // ── Torreta del Capital (independiente del ángulo del casco)
+  // ── Torreta del Gunship (independiente del ángulo del casco)
   if (player.shipType === "gunship" && !player.dead) {
     const hasGunner = !!player.gunnerId;
     const tAngle = player.turretAngle ?? 0;
     const tColor = player.team === "green" ? "#007744" : "#881122";
     ctx.save();
     ctx.translate(pos.x, pos.y);
-    // Base de la torreta
     ctx.beginPath();
     ctx.arc(0, 0, 11, 0, Math.PI * 2);
     ctx.fillStyle = "#111";
@@ -1827,11 +1904,44 @@ function drawShip(player, camX, camY) {
     ctx.strokeStyle = hasGunner ? tColor : "#333";
     ctx.lineWidth = 2;
     ctx.stroke();
-    // Cañón de la torreta
     ctx.rotate(tAngle);
     ctx.fillStyle = hasGunner ? tColor : "#2a2a2a";
     ctx.fillRect(4, -3.5, 28, 7);
     ctx.restore();
+  }
+
+  // ── 3 Torretas de la Capital (posiciones fijas en el casco, ángulo independiente)
+  if (player.shipType === "capital" && !player.dead) {
+    const hardpoints = shape.turretHardpoints || [];
+    const gunnerIds  = player.gunnerIds || [];
+    const angles     = player.turretAngles || {};
+    const tColor     = player.team === "green" ? "#007744" : "#881122";
+    const cosA = Math.cos(player.angle);
+    const sinA = Math.sin(player.angle);
+
+    hardpoints.forEach((hp, idx) => {
+      const hasGunner = !!(gunnerIds[idx]);
+      const tAngle    = hasGunner ? (angles[gunnerIds[idx]] ?? 0) : 0;
+      // Transformar hardpoint a coordenadas de pantalla
+      const sx = pos.x + hp[0] * cosA - hp[1] * sinA;
+      const sy = pos.y + hp[0] * sinA + hp[1] * cosA;
+
+      ctx.save();
+      ctx.translate(sx, sy);
+      // Base de la torreta
+      ctx.beginPath();
+      ctx.arc(0, 0, 9, 0, Math.PI * 2);
+      ctx.fillStyle = "#111";
+      ctx.fill();
+      ctx.strokeStyle = hasGunner ? tColor : "#333";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Cañón
+      ctx.rotate(tAngle);
+      ctx.fillStyle = hasGunner ? tColor : "#2a2a2a";
+      ctx.fillRect(3, -3, 22, 6);
+      ctx.restore();
+    });
   }
 
   // ── HUD elements (only if detected) ───────────

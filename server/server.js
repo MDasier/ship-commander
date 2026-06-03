@@ -5,9 +5,22 @@ const fs        = require("fs");
 const path      = require("path");
 const CFG       = require("./config");
 
-const WORLD_W = 6000;
-const WORLD_H = 6000;
 const FPS     = 60;
+
+const WORLD_PRESETS = {
+  small:  { w: 3000,  h: 3000,  asteroids: 15,  label: "Pequeño" },
+  medium: { w: 6000,  h: 6000,  asteroids: 40,  label: "Medio"   },
+  large:  { w: 10000, h: 10000, asteroids: 80,  label: "Grande"  },
+  huge:   { w: 15000, h: 15000, asteroids: 130, label: "Enorme"  },
+};
+
+function spawnPos(team, room) {
+  const W = room.worldW, H = room.worldH;
+  if (team === "green") {
+    return { x: W * 0.05 + Math.random() * W * 0.033, y: H * 0.167 + Math.random() * H * 0.083 };
+  }
+  return { x: W * 0.417 + Math.random() * W * 0.033, y: H * 0.167 + Math.random() * H * 0.083 };
+}
 const PORT    = parseInt(process.env.PORT) || 8080;
 const ADMIN_PORT = PORT + 1;
 
@@ -158,6 +171,11 @@ function applyShipStats(p) {
   p.shieldHitTimer        = 99999;
   p.shieldFlash           = 0;
   p.shieldHitAngle        = null;
+  // Nave Capital: 3 slots de artillero
+  if (p.shipType === "capital") {
+    if (!p.gunnerIds)    p.gunnerIds    = [null, null, null];
+    if (!p.turretAngles) p.turretAngles = {};
+  }
 }
 
 // Aplica daño al escudo primero; el excedente va al HP.
@@ -179,7 +197,14 @@ function applyDamage(target, dmg, attacker, hitAngle = null) {
     target.shieldHitTimer = 0;
     dealt += dmg;
   }
-  if (attacker) attacker.damageDealt += dealt;
+  if (attacker) {
+    attacker.damageDealt += dealt;
+    // Daño del artillero se comparte con el piloto
+    if (attacker.pilotingFor) {
+      const pilot = room.players[attacker.pilotingFor];
+      if (pilot) pilot.damageDealt += dealt;
+    }
+  }
   return dealt;
 }
 
@@ -227,10 +252,26 @@ function killPlayer(p, killer, weapon, room) {
   p.deadAt = Date.now();
   p.respawnReadyAt = Date.now() + ((CFG.RESPAWN_DELAY ?? 5) * 1000);
   room.shipsDestroyed = true;
-  if (killer && killer.id !== p.id) killer.kills++;
-  // El artillero muere con el piloto
-  if (p.gunnerId) {
-    const gunner = room.players[p.gunnerId];
+  if (killer && killer.id !== p.id) {
+    killer.kills++;
+    // Kills del artillero se comparten con el piloto (y viceversa)
+    if (killer.pilotingFor) {
+      const pilot = room.players[killer.pilotingFor];
+      if (pilot) pilot.kills++;
+    } else if (killer.gunnerId) {
+      const gunner = room.players[killer.gunnerId];
+      if (gunner) gunner.kills++;
+    } else if (killer.gunnerIds) {
+      killer.gunnerIds.filter(Boolean).forEach(gid => {
+        const g = room.players[gid];
+        if (g) g.kills++;
+      });
+    }
+  }
+  // Artilleros mueren con el piloto (Gunship: uno; Capital: hasta 3)
+  const crewIds = p.gunnerIds ? p.gunnerIds.filter(Boolean) : (p.gunnerId ? [p.gunnerId] : []);
+  for (const gid of crewIds) {
+    const gunner = room.players[gid];
     if (gunner && !gunner.dead) {
       gunner.hp = 0;
       gunner.dead = true;
@@ -240,15 +281,14 @@ function killPlayer(p, killer, weapon, room) {
     }
   }
 }
-function createAsteroids(count = 40) {
+function createAsteroids(count, W, H) {
   const arr = [];
   for (let i = 0; i < count; i++) {
     const roll = Math.random();
-    // 50% nivel 0 (colisión), 25% por encima (volar por debajo), 25% por debajo (volar por encima)
     const z = roll < 0.5 ? 0 : roll < 0.75 ? 1 : -1;
     arr.push({
-      x: Math.random() * WORLD_W,
-      y: Math.random() * WORLD_H,
+      x: Math.random() * W,
+      y: Math.random() * H,
       r: 40 + Math.random() * 100,
       z,
     });
@@ -257,19 +297,23 @@ function createAsteroids(count = 40) {
 }
 
 function createRoom(ownerId, ownerName) {
-  const id = crypto.randomUUID();
-  const asteroids = createAsteroids();
+  const id     = crypto.randomUUID();
+  const preset = WORLD_PRESETS.medium;
+  const W = preset.w, H = preset.h;
   rooms[id] = {
     id,
     status: "waiting",
     ownerId,
     name: ownerName ? `Sala de ${ownerName}`.slice(0, 28) : "Nueva sala",
     enforceBalance: false,
+    worldSize: "medium",
+    worldW: W,
+    worldH: H,
     players: {},
     bullets: [],
     missiles: [],
     flare: [],
-    asteroids: asteroids,
+    asteroids: createAsteroids(preset.asteroids, W, H),
     winner:  null,
     killFeed: [],
     timeLeft: 0,
@@ -325,13 +369,8 @@ function startGame(room) {
 
     applyShipStats(p);
 
-    if (p.team === "green") {
-      p.x = 300  + Math.random() * 200;
-      p.y = 1000 + Math.random() * 500;
-    } else {
-      p.x = 2500 + Math.random() * 200;
-      p.y = 1000 + Math.random() * 500;
-    }
+    const sp = spawnPos(p.team, room);
+    p.x = sp.x; p.y = sp.y;
   });
 
   // ── 2ª pasada: artilleros (posición = piloto, stats de torreta)
@@ -346,6 +385,9 @@ function startGame(room) {
     p.x = pilot.x;  p.y = pilot.y;
     p.vx = 0;        p.vy = 0; p.angle = 0;
     p.kills          = 0; p.deaths = 0;
+    p.damageDealt    = 0;  // reset que faltaba en artilleros
+    p.assists        = 0;
+    p.recentDamageFrom = [];
     p.maxMissiles    = CFG.GUNNER_MISSILES ?? 20;
     p.missileCooldownBase = CFG.GUNNER_MISSILE_COOLDOWN ?? 55;
     p.missileCooldown = 0;
@@ -456,6 +498,7 @@ function roomList() {
     status:           r.status,
     allowJoinMidGame: r.allowJoinMidGame,
     enforceBalance:   r.enforceBalance,
+    worldSize:        r.worldSize || "medium",
   }));
 }
 
@@ -529,13 +572,8 @@ wss.on("connection", ws => {
         player.respawnsLeft = CFG.RESPAWN_COUNT ?? 3;
         player.deadAt = null; player.respawnReadyAt = 0;
         player.missileCooldown = 0; player.bulletCooldown = 0;
-        if (player.team === "green") {
-          player.x = 300  + Math.random() * 200;
-          player.y = 1000 + Math.random() * 500;
-        } else {
-          player.x = 2500 + Math.random() * 200;
-          player.y = 1000 + Math.random() * 500;
-        }
+        const sp = spawnPos(player.team, room);
+        player.x = sp.x; player.y = sp.y;
         send(ws, { type: "gameStarted" });
       }
       return;
@@ -545,6 +583,21 @@ wss.on("connection", ws => {
       const room = rooms[player.roomId];
       if (!room || room.ownerId !== player.id) return;
       room.allowJoinMidGame = !room.allowJoinMidGame;
+      broadcastRoom(room, { type: "roomUpdate", room });
+      broadcastRoomList();
+      return;
+    }
+
+    if (msg.type === "setWorldSize") {
+      const room = rooms[player.roomId];
+      if (!room || room.ownerId !== player.id || room.status !== "waiting") return;
+      const preset = WORLD_PRESETS[msg.size];
+      if (!preset) return;
+      room.worldSize = msg.size;
+      room.worldW    = preset.w;
+      room.worldH    = preset.h;
+      // Regenerar asteroides con el nuevo tamaño
+      room.asteroids = createAsteroids(preset.asteroids, preset.w, preset.h);
       broadcastRoom(room, { type: "roomUpdate", room });
       broadcastRoomList();
       return;
@@ -605,10 +658,16 @@ wss.on("connection", ws => {
       player.vx     = 0;
       player.vy     = 0;
       player.targetId = null;
-      // Sincronizar equipo del artillero si tiene uno
+      // Sincronizar equipo de todos los artilleros
       if (player.gunnerId) {
         const gunner = room.players[player.gunnerId];
         if (gunner) gunner.team = player.team;
+      }
+      if (player.gunnerIds) {
+        player.gunnerIds.filter(Boolean).forEach(gid => {
+          const g = room.players[gid];
+          if (g) g.team = player.team;
+        });
       }
       broadcastRoom(room, { type: "roomUpdate", room });
       return;
@@ -621,11 +680,22 @@ wss.on("connection", ws => {
       const inLobby = room.status === "waiting";
       const deadInGame = room.status === "playing" && player.dead;
       if (!inLobby && !deadInGame) return;
-      // Si cambia de Capital a otra nave, expulsa al artillero (solo en lobby)
-      if (inLobby && player.gunnerId && player.shipType === "gunship" && msg.shipType !== "gunship") {
-        const gunner = room.players[player.gunnerId];
-        if (gunner) gunner.pilotingFor = null;
-        player.gunnerId = null;
+      // Expulsar artilleros al cambiar de nave multi-crew (solo en lobby)
+      if (inLobby) {
+        if (player.gunnerId && player.shipType === "gunship" && msg.shipType !== "gunship") {
+          const gunner = room.players[player.gunnerId];
+          if (gunner) { gunner.pilotingFor = null; gunner.turretIndex = undefined; }
+          player.gunnerId = null;
+        }
+        if (player.gunnerIds && player.shipType === "capital" && msg.shipType !== "capital") {
+          player.gunnerIds.forEach((gid, idx) => {
+            if (!gid) return;
+            const g = room.players[gid];
+            if (g) { g.pilotingFor = null; g.turretIndex = undefined; }
+            player.gunnerIds[idx] = null;
+          });
+          player.turretAngles = {};
+        }
       }
       player.shipType = msg.shipType;
       if (inLobby) broadcastRoom(room, { type: "roomUpdate", room });
@@ -636,13 +706,27 @@ wss.on("connection", ws => {
       const room = rooms[player.roomId];
       if (!room || room.status !== "waiting") return;
       const target = room.players[msg.targetId];
-      if (!target || target.shipType !== "gunship") return;
-      if (target.gunnerId) return;          // ya tiene artillero
-      if (player.pilotingFor) return;       // ya es artillero de otro
-      if (player.id === msg.targetId) return; // no puede ser artillero de sí mismo
-      target.gunnerId  = player.id;
-      player.pilotingFor = target.id;
-      player.team      = target.team;       // mismo equipo que el piloto
+      if (!target) return;
+      if (player.pilotingFor) return;
+      if (player.id === msg.targetId) return;
+
+      if (target.shipType === "gunship") {
+        if (target.gunnerId) return;
+        target.gunnerId    = player.id;
+        player.pilotingFor = target.id;
+        player.team        = target.team;
+      } else if (target.shipType === "capital") {
+        if (!target.gunnerIds) target.gunnerIds = [null, null, null];
+        const slot = target.gunnerIds.indexOf(null);
+        if (slot === -1) return;  // nave llena
+        target.gunnerIds[slot] = player.id;
+        player.pilotingFor  = target.id;
+        player.turretIndex  = slot;
+        player.team         = target.team;
+        if (!target.turretAngles) target.turretAngles = {};
+      } else {
+        return;
+      }
       broadcastRoom(room, { type: "roomUpdate", room });
       return;
     }
@@ -651,8 +735,17 @@ wss.on("connection", ws => {
       const room = rooms[player.roomId];
       if (!room || !player.pilotingFor) return;
       const pilot = room.players[player.pilotingFor];
-      if (pilot) pilot.gunnerId = null;
+      if (pilot) {
+        if (pilot.shipType === "capital" && pilot.gunnerIds) {
+          const idx = pilot.gunnerIds.indexOf(player.id);
+          if (idx !== -1) pilot.gunnerIds[idx] = null;
+          if (pilot.turretAngles) delete pilot.turretAngles[player.id];
+        } else {
+          pilot.gunnerId = null;
+        }
+      }
       player.pilotingFor = null;
+      player.turretIndex = undefined;
       broadcastRoom(room, { type: "roomUpdate", room });
       return;
     }
@@ -680,10 +773,14 @@ wss.on("connection", ws => {
       const active = room.missiles.filter(m => m.ownerId === player.id).length;
       if (active >= (player.maxMissiles ?? CFG.MISSILE_MAX_ACTIVE)) return;
 
-      // Artillero lanza desde la posición del piloto con ángulo de torreta
+      // Artillero lanza desde la posición del piloto con ángulo de su torreta
       const origin = player.pilotingFor ? room.players[player.pilotingFor] : player;
       if (!origin || origin.dead) return;
-      const fireAngle = player.pilotingFor ? origin.turretAngle : player.angle;
+      const fireAngle = player.pilotingFor
+        ? ((origin.shipType === "capital" && origin.turretAngles)
+            ? (origin.turretAngles[player.id] ?? 0)
+            : (origin.turretAngle ?? 0))
+        : player.angle;
 
       room.missiles.push({
         x:        origin.x,
@@ -717,20 +814,24 @@ wss.on("connection", ws => {
       // Artillero eyectado: sale como caza independiente
       if (player.pilotingFor) {
         const pilot = room.players[player.pilotingFor];
-        if (pilot) pilot.gunnerId = null;
+        if (pilot) {
+          if (pilot.shipType === "capital" && pilot.gunnerIds) {
+            const idx = pilot.gunnerIds.indexOf(player.id);
+            if (idx !== -1) pilot.gunnerIds[idx] = null;
+            if (pilot.turretAngles) delete pilot.turretAngles[player.id];
+          } else {
+            pilot.gunnerId = null;
+          }
+        }
         player.pilotingFor = null;
+        player.turretIndex = undefined;
         player.shipType    = "fighter";
       }
       applyShipStats(player);
       player.vx = 0; player.vy = 0; player.angle = 0;
       player.missileCooldown = 0; player.bulletCooldown = 0;
-      if (player.team === "green") {
-        player.x = 300  + Math.random() * 200;
-        player.y = 1000 + Math.random() * 500;
-      } else {
-        player.x = 2500 + Math.random() * 200;
-        player.y = 1000 + Math.random() * 500;
-      }
+      const rsp = spawnPos(player.team, room);
+      player.x = rsp.x; player.y = rsp.y;
       return;
     }
 
@@ -761,10 +862,14 @@ wss.on("connection", ws => {
         if (!pilot || pilot.dead) return;
         if (player.turretCooldown > 0) return;
         player.turretCooldown = CFG.TURRET_COOLDOWN;
+        // Ángulo: Capital usa turretAngles por artillero; Gunship usa turretAngle único
+        const fireAngle = (pilot.shipType === "capital" && pilot.turretAngles)
+          ? (pilot.turretAngles[player.id] ?? 0)
+          : (pilot.turretAngle ?? 0);
         room.bullets.push({
           x: pilot.x, y: pilot.y,
-          vx: Math.cos(pilot.turretAngle) * CFG.TURRET_BULLET_SPEED,
-          vy: Math.sin(pilot.turretAngle) * CFG.TURRET_BULLET_SPEED,
+          vx: Math.cos(fireAngle) * CFG.TURRET_BULLET_SPEED,
+          vy: Math.sin(fireAngle) * CFG.TURRET_BULLET_SPEED,
           team: player.team, ownerId: player.id,
           damage: CFG.TURRET_DAMAGE,
         });
@@ -849,7 +954,16 @@ function update() {
         if (p.turretCooldown  > 0) p.turretCooldown--;
         if (p.missileCooldown > 0) p.missileCooldown--;
         const inp = p.input || {};
-        if (inp.targetAngle != null) pilot.turretAngle = inp.targetAngle;
+        if (inp.targetAngle != null) {
+          if (pilot.shipType === "capital") {
+            // Capital: cada artillero tiene su propio ángulo de torreta
+            if (!pilot.turretAngles) pilot.turretAngles = {};
+            pilot.turretAngles[p.id] = inp.targetAngle;
+          } else {
+            // Gunship: torreta única del piloto
+            pilot.turretAngle = inp.targetAngle;
+          }
+        }
         return;
       }
 
@@ -925,8 +1039,8 @@ function update() {
       // DRIFT (inertiaDamp=false): sin drag, inercia indefinida
       p.x  += p.vx;
       p.y  += p.vy;
-      p.x   = Math.max(0, Math.min(WORLD_W, p.x));
-      p.y   = Math.max(0, Math.min(WORLD_H, p.y));
+      p.x   = Math.max(0, Math.min(room.worldW, p.x));
+      p.y   = Math.max(0, Math.min(room.worldH, p.y));
     });
 
     // ── Asteroid collision
@@ -990,8 +1104,8 @@ function update() {
     // ── Bullets
     room.bullets.forEach(b => { b.x += b.vx; b.y += b.vy; });
     room.bullets = room.bullets.filter(b =>
-      b.x > -100 && b.x < WORLD_W + 100 &&
-      b.y > -100 && b.y < WORLD_H + 100
+      b.x > -100 && b.x < room.worldW + 100 &&
+      b.y > -100 && b.y < room.worldH + 100
     );
 
     for (let i = room.bullets.length - 1; i >= 0; i--) {
@@ -1150,7 +1264,7 @@ function update() {
       winner:    room.winner,
       killFeed:  room.killFeed,
       timeLeft:  Math.max(0, Math.ceil(room.timeLeft / FPS)),
-      world:     { width: WORLD_W, height: WORLD_H }
+      world:     { width: room.worldW, height: room.worldH }
     });
   });
 }

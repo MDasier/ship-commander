@@ -262,9 +262,6 @@ Un servidor HTTP independiente en `server.js` sirve `admin.html` en el puerto 80
 
 El juego es jugable y estable para sesiones locales y con amigos via túnel. Las áreas principales aún en desarrollo son:
 
-- [ ] Tenemos que compensar los equipos en el lobby para que la partida esté bien configurada. Si un equipo tiene naves multitripuladas, en el otro equipo tiene que haber al menos la misma cantidad de jugadores.
-- [ ] El daño de la nave multitripulada se guarda mal. Le cuenta todo a un solo jugador. (La explosión doble ya está corregida; y el selector de nave al morir ya está implementado. Pendiente: revisar atribución de daño/kills)
-- [ ] Ahora que tenemos una nave para 2 personas, deberíamos hacer una nave aún más grande con 1 piloto y 3 torretas. (Controlar equipos proporcionales).
 - [ ] Añadir "ruido" como habilidad adicional además del "flare". Una habilidad que hace que no te puedan ver/targetear en unos segundos.
 - [ ] Poder reiniciar datos del servidor para evitar datos corruptos del config.json. Esto es relativo, Igual hay que cambiar alguna lógica por ahora no hagas nada.
 
