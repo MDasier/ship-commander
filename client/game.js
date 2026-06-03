@@ -11,8 +11,8 @@ const DEFAULT_BINDINGS = {
   missile: "q",
   flare: "f",
   respawn: "r",
-  chat: "t",
   scan: "c",
+  inertiaDamp: "z",
 };
 
 const BINDING_LABELS = {
@@ -24,8 +24,8 @@ const BINDING_LABELS = {
   missile: "Misil (teclado)",
   flare: "Bengala",
   respawn: "Reaparecer",
-  chat: "Chat",
   scan: "Escaneo radar",
+  inertiaDamp: "Toggle inercia",
 };
 
 // Teclas que no se pueden asignar (fijas)
@@ -173,6 +173,7 @@ const SHIP_SHAPES = {
     engine: [[-24, -4], [-32, 0], [-24, 4]],
     hpBarW: 34,
     uiOffY: -30,
+    shieldR: 34,
   },
 
   fighter: {
@@ -188,9 +189,10 @@ const SHIP_SHAPES = {
     engine: [[-24, -6], [-32, 0], [-24, 6]],
     hpBarW: 44,
     uiOffY: -30,
+    shieldR: 40,
   },
 
-  
+
   bomber: {
     body: [
       [30, 0],
@@ -203,9 +205,10 @@ const SHIP_SHAPES = {
     engine: [[-26, -12], [-36, 0], [-26, 12]],
     hpBarW: 62,
     uiOffY: -32,
+    shieldR: 48,
   },
 
-  
+
   gunship: {
     body: [
       [28, 0],
@@ -221,6 +224,7 @@ const SHIP_SHAPES = {
     engine: [[-26, -14], [-38, 0], [-26, 14]],
     hpBarW: 90,
     uiOffY: -46,
+    shieldR: 58,
   },
 };
 
@@ -247,47 +251,44 @@ function buildShipPath(c, type) {
 }
 
 // Draw preview silhouettes into the selector canvases
+function drawShipPreviewInto(el, type, shape) {
+  const pc = el.getContext("2d");
+  const w = el.width, h = el.height;
+  pc.clearRect(0, 0, w, h);
+  pc.save();
+  pc.translate(w / 2, h / 2);
+  const rotated = type === "gunship";
+  if (rotated) pc.rotate(-Math.PI / 2);
+  const xs = shape.body.map(p => p[0]);
+  const ys = shape.body.map(p => p[1]);
+  const bW = rotated ? (Math.max(...ys) - Math.min(...ys)) : (Math.max(...xs) - Math.min(...xs));
+  const bH = rotated ? (Math.max(...xs) - Math.min(...xs)) : (Math.max(...ys) - Math.min(...ys));
+  const sc = Math.min((w * 0.88) / bW, (h * 0.88) / bH);
+  pc.scale(sc, sc);
+  pc.beginPath();
+  buildShipPath(pc, type);
+  pc.fillStyle = "#00ccff55";
+  pc.strokeStyle = "#00ccff";
+  pc.lineWidth = 1.5 / sc;
+  pc.fill();
+  pc.stroke();
+  const eng = shape.engine;
+  pc.beginPath();
+  pc.moveTo(eng[0][0], eng[0][1]);
+  pc.lineTo(eng[1][0], eng[1][1]);
+  pc.lineTo(eng[2][0], eng[2][1]);
+  pc.strokeStyle = "#00aaff88";
+  pc.lineWidth = 1 / sc;
+  pc.stroke();
+  pc.restore();
+}
+
 function drawShipPreviews() {
   for (const [type, shape] of Object.entries(SHIP_SHAPES)) {
     const el = document.getElementById("prev-" + type);
-    if (!el) continue;
-    const pc = el.getContext("2d");
-    const w = el.width, h = el.height;
-    pc.clearRect(0, 0, w, h);
-    pc.save();
-    pc.translate(w / 2, h / 2);
-
-    // Paladin: rotar 90° (es más alta que ancha); el resto auto-escala sin rotar
-    const rotated = type === "gunship";
-    if (rotated) pc.rotate(-Math.PI / 2);
-
-    // Auto-escalar para que la silueta llene el canvas sin salirse
-    const xs = shape.body.map(p => p[0]);
-    const ys = shape.body.map(p => p[1]);
-    const bW = rotated ? (Math.max(...ys) - Math.min(...ys)) : (Math.max(...xs) - Math.min(...xs));
-    const bH = rotated ? (Math.max(...xs) - Math.min(...xs)) : (Math.max(...ys) - Math.min(...ys));
-    const sc = Math.min((w * 0.88) / bW, (h * 0.88) / bH);
-    pc.scale(sc, sc);
-
-    pc.beginPath();
-    buildShipPath(pc, type);
-    pc.fillStyle = "#00ccff55";
-    pc.strokeStyle = "#00ccff";
-    pc.lineWidth = 1.5 / sc;
-    pc.fill();
-    pc.stroke();
-
-    // Engine glow mark
-    const eng = shape.engine;
-    pc.beginPath();
-    pc.moveTo(eng[0][0], eng[0][1]);
-    pc.lineTo(eng[1][0], eng[1][1]);
-    pc.lineTo(eng[2][0], eng[2][1]);
-    pc.strokeStyle = "#00aaff88";
-    pc.lineWidth = 1 / sc;
-    pc.stroke();
-
-    pc.restore();
+    if (el) drawShipPreviewInto(el, type, shape);
+    const el2 = document.getElementById("dead-prev-" + type);
+    if (el2) drawShipPreviewInto(el2, type, shape);
   }
 }
 
@@ -317,6 +318,8 @@ let targetId = null;
 let missiles = [];
 let flares = [];
 let scanUntil = 0;
+let pingEnemiesUntil = 0;
+let inertiaDampActive = true;
 
 let world = {
   width: 6000,
@@ -499,9 +502,6 @@ function initAjustesPane() {
     localStorage.setItem("vol_music", v);
   });
 
-  document.getElementById("openAdminBtn").addEventListener("click", () => {
-    window.open("http://" + location.hostname + ":8081", "_blank");
-  });
 }
 
 function applyStoredVolumes() {
@@ -650,6 +650,7 @@ function showGameOver() {
   if (guestHint) guestHint.classList.toggle("hidden", isHost);
   playVictorySound();
   stopMusic();
+  hideDeadPanel();
 }
 
 function hideGameOver() {
@@ -665,6 +666,7 @@ function resetClientState() {
   shakeMag = 0;
   asteroidCache.clear();
   cancelSd();
+  hideDeadPanel();
 }
 
 restartBtn.onclick = () => {
@@ -721,24 +723,62 @@ canvas.addEventListener("mousemove", e => {
   mouseY = e.clientY;
 });
 
-canvas.addEventListener("contextmenu", e => e.preventDefault());
+document.addEventListener("contextmenu", e => e.preventDefault());
+
+// ── Weapon heat system
+let weaponHeat = 0;          // 0..100
+let mouseLeftHeld = false;
+let weaponFireTimer = null;
+const HEAT_PER_SHOT   = 12;  // calor por disparo (click individual = 0 penalización acumulada)
+const HEAT_DECAY_MS   = 30;  // ms por tick de enfriamiento
+const HEAT_DECAY_AMT  = 2;   // calor que baja por tick
+const BASE_FIRE_MS    = 130; // intervalo base (ms) al mantener pulsado
+
+function fireWeapon() {
+  const me = getMe();
+  if (!me || me.dead || hud.classList.contains("hidden")) {
+    stopAutoFire();
+    return;
+  }
+  ws.send(JSON.stringify({ type: "shoot" }));
+  playShootSound();
+  weaponHeat = Math.min(100, weaponHeat + HEAT_PER_SHOT);
+  // Programar el siguiente disparo con intervalo aumentado por calor
+  if (mouseLeftHeld) {
+    const interval = BASE_FIRE_MS * (1 + weaponHeat * 0.025);
+    weaponFireTimer = setTimeout(fireWeapon, interval);
+  }
+}
+
+function stopAutoFire() {
+  mouseLeftHeld = false;
+  if (weaponFireTimer) { clearTimeout(weaponFireTimer); weaponFireTimer = null; }
+}
+
+// Enfriamiento pasivo de arma
+setInterval(() => {
+  if (weaponHeat > 0) weaponHeat = Math.max(0, weaponHeat - HEAT_DECAY_AMT);
+}, HEAT_DECAY_MS);
 
 canvas.addEventListener("mousedown", e => {
   if (hud.classList.contains("hidden")) return;
   const me = getMe();
   if (!me || me.dead) return;
   if (e.button === 0) {
-    ws.send(JSON.stringify({ type: "shoot" }));
-    playShootSound();
+    stopAutoFire();
+    mouseLeftHeld = true;
+    fireWeapon();
   } else if (e.button === 2) {
-    if (targetId && players[targetId] && !players[targetId].dead) {
-      ws.send(JSON.stringify({ type: "missile", targetId }));
-      playMissileSound();
-    } else {
-      cycleTargetByRadar();
-    }
+    // Clic der: ciclar objetivo; al pasar del último → deslockear
+    cycleTargetByRadar();
   }
 });
+
+canvas.addEventListener("mouseup", e => {
+  if (e.button === 0) stopAutoFire();
+});
+
+canvas.addEventListener("mouseleave", () => stopAutoFire());
 
 // ── Spectator
 function cycleSpectator() {
@@ -928,21 +968,30 @@ ws.onmessage = e => {
     Object.values(incoming).forEach(p => {
       if (p.dead && !deadIds.has(p.id)) {
         deadIds.add(p.id);
-        spawnExplosion(p.x, p.y, p.team);
-        playExplosionSound();
-        if (p.id === myId) { cancelSd(); clientDeadAt = Date.now(); }
-        const myP = players[myId];
-        if (myP) {
-          const dist = Math.hypot(p.x - myP.x, p.y - myP.y);
-          shakeMag = Math.max(shakeMag, Math.max(0, (500 - dist) / 500) * 14);
+        // Artillero dentro de una nave: no generar explosión separada (ya la genera el piloto)
+        if (!p.pilotingFor) {
+          spawnExplosion(p.x, p.y, p.team);
+          playExplosionSound();
+          const myP = players[myId];
+          if (myP) {
+            const dist = Math.hypot(p.x - myP.x, p.y - myP.y);
+            shakeMag = Math.max(shakeMag, Math.max(0, (500 - dist) / 500) * 14);
+          }
         }
+        if (p.id === myId) { cancelSd(); clientDeadAt = Date.now(); }
       }
       // Detectar respawn (dead → alive)
       if (!p.dead && deadIds.has(p.id)) {
         deadIds.delete(p.id);
-        if (p.id === myId) clientDeadAt = null;
+        if (p.id === myId) { clientDeadAt = null; hideDeadPanel(); }
       }
     });
+
+    // Mostrar/ocultar panel de nave al morir
+    const myIncoming = incoming[myId];
+    const myWasDead = players[myId]?.dead;
+    if (myIncoming && myIncoming.dead && !myWasDead) showDeadPanel();
+    if (myIncoming && !myIncoming.dead && myWasDead) hideDeadPanel();
 
     // Detect damage taken → shake
     const myPrev = players[myId];
@@ -1035,10 +1084,11 @@ function buildShipCards(ships) {
   }
 
   const vals = Object.values(ships);
-  const maxHp    = Math.max(...vals.map(s => s.maxHp));
-  const maxSpeed = Math.max(...vals.map(s => s.thrustMult));
-  const maxMsl   = Math.max(...vals.map(s => s.maxMissiles));
-  const maxRadar = Math.max(...vals.map(s => s.radarSignature));
+  const maxHp     = Math.max(...vals.map(s => s.maxHp));
+  const maxSpeed  = Math.max(...vals.map(s => s.thrustMult));
+  const maxMsl    = Math.max(...vals.map(s => s.maxMissiles));
+  const maxRadar  = Math.max(...vals.map(s => s.radarSignature));
+  const maxShield = Math.max(...vals.map(s => s.maxShield ?? 0));
 
   function segs(value, max, invert = false, n = 10) {
     const filled = Math.round((value / max) * n);
@@ -1048,30 +1098,35 @@ function buildShipCards(ships) {
     ).join('');
   }
 
-  const container = document.getElementById("shipCards");
-  container.innerHTML = "";
-
-  for (const [type, ship] of Object.entries(ships)) {
+  function makeCard(type, ship, previewIdPrefix) {
     const btn = document.createElement("button");
     btn.className = "shipCard" + (type === "fighter" ? " selected" : "");
     btn.dataset.type = type;
-
     const mslDisplay = ship.crewCapacity > 1 ? `${ship.maxMissiles}+20` : ship.maxMissiles;
     const velDisplay  = Math.round(ship.thrustMult * 100) + "%";
-
     btn.innerHTML = `
-      <canvas class="shipPreview" id="prev-${type}" width="90" height="54"></canvas>
+      <canvas class="shipPreview" id="${previewIdPrefix}${type}" width="90" height="54"></canvas>
       <div class="shipCardName">${ship.label || type.toUpperCase()}</div>
       <div class="shipStats">
         <div class="sRow"><span class="sLbl">HP</span><div class="sBar">${segs(ship.maxHp, maxHp)}</div><span class="sVal">${ship.maxHp}</span></div>
+        <div class="sRow sRowShield"><span class="sLbl" style="color:#6ab8cc">SHD</span><div class="sBar">${segs(ship.maxShield ?? 0, maxShield)}</div><span class="sVal">${ship.maxShield ?? 0}</span></div>
         <div class="sRow"><span class="sLbl">VEL</span><div class="sBar">${segs(ship.thrustMult, maxSpeed)}</div><span class="sVal">${velDisplay}</span></div>
         <div class="sRow"><span class="sLbl">MSL</span><div class="sBar">${segs(ship.maxMissiles, maxMsl)}</div><span class="sVal">${mslDisplay}</span></div>
         <div class="sRow"><span class="sLbl">SIG</span><div class="sBar">${segs(ship.radarSignature, maxRadar)}</div><span class="sVal">${ship.radarSignature}</span></div>
       </div>
       <div class="shipCardDesc">${ship.desc || ""}</div>
     `;
+    return btn;
+  }
 
-    container.appendChild(btn);
+  const container = document.getElementById("shipCards");
+  container.innerHTML = "";
+  const deadContainer = document.getElementById("deadShipCards");
+  deadContainer.innerHTML = "";
+
+  for (const [type, ship] of Object.entries(ships)) {
+    container.appendChild(makeCard(type, ship, "prev-"));
+    deadContainer.appendChild(makeCard(type, ship, "dead-prev-"));
   }
 
   drawShipPreviews();
@@ -1167,13 +1222,32 @@ function syncShipSelector(type) {
   });
 }
 
-// Ship card clicks → send to server
-document.getElementById("shipCards").addEventListener("click", e => {
+// Ship card clicks → send to server (lobby y panel de muerte)
+function handleShipCardClick(e) {
   const card = e.target.closest(".shipCard");
   if (!card) return;
   ws.send(JSON.stringify({ type: "selectShip", shipType: card.dataset.type }));
   syncShipSelector(card.dataset.type);
+}
+document.getElementById("shipCards").addEventListener("click", handleShipCardClick);
+document.getElementById("deadShipCards").addEventListener("click", handleShipCardClick);
+
+// Botón cambiar equipo desde el panel de muerte
+document.getElementById("deadSwitchTeamBtn").addEventListener("click", () => {
+  ws.send(JSON.stringify({ type: "switchTeam" }));
 });
+
+const deadPanel = document.getElementById("deadPanel");
+
+function showDeadPanel() {
+  deadPanel.classList.remove("hidden");
+  const me = getMe();
+  if (me) syncShipSelector(me.shipType || "fighter");
+}
+
+function hideDeadPanel() {
+  deadPanel.classList.add("hidden");
+}
 
 // Las previews se dibujan en buildShipCards() al recibir el init del servidor
 
@@ -1188,8 +1262,14 @@ addEventListener("keydown", e => {
     const me = getMe();
     if (me && !me.dead) {
       scanUntil = performance.now() + 8000;
+      pingEnemiesUntil = performance.now() + 2000;
       triggerPingEffect(me.x, me.y);
     }
+  }
+
+  if (bindings.inertiaDamp && key === bindings.inertiaDamp) {
+    const me = getMe();
+    if (me && !me.dead) inertiaDampActive = !inertiaDampActive;
   }
 
   // Fallback teclado: shoot / missile
@@ -1223,7 +1303,7 @@ addEventListener("keydown", e => {
     }
   }
 
-  if (bindings.chat && key === bindings.chat && !chatInputOpen) {
+  if (key === "enter" && !chatInputOpen) {
     e.preventDefault();
     const meNow = getMe();
     if (meNow && !meNow.dead) openChat();
@@ -1273,6 +1353,7 @@ setInterval(() => {
     reverse: !!(bindings.reverse && keys[bindings.reverse]),
     strafeLeft: !!(bindings.strafeLeft && keys[bindings.strafeLeft]),
     strafeRight: !!(bindings.strafeRight && keys[bindings.strafeRight]),
+    inertiaDamp: inertiaDampActive,
     targetAngle
   }));
 }, 33);
@@ -1590,6 +1671,57 @@ function drawShip(player, camX, camY) {
     ctx.restore();
   }
 
+  // Escudo: anillo permanente tenue cuando hay escudo activo
+  if ((player.shield ?? 0) > 0 && !player.dead) {
+    const sR = shape.shieldR ?? 42;
+    const dimAlpha = 0.10 * (player.shield / (player.maxShield || 1));
+    ctx.save();
+    ctx.globalAlpha = dimAlpha;
+    ctx.beginPath();
+    ctx.arc(0, 0, sR, 0, Math.PI * 2);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Escudo: arco blanco direccional al absorber impacto
+  if ((player.shieldFlash ?? 0) > 0) {
+    const sAlpha = player.shieldFlash / 12;
+    const sR = shape.shieldR ?? 42;
+    const arcSpan = 2.2; // ±63° (rad) — arco del lado impactado
+    ctx.save();
+
+    if (player.shieldHitAngle != null) {
+      // Ángulo en coordenadas locales (se resta la rotación de la nave)
+      const localAngle = player.shieldHitAngle - player.angle;
+      // Glow exterior (trazo más ancho y tenue)
+      ctx.globalAlpha = sAlpha * 0.35;
+      ctx.beginPath();
+      ctx.arc(0, 0, sR, localAngle - arcSpan / 2, localAngle + arcSpan / 2);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 8;
+      ctx.stroke();
+      // Línea interior nítida
+      ctx.globalAlpha = sAlpha * 0.95;
+      ctx.beginPath();
+      ctx.arc(0, 0, sR, localAngle - arcSpan / 2, localAngle + arcSpan / 2);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else {
+      // Sin dirección conocida: anillo completo
+      ctx.globalAlpha = sAlpha * 0.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, sR, 0, Math.PI * 2);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
   // Engine glow (only when alive)
   if (!player.dead) {
     ctx.beginPath();
@@ -1630,6 +1762,18 @@ function drawShip(player, camX, camY) {
     const hw = shape.hpBarW;
     const offY = shape.uiOffY;   // negative = above ship
 
+    const hasShield = (player.maxShield ?? 0) > 0;
+    const shieldBarOffY = hasShield ? offY - 5 : offY;
+
+    // Barra de escudo (blanca, encima de la barra de HP)
+    if (hasShield) {
+      const shieldFrac = Math.max(0, (player.shield ?? 0) / player.maxShield);
+      ctx.fillStyle = "#111";
+      ctx.fillRect(pos.x - hw / 2, pos.y + offY - 5, hw, 3);
+      ctx.fillStyle = shieldFrac > 0 ? "#aaddff" : "#223344";
+      ctx.fillRect(pos.x - hw / 2, pos.y + offY - 5, hw * shieldFrac, 3);
+    }
+
     // HP bar background
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(pos.x - hw / 2, pos.y + offY, hw, 4);
@@ -1644,12 +1788,12 @@ function drawShip(player, camX, camY) {
     ctx.fillStyle = "#00aaff";
     ctx.fillRect(pos.x - hw / 2, pos.y + offY + 6, hw * (player.fuel / 100), 3);
 
-    // Callsign
+    // Callsign (sube si hay escudo para no solapar)
     ctx.save();
     ctx.fillStyle = player.id === myId ? "#00ccff" : "rgba(255,255,255,0.6)";
     ctx.font = "11px 'Courier New', monospace";
     ctx.textAlign = "center";
-    ctx.fillText(player.name || "Pilot", pos.x, pos.y + offY - 6);
+    ctx.fillText(player.name || "Pilot", pos.x, pos.y + (hasShield ? offY - 12 : offY - 6));
     ctx.restore();
   }
 
@@ -1757,7 +1901,8 @@ function cycleTargetByRadar() {
   if (!targetId) { targetId = enemies[0].id; return; }
   const idx = enemies.findIndex(e => e.id === targetId);
   if (idx === -1) { targetId = enemies[0].id; return; }
-  targetId = enemies[(idx + 1) % enemies.length].id;
+  // Al llegar al último → deslockear (null); siguiente click vuelve al primero
+  targetId = idx === enemies.length - 1 ? null : enemies[idx + 1].id;
 }
 function drawMissiles(camX, camY) {
 
@@ -1880,10 +2025,13 @@ function drawRadar() {
 
   Object.values(players).forEach(p => {
 
-    // Enemigos solo visibles dentro de su firma radar
+    // Enemigos solo visibles dentro de su firma radar (o durante ping activo)
     if (me && p.team !== me.team) {
-      const dist = Math.hypot(p.x - me.x, p.y - me.y);
-      if (dist > (p.radarSignature || 450)) return;
+      const pinging = performance.now() < pingEnemiesUntil;
+      if (!pinging) {
+        const dist = Math.hypot(p.x - me.x, p.y - me.y);
+        if (dist > (p.radarSignature || 450)) return;
+      }
     }
 
     const rx = x + ((p.x / world.width) - 0.5) * size;
@@ -2012,6 +2160,25 @@ function updateHUD(me) {
   document.getElementById("hp").textContent =
     Math.floor(ship.hp);
 
+  const shieldEl = document.getElementById("shieldEl");
+  if (shieldEl) {
+    const shieldVal = Math.floor(ship.shield ?? 0);
+    const maxShield = ship.maxShield ?? 0;
+    if (maxShield <= 0) {
+      shieldEl.textContent = "—";
+      shieldEl.style.color = "";
+    } else if (shieldVal <= 0) {
+      shieldEl.textContent = "0/" + maxShield;
+      shieldEl.style.color = "#334455";
+    } else if (shieldVal < maxShield * 0.35) {
+      shieldEl.textContent = shieldVal + "/" + maxShield;
+      shieldEl.style.color = "#5588aa";
+    } else {
+      shieldEl.textContent = shieldVal + "/" + maxShield;
+      shieldEl.style.color = "#aaddff";
+    }
+  }
+
   document.getElementById("fuel").textContent =
     Math.floor(ship.fuel);
 
@@ -2025,6 +2192,27 @@ function updateHUD(me) {
     me.missileCooldown > 0
       ? Math.ceil(me.missileCooldown / 30) + "s"
       : "LISTO";
+
+  const inertiaEl = document.getElementById("inertiaMode");
+  if (inertiaEl) {
+    inertiaEl.textContent = inertiaDampActive ? "DAMP" : "DRIFT";
+    inertiaEl.style.color = inertiaDampActive ? "#555" : "#ffcc00";
+  }
+
+  const heatEl = document.getElementById("weaponHeatEl");
+  if (heatEl) {
+    const heatPct = Math.round(weaponHeat);
+    if (heatPct === 0) {
+      heatEl.textContent = "FRÍO";
+      heatEl.style.color = "#555";
+    } else if (heatPct < 50) {
+      heatEl.textContent = heatPct + "%";
+      heatEl.style.color = "#ffcc00";
+    } else {
+      heatEl.textContent = heatPct + "% ▲";
+      heatEl.style.color = "#ff4444";
+    }
+  }
 
   const alive =
     Object.values(players)
@@ -2125,7 +2313,7 @@ function loop() {
   if (me) {
     updateHUD(me);
     const pilot = me.pilotingFor ? players[me.pilotingFor] : null;
-    setMissileWarning(!!(me.lockedByMissile || pilot?.lockedByMissile));
+    setMissileWarning(!me.dead && !!(me.lockedByMissile || pilot?.lockedByMissile));
 
     if (me.dead) {
       ctx.fillStyle = "rgba(255,255,255,0.85)";

@@ -70,6 +70,10 @@ const DEFAULTS = {
       maxMissiles: 3,
       missileCooldown: 110,
       radarSignature: 700,
+      // Escudos — ágil: escudo pequeño pero recarga rápida (estilo hit-and-run)
+      maxShield: 35,
+      shieldRegenRate: 7,      // unidades/segundo
+      shieldRegenDelay: 3.5,   // segundos sin daño antes de empezar a recargar
     },
     fighter: {
       label: "L.Fighter",
@@ -82,6 +86,10 @@ const DEFAULTS = {
       maxMissiles: 6,
       missileCooldown: 150,
       radarSignature: 1000,
+      // Escudos — equilibrado
+      maxShield: 50,
+      shieldRegenRate: 6,
+      shieldRegenDelay: 4,
     },
     bomber: {
       label: "Bomber",
@@ -94,6 +102,10 @@ const DEFAULTS = {
       maxMissiles: 12,
       missileCooldown: 85,
       radarSignature: 2000,
+      // Escudos — tanque: escudo grande, recarga moderada y largo cooldown
+      maxShield: 120,
+      shieldRegenRate: 8,
+      shieldRegenDelay: 5,
     },
     gunship: {
       label: "Gunship",
@@ -107,6 +119,10 @@ const DEFAULTS = {
       missileCooldown: 240,
       radarSignature: 5000,
       crewCapacity: 2,
+      // Escudos — fortaleza: escudo enorme, recarga más lenta por su tamaño
+      maxShield: 250,
+      shieldRegenRate: 10,
+      shieldRegenDelay: 6,
     },
   },
 };

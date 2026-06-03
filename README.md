@@ -163,22 +163,121 @@ ship-commander/
 
 ---
 
+## Arquitectura Técnica Detallada
+
+Esta sección explica cómo fluye la información entre cliente y servidor para que otros desarrolladores puedan entender el proyecto rápidamente.
+
+### Diagrama de flujo general
+
+```
+[NAVEGADOR - Cliente]                    [NODE.JS - Servidor]
+        │                                         │
+        │   WebSocket (ws://<host>:8080)          │
+        │◄────────────────────────────────────────│
+        │────────────────────────────────────────►│
+        │                                         │
+  Canvas render loop                     Game loop (30 fps)
+  Input → JSON msgs                      Física, colisiones
+  Efectos locales                        Estado autoritativo
+```
+
+### Conexión WebSocket
+
+El servidor (`server/server.js`) inicia un servidor HTTP en el puerto **8080** que también sirve los archivos estáticos del cliente. Encima de ese mismo servidor HTTP se monta el servidor WebSocket (`ws`):
+
+```js
+const wss = new WebSocketServer({ server: httpServer });
+wss.on("connection", ws => { /* nuevo jugador */ });
+```
+
+El cliente (`client/game.js`) abre la conexión al cargar la página:
+
+```js
+const ws = new WebSocket("ws://" + location.host);
+```
+
+### Mensajes cliente → servidor
+
+El cliente envía objetos JSON con un campo `type`. Los principales son:
+
+| `type` | Cuándo | Contenido adicional |
+|---|---|---|
+| `setName` | Al guardar el nombre | `name` |
+| `createRoom` | Botón "Crear sala" | — |
+| `joinRoom` | Botón "Unirse" | `roomId` |
+| `leaveRoom` | Botón "Salir" | — |
+| `ready` | Botón "Listo" | — |
+| `switchTeam` | Botón "Cambiar equipo" | — |
+| `selectShip` | Clic en carta de nave | `shipType` |
+| `boardShip` | Botón "Embarcar" (artillero) | `targetId` |
+| `leaveShip` | Botón "Salir" del artillero | — |
+| `input` | Cada 33 ms mientras se juega | `thrust`, `reverse`, `strafeLeft`, `strafeRight`, `targetAngle`, `inertiaDamp` |
+| `shoot` | Clic izquierdo / tecla E | — |
+| `missile` | Tecla Q | `targetId` |
+| `flare` | Tecla F | — |
+| `respawn` | Tecla R tras morir | — |
+| `selfDestruct` | Del ×2 s | — |
+| `toggleMidGameJoin` | Host, en partida | — |
+| `restartGame` | Host, en Game Over | — |
+| `chat` | Enter, escribe, Enter | `text` |
+
+### Mensajes servidor → cliente
+
+El servidor hace **broadcast** a todos los clientes de una sala usando `broadcastRoom()`. Los mensajes son:
+
+| `type` | Cuándo | Qué contiene |
+|---|---|---|
+| `init` | Al conectar | `id` (UUID del jugador), `ships` (tipos de nave con stats) |
+| `rooms` | Al pedir lista / cambios | Array de salas disponibles |
+| `roomUpdate` | Cambio en la sala (equipo, nave, listo…) | Objeto `room` completo |
+| `gameStarted` | Todos listos | — |
+| `state` | Cada tick (30 fps) | `players`, `bullets`, `missiles`, `flare`, `asteroids`, `winner`, `killFeed`, `timeLeft`, `world` |
+| `chat` | Mensaje de chat | `name`, `team`, `text` |
+
+### Game loop del servidor
+
+`setInterval(update, 1000 / 30)` — se ejecuta cada ~33 ms:
+
+1. **Input** — para cada jugador vivo, lee su último `player.input` y aplica rotación, empuje, strafe.
+2. **Física** — aplica drag (o no si `inertiaDamp = false`), mueve posición, clipa al límite del mundo.
+3. **Artillero** — si el jugador es artillero, sincroniza su posición con la del piloto y actualiza el ángulo de torreta.
+4. **Colisiones balas** — para cada bala, comprueba si choca con un jugador enemigo. Aplica daño, registra `damageDealt`, llama a `killPlayer()` si HP ≤ 0.
+5. **Colisiones misiles** — igual que balas pero con radio mayor.
+6. **Colisiones asteroides** — comprueba velocidad de impacto; por encima del umbral aplica daño proporcional.
+7. **Misiles guiados** — `steerMissile()` calcula el ángulo hacia el objetivo con guía proporcional y lo persigue.
+8. **Condición de victoria** — comprueba si un equipo se quedó sin jugadores (todas las vidas agotadas) o si se acabó el tiempo.
+9. **Broadcast** — envía el estado completo a todos los clientes de la sala.
+
+### Interpolación en el cliente
+
+El cliente recibe estados a 30 fps pero renderiza a 60+ fps. Para evitar tirones mantiene un buffer `stateBuffer` con los últimos estados recibidos. En cada frame de `requestAnimationFrame` interpola linealmente la posición de los jugadores entre el estado anterior y el siguiente usando el timestamp del servidor como referencia.
+
+### Panel admin (puerto 8081)
+
+Un servidor HTTP independiente en `server.js` sirve `admin.html` en el puerto 8081. El panel hace `GET /config` al cargar y `POST /config` al guardar. El servidor escribe los cambios en `server/config.json` y los aplica en el mismo objeto `CFG` que usa el game loop; los cambios son inmediatos.
+
+---
+
 ## Tareas pendientes
 
 El juego es jugable y estable para sesiones locales y con amigos via túnel. Las áreas principales aún en desarrollo son:
 
-- [ ] Deberíamos poder cambiar de nave cuando morimos en la partida.
-- [ ] Cambiar el abrir el char con 'Enter' en lugar de con 't'.
-- [ ] Tenemos que compensar los equipos en el lobby para que la partida esté bien configurada. Que no haya mayor diferencia que 1 persona demás entre los equipos.
-- [ ] Las naves deberían tener escudos de energía como en el StarCitizen. Primero le hacemos daño al escudo y después a la nave. Los escudos tienen un tiempo de "cooldown".
-- [ ] Las naves tienen una sensación rara de inercia a veces. Tenemos que mejorar el movimiento de las naves. Poder dejar pulsado el clic de disparar pero añadir algún control de cooldown para que no se dispare tan rápido. Además de que tengamos el efecto de "calentamiento" de arma cuando se mantiene pulsado. Debería ser un poco mejor a la larga "pulsar y soltar" que mantener pulsado.
-- [ ] El daño de la nave multitripulada se guarda mal. Le cuenta todo a un solo jugador. Además no debería salir una nave extra al explotar. Cuando la nace se destruye mueren ambos jugadores. Y ambos deberían seleccionar volver a la nave o seleccionar otra diferente.
+- [ ] Lo único que el HOST debe poder cambiar del servidor/partida es si se pueden unir en partida, el tiempo de partida. El resto de jugadores solo pueden cambiar sus controles y el volumen de los sonidos. (El botón de admin ya ha sido eliminado del F1; pendiente: restringir config solo al host)
+- [x] Hay que controlar bien que no pase nada al hacer click derecho en la pantalla. A veces saca menú contextual etc y no debe pasar. Controlar que el juego sea profesional.
+- [x] Deberíamos poder cambiar de nave cuando morimos en la partida. (+ botón cambiar equipo al morir)
+- [x] Cambiar el abrir el chat con 'Enter' en lugar de con 't'.
+- [ ] Tenemos que compensar los equipos en el lobby para que la partida esté bien configurada. Si un equipo tiene naves multitripuladas, en el otro equipo tiene que haber al menos la misma cantidad de jugadores.
+- [x] Escudos de energía implementados. Barra blanca sobre la barra de HP en cada nave. Anillo cian al absorber impacto. Recarga automática tras N segundos sin daño. Stats proporcionales al perfil de cada nave (ver tabla). Primero le hacemos daño al escudo y después a la nave. Los escudos tienen un tiempo de "cooldown". No tiene porque tener un efecto continuo, puede ser una barra blanca pegada a la parte superior de la barra de vida de la nave que se consume cuando nos pegan y hacen daño. Cuando nos golpean podemos poner un efecto de escudo de energía en esa parte de la nave un poco separada de la misma. El escudo se regenera cuando no recibimos daño durante un tiempo.
+- [x] Las naves tienen una sensación de demasiada inercia a veces. Tecla Z para toggle DAMP/DRIFT. Disparo continuo con calentamiento de arma (mantener pulsado = fuego más lento; soltar y volver a pulsar = más eficiente).
+- [ ] El daño de la nave multitripulada se guarda mal. Le cuenta todo a un solo jugador. (La explosión doble ya está corregida; y el selector de nave al morir ya está implementado. Pendiente: revisar atribución de daño/kills)
 - [ ] Ahora que tenemos una nave para 2 personas, deberíamos hacer una nave aún más grande con 1 piloto y 3 torretas. (Controlar equipos proporcionales).
-- [ ] Si es posible, cuando pulsamos la "c" y activamos el ping, además de ver los asteroides durante 8 segundos, deberíamos ver los enemigos 1 segundo en el radar.
-- [ ] Hay que mejorar el pitido de los misiles porque es molesto si te targetean varios etc. Además en algún caso hemos notado que al morir no para de sonar el pitido. Hay que mejorar el tema del target/lock para hacerlo más fluido. Que sea más fácil el cycle lock y el deslockear.
-- [ ] Añadir efectos visuales a las naves. Cuando tienen menos vida, que le falten partes o algo así. (echar humo?).
+- [x] Al activar ping (C): los asteroides se ven 8 segundos Y los enemigos aparecen en el radar durante 2 segundos (independientemente de su firma radar). Las naves ahora pueden ocultarse "debajo" de los asteroides y no deben recibir daño en esa situación pero controlar que tampoco hagan daño a los enemigos.
+- [x] Ahora que tenemos control de daños además de KDA, el ganador se calcula con daño como desempate (supervivientes > kills > daño total de equipo).
+- [x] Pitido de misiles corregido (para al morir). Clic derecho cicla objetivo y al llegar al último deslockea. Misil solo con Q.
+- [ ] Añadir efectos visuales a las naves con daños. Cuando tienen menos vida, que le falten partes o algo así. (echar humo?). Darles profundidad a las naves (como a los asteroides).
 - [ ] Añadir "ruido" como habilidad adicional además del "flare". Una habilidad que hace que no te puedan ver/targetear en unos segundos.
-- [ ] Poder reiniciar datos del servidor para evitar datos corruptos del config.json.
+- [x] Añadida sección "Arquitectura Técnica Detallada" con diagrama de flujo, tabla de mensajes WebSocket, game loop paso a paso e interpolación de cliente.
+- [ ] Poder reiniciar datos del servidor para evitar datos corruptos del config.json. Esto es relativo, Igual hay que cambiar alguna lógica por ahora no hagas nada.
 
 
 ## Estado actual (Beta)

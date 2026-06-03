@@ -150,6 +150,37 @@ function applyShipStats(p) {
   p.maxMissiles         = ship.maxMissiles;
   p.missileCooldownBase = ship.missileCooldown;
   p.radarSignature      = ship.radarSignature;
+  // Escudos
+  p.maxShield             = ship.maxShield      ?? 0;
+  p.shield                = p.maxShield;
+  p.shieldRegenPerTick    = (ship.shieldRegenRate  ?? 0) / FPS;
+  p.shieldRegenDelayTicks = Math.round((ship.shieldRegenDelay ?? 5) * FPS);
+  p.shieldHitTimer        = 99999;
+  p.shieldFlash           = 0;
+  p.shieldHitAngle        = null;
+}
+
+// Aplica daño al escudo primero; el excedente va al HP.
+// hitAngle: ángulo (rad) desde la posición del objetivo hacia el origen del impacto (coord mundo).
+function applyDamage(target, dmg, attacker, hitAngle = null) {
+  let dealt = 0;
+  if (target.shield > 0 && dmg > 0) {
+    const absorbed = Math.min(target.shield, dmg);
+    target.shield  = Math.max(0, target.shield - absorbed);
+    dmg            -= absorbed;
+    dealt          += absorbed;
+    target.shieldFlash    = 12;
+    target.shieldHitTimer = 0;
+    target.shieldHitAngle = hitAngle;
+  }
+  if (dmg > 0) {
+    target.hp  -= dmg;
+    target.hitFlash       = 8;
+    target.shieldHitTimer = 0;
+    dealt += dmg;
+  }
+  if (attacker) attacker.damageDealt += dealt;
+  return dealt;
 }
 
 function send(ws, data) {
@@ -377,6 +408,10 @@ function restartRoom(room) {
     p.damageDealt      = 0;
     p.assists          = 0;
     p.recentDamageFrom = [];
+    p.shield           = p.maxShield ?? 0;
+    p.shieldFlash      = 0;
+    p.shieldHitTimer   = 99999;
+    p.shieldHitAngle   = null;
   });
 
   broadcastRoom(room, { type: "roomRestarted", room });
@@ -552,16 +587,19 @@ wss.on("connection", ws => {
 
     if (msg.type === "selectShip") {
       const room = rooms[player.roomId];
-      if (!room || room.status !== "waiting") return;
+      if (!room) return;
       if (!CFG.SHIP_TYPES[msg.shipType]) return;
-      // Si cambia de Capital a otra nave, expulsa al artillero
-      if (player.gunnerId && player.shipType === "gunship" && msg.shipType !== "gunship") {
+      const inLobby = room.status === "waiting";
+      const deadInGame = room.status === "playing" && player.dead;
+      if (!inLobby && !deadInGame) return;
+      // Si cambia de Capital a otra nave, expulsa al artillero (solo en lobby)
+      if (inLobby && player.gunnerId && player.shipType === "gunship" && msg.shipType !== "gunship") {
         const gunner = room.players[player.gunnerId];
         if (gunner) gunner.pilotingFor = null;
         player.gunnerId = null;
       }
       player.shipType = msg.shipType;
-      broadcastRoom(room, { type: "roomUpdate", room });
+      if (inLobby) broadcastRoom(room, { type: "roomUpdate", room });
       return;
     }
 
@@ -774,7 +812,14 @@ function update() {
       if (p.missileCooldown > 0) p.missileCooldown--;
       if (p.bulletCooldown  > 0) p.bulletCooldown--;
       if (p.hitFlash        > 0) p.hitFlash--;
+      if (p.shieldFlash     > 0) p.shieldFlash--;
       if (p.flaredCooldown  > 0) p.flaredCooldown--;
+      // Recarga de escudo
+      if ((p.shieldHitTimer ?? 99999) < (p.shieldRegenDelayTicks ?? 99999)) {
+        p.shieldHitTimer++;
+      } else if ((p.shield ?? 0) < (p.maxShield ?? 0)) {
+        p.shield = Math.min(p.maxShield, p.shield + p.shieldRegenPerTick);
+      }
 
       const i = p.input || {};
 
@@ -818,8 +863,10 @@ function update() {
         p.fuel = Math.max(0, p.fuel - CFG.THRUST_FUEL * 0.5);
       }
 
-      p.vx *= (p.dragVal ?? CFG.DRAG);
-      p.vy *= (p.dragVal ?? CFG.DRAG);
+      if (i.inertiaDamp !== false) {
+        p.vx *= (p.dragVal ?? CFG.DRAG);
+        p.vy *= (p.dragVal ?? CFG.DRAG);
+      }
       p.x  += p.vx;
       p.y  += p.vy;
       p.x   = Math.max(0, Math.min(WORLD_W, p.x));
@@ -871,9 +918,10 @@ function update() {
                 (impactSpeed - CFG.ASTEROID_IMPACT_MIN) *
                 CFG.ASTEROID_DAMAGE_FACTOR;
     
-              p.hp -= Math.floor(damage);
-              p.hitFlash = 8;
-    
+              // Dirección del impacto: desde la nave hacia el asteroide = -(normal)
+              const impactAngle = Math.atan2(-ny, -nx);
+              applyDamage(p, Math.floor(damage), null, impactAngle);
+
               if (p.hp <= 0) {
                 killPlayer(p, null, "asteroid", room);
               }
@@ -896,10 +944,10 @@ function update() {
         if (p.dead || p.team === b.team || p.pilotingFor) continue;
         if (Math.hypot(p.x - b.x, p.y - b.y) < CFG.BULLET_RADIUS) {
           const dmg = b.damage ?? CFG.BULLET_DAMAGE;
-          p.hp -= dmg;
-          p.hitFlash = 8;
           const attacker = room.players[b.ownerId];
-          if (attacker) { attacker.damageDealt += dmg; updateDamageLog(p, attacker.id); }
+          const bulletAngle = Math.atan2(b.y - p.y, b.x - p.x);
+          applyDamage(p, dmg, attacker, bulletAngle);
+          if (attacker) updateDamageLog(p, attacker.id);
           if (p.hp <= 0) killPlayer(p, attacker || null, "bullet", room);
           room.bullets.splice(i, 1);
           break;
@@ -972,10 +1020,10 @@ function update() {
       for (const p of Object.values(room.players)) {
         if (p.dead || p.team === m.team || p.pilotingFor) continue;
         if (Math.hypot(p.x - m.x, p.y - m.y) < CFG.MISSILE_RADIUS) {
-          p.hp -= CFG.MISSILE_DAMAGE;
-          p.hitFlash = 8;
           const attacker = room.players[m.ownerId];
-          if (attacker) { attacker.damageDealt += CFG.MISSILE_DAMAGE; updateDamageLog(p, attacker.id); }
+          const missileAngle = Math.atan2(m.y - p.y, m.x - p.x);
+          applyDamage(p, CFG.MISSILE_DAMAGE, attacker, missileAngle);
+          if (attacker) updateDamageLog(p, attacker.id);
           if (p.hp <= 0) killPlayer(p, attacker || null, "missile", room);
           room.missiles.splice(i, 1);
           break;
@@ -1011,7 +1059,14 @@ function update() {
           const redKills   = allPlayers.filter(p => p.team === "red"  ).reduce((s,p) => s + (p.kills||0), 0);
           if      (greenKills > redKills) room.winner = "green";
           else if (redKills > greenKills) room.winner = "red";
-          else                            room.winner = "draw";
+          else {
+            // Desempate por daño total infligido
+            const greenDmg = allPlayers.filter(p => p.team === "green").reduce((s,p) => s + (p.damageDealt||0), 0);
+            const redDmg   = allPlayers.filter(p => p.team === "red"  ).reduce((s,p) => s + (p.damageDealt||0), 0);
+            if      (greenDmg > redDmg) room.winner = "green";
+            else if (redDmg > greenDmg) room.winner = "red";
+            else                        room.winner = "draw";
+          }
         }
       }
     }

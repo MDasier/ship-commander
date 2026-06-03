@@ -67,7 +67,7 @@
           </tr>
           <tr>
             <td>Clic Der.</td>
-            <td>Lockear objetivo · Clic Der. de nuevo = Misil</td>
+            <td>Ciclar objetivo (último clic = deslockear)</td>
           </tr>
           <tr>
             <td>W / S</td>
@@ -90,7 +90,7 @@
             <td>Reaparecer (tras morir, con cooldown)</td>
           </tr>
           <tr>
-            <td>T</td>
+            <td>Enter</td>
             <td>Chat</td>
           </tr>
           <tr>
@@ -115,10 +115,13 @@
 
     <div id="topLeft">
       <div>HP: <span id="hp">100</span></div>
+      <div>SHD: <span id="shieldEl">—</span></div>
       <div>Fuel: <span id="fuel">100</span></div>
       <div>Speed: <span id="speed">0</span></div>
       <div>K/D: <span id="kd">0/0</span></div>
       <div>MSL: <span id="mslCd">LISTO</span></div>
+      <div>FLT: <span id="inertiaMode">DAMP</span></div>
+      <div>CAÑÓN: <span id="weaponHeatEl">FRÍO</span></div>
     </div>
 
     <div id="topCenter">
@@ -127,9 +130,21 @@
 
     <div id="topRight">
       <div id="alive"></div>
-      <div id="hudControls">[F1] MobiGlass · [T] Chat</div>
+      <div id="hudControls">[F1] MobiGlass · [Enter] Chat</div>
     </div>
 
+  </div>
+
+  <!-- ── PANEL NAVE AL MORIR ── -->
+  <div id="deadPanel" class="hidden">
+    <div id="deadPanelInner">
+      <div id="deadPanelTitle">SELECCIONAR NAVE</div>
+      <div id="deadShipCards"></div>
+      <div id="deadPanelActions">
+        <button id="deadSwitchTeamBtn">⇄ Cambiar equipo</button>
+      </div>
+      <div id="deadPanelHint">Pulsa [R] para reaparecer con la nave seleccionada</div>
+    </div>
   </div>
 
   <!-- ── MOBIGLASS ── -->
@@ -179,12 +194,6 @@
               <input type="range" id="volMusic" min="0" max="1" step="0.05" value="0.5">
               <span id="volMusicVal">50%</span>
             </div>
-          </div>
-          <div class="mobiSettingsDivider"></div>
-          <div class="mobiSettingsSection">
-            <div class="mobiSettingsLabel">CONFIGURACIÓN AVANZADA</div>
-            <div class="mobiSettingsHint">Velocidades, daño, cooldowns y más parámetros de partida.</div>
-            <button id="openAdminBtn" class="mobiAdminBtn">⬡ Abrir panel admin</button>
           </div>
         </div>
 
