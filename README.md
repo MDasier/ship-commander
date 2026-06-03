@@ -263,6 +263,7 @@ Un servidor HTTP independiente en `server.js` sirve `admin.html` en el puerto 80
 El juego es jugable y estable para sesiones locales y con amigos via túnel. Las áreas principales aún en desarrollo son:
 
 - [ ] Añadir "ruido" como habilidad adicional además del "flare". Una habilidad que hace que no te puedan ver/targetear en unos segundos.
+- [ ] Añadir "EMP" como habilidad. Desactiva radares, armas y escudos enemigos.
 - [ ] Poder reiniciar datos del servidor para evitar datos corruptos del config.json. Esto es relativo, Igual hay que cambiar alguna lógica por ahora no hagas nada.
 
 
