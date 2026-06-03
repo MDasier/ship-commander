@@ -13,6 +13,22 @@ No hay base de datos. El estado de las partidas vive en memoria y se pierde al r
 
 ---
 
+## Build y herramientas — ¿por qué no hay Vite / bundler?
+
+El proyecto **no usa ningún build step** (ni Vite, ni Webpack, ni bundler). Es intencionado y, para este caso, **simplifica el despliegue**, no lo complica:
+
+- **El cliente no es el cuello de botella del deploy.** Son 3 ficheros JS vanilla (`game.js`, `sounds.js`, `particles.js`) + HTML/CSS servidos como estáticos por el propio proceso Node. No hay nada que compilar.
+- **Lo difícil de desplegar es el servidor WebSocket con estado**, y eso una herramienta de frontend como Vite no lo toca. Las partidas viven en memoria y requieren un proceso Node de larga duración con conexiones WS persistentes → no se puede hacer "estático puro" ni serverless.
+- Con Vite, en producción seguirías necesitando **el mismo `server.js`** para el WebSocket, pero además tendrías que ejecutar `vite build` y servir su salida. Es decir: **una pieza y un paso más**, no menos.
+
+**Cuándo SÍ compensaría Vite** (es ganancia de *experiencia de desarrollo*, no de deploy): HMR al editar el cliente, modularizar `game.js` en imports ES, minificado/tree-shaking o TypeScript.
+
+**Patrón híbrido recomendado** si algún día se quiere ese DX sin perder la simpleza de despliegue: usar Vite **solo en desarrollo** (su dev server con HMR y un proxy de WebSocket hacia `:8080`) y en producción `vite build` servido por el mismo Node. Así el deploy sigue siendo "arranca `server.js`".
+
+> Lo que de verdad reduce la fricción de despliegue aquí no es un bundler, sino empaquetar el **servidor**: el PaaS documentado abajo (prácticamente un clic) o un **Dockerfile** (un contenedor reproducible: instala `ws`, copia `client/` + `server/`, `node server.js`).
+
+---
+
 ## Variables de entorno
 
 | Variable | Default | Descripción |
