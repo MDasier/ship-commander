@@ -262,21 +262,10 @@ Un servidor HTTP independiente en `server.js` sirve `admin.html` en el puerto 80
 
 El juego es jugable y estable para sesiones locales y con amigos via túnel. Las áreas principales aún en desarrollo son:
 
-- [ ] Lo único que el HOST debe poder cambiar del servidor/partida es si se pueden unir en partida, el tiempo de partida. El resto de jugadores solo pueden cambiar sus controles y el volumen de los sonidos. (El botón de admin ya ha sido eliminado del F1; pendiente: restringir config solo al host)
-- [x] Hay que controlar bien que no pase nada al hacer click derecho en la pantalla. A veces saca menú contextual etc y no debe pasar. Controlar que el juego sea profesional.
-- [x] Deberíamos poder cambiar de nave cuando morimos en la partida. (+ botón cambiar equipo al morir)
-- [x] Cambiar el abrir el chat con 'Enter' en lugar de con 't'.
 - [ ] Tenemos que compensar los equipos en el lobby para que la partida esté bien configurada. Si un equipo tiene naves multitripuladas, en el otro equipo tiene que haber al menos la misma cantidad de jugadores.
-- [x] Escudos de energía implementados. Barra blanca sobre la barra de HP en cada nave. Anillo cian al absorber impacto. Recarga automática tras N segundos sin daño. Stats proporcionales al perfil de cada nave (ver tabla). Primero le hacemos daño al escudo y después a la nave. Los escudos tienen un tiempo de "cooldown". No tiene porque tener un efecto continuo, puede ser una barra blanca pegada a la parte superior de la barra de vida de la nave que se consume cuando nos pegan y hacen daño. Cuando nos golpean podemos poner un efecto de escudo de energía en esa parte de la nave un poco separada de la misma. El escudo se regenera cuando no recibimos daño durante un tiempo.
-- [x] Las naves tienen una sensación de demasiada inercia a veces. Tecla Z para toggle DAMP/DRIFT. Disparo continuo con calentamiento de arma (mantener pulsado = fuego más lento; soltar y volver a pulsar = más eficiente).
 - [ ] El daño de la nave multitripulada se guarda mal. Le cuenta todo a un solo jugador. (La explosión doble ya está corregida; y el selector de nave al morir ya está implementado. Pendiente: revisar atribución de daño/kills)
 - [ ] Ahora que tenemos una nave para 2 personas, deberíamos hacer una nave aún más grande con 1 piloto y 3 torretas. (Controlar equipos proporcionales).
-- [x] Al activar ping (C): los asteroides se ven 8 segundos Y los enemigos aparecen en el radar durante 2 segundos (independientemente de su firma radar). Las naves ahora pueden ocultarse "debajo" de los asteroides y no deben recibir daño en esa situación pero controlar que tampoco hagan daño a los enemigos.
-- [x] Ahora que tenemos control de daños además de KDA, el ganador se calcula con daño como desempate (supervivientes > kills > daño total de equipo).
-- [x] Pitido de misiles corregido (para al morir). Clic derecho cicla objetivo y al llegar al último deslockea. Misil solo con Q.
-- [ ] Añadir efectos visuales a las naves con daños. Cuando tienen menos vida, que le falten partes o algo así. (echar humo?). Darles profundidad a las naves (como a los asteroides).
 - [ ] Añadir "ruido" como habilidad adicional además del "flare". Una habilidad que hace que no te puedan ver/targetear en unos segundos.
-- [x] Añadida sección "Arquitectura Técnica Detallada" con diagrama de flujo, tabla de mensajes WebSocket, game loop paso a paso e interpolación de cliente.
 - [ ] Poder reiniciar datos del servidor para evitar datos corruptos del config.json. Esto es relativo, Igual hay que cambiar alguna lógica por ahora no hagas nada.
 
 

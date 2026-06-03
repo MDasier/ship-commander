@@ -256,13 +256,15 @@ function createAsteroids(count = 40) {
   return arr;
 }
 
-function createRoom(ownerId) {
+function createRoom(ownerId, ownerName) {
   const id = crypto.randomUUID();
   const asteroids = createAsteroids();
   rooms[id] = {
     id,
     status: "waiting",
     ownerId,
+    name: ownerName ? `Sala de ${ownerName}`.slice(0, 28) : "Nueva sala",
+    enforceBalance: false,
     players: {},
     bullets: [],
     missiles: [],
@@ -449,9 +451,11 @@ const MAX_PLAYERS = 20;
 function roomList() {
   return Object.values(rooms).map(r => ({
     id:               r.id,
+    name:             r.name || "Nueva sala",
     players:          Object.keys(r.players).length,
     status:           r.status,
     allowJoinMidGame: r.allowJoinMidGame,
+    enforceBalance:   r.enforceBalance,
   }));
 }
 
@@ -491,7 +495,7 @@ wss.on("connection", ws => {
     }
 
     if (msg.type === "createRoom") {
-      const room = createRoom(id);
+      const room = createRoom(id, player.name);
       joinRoom(player, room);
       send(ws, { type: "roomJoined", roomId: room.id });
       broadcastRoom(room, { type: "roomUpdate", room });
@@ -546,6 +550,23 @@ wss.on("connection", ws => {
       return;
     }
 
+    if (msg.type === "setRoomName") {
+      const room = rooms[player.roomId];
+      if (!room || room.ownerId !== player.id || room.status !== "waiting") return;
+      room.name = String(msg.name || "").trim().slice(0, 28) || "Nueva sala";
+      broadcastRoom(room, { type: "roomUpdate", room });
+      broadcastRoomList();
+      return;
+    }
+
+    if (msg.type === "toggleEnforceBalance") {
+      const room = rooms[player.roomId];
+      if (!room || room.ownerId !== player.id || room.status !== "waiting") return;
+      room.enforceBalance = !room.enforceBalance;
+      broadcastRoom(room, { type: "roomUpdate", room });
+      return;
+    }
+
     if (msg.type === "ready") {
       const room = rooms[player.roomId];
       if (!room || room.status !== "waiting") return;
@@ -555,6 +576,14 @@ wss.on("connection", ws => {
 
       const list = Object.values(room.players);
       if (list.length >= 1 && list.every(p => p.ready)) {
+        if (room.enforceBalance) {
+          const gc = list.filter(p => p.team === "green").length;
+          const rc = list.filter(p => p.team === "red").length;
+          if (gc !== rc) {
+            broadcastRoom(room, { type: "balanceError", green: gc, red: rc });
+            return;
+          }
+        }
         startGame(room);
         broadcastRoomList();
       }
@@ -762,6 +791,24 @@ wss.on("connection", ws => {
 });
 
 // ─────────────────────────────────────────────
+// Distancia mínima de un punto al segmento A→B
+// Usada para colisión swept (anti-tunneling)
+// ─────────────────────────────────────────────
+function distToSegment(px, py, ax, ay, bx, by) {
+
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+// Nave "cubierta": su posición cae dentro del radio de un asteroide flotante (z=1)
+function isSheltered(px, py, asteroids) {
+  return asteroids.some(a => a.z === 1 && Math.hypot(px - a.x, py - a.y) < a.r);
+}
+
+// ─────────────────────────────────────────────
 // Missile guidance
 // ─────────────────────────────────────────────
 function steerMissile(m, tx, ty, maxTurn, thrust) {
@@ -823,16 +870,20 @@ function update() {
 
       const i = p.input || {};
 
+      // En DAMP con nave parada, giro hasta 1.5× más ágil
+      const baseTurn = p.turnRateVal ?? CFG.TURN_RATE;
+      const dampBoost = (i.inertiaDamp !== false && Math.hypot(p.vx, p.vy) < 0.8);
+      const maxTurn   = dampBoost ? baseTurn * 1.5 : baseTurn;
+
       // Rotación: mouse aim (targetAngle) o fallback teclado
       if (i.targetAngle != null) {
         let diff = i.targetAngle - p.angle;
         while (diff >  Math.PI) diff -= 2 * Math.PI;
         while (diff < -Math.PI) diff += 2 * Math.PI;
-        const maxTurn = p.turnRateVal ?? CFG.TURN_RATE;
         p.angle += Math.max(-maxTurn, Math.min(maxTurn, diff));
       } else {
-        if (i.left)  p.angle -= (p.turnRateVal ?? CFG.TURN_RATE);
-        if (i.right) p.angle += (p.turnRateVal ?? CFG.TURN_RATE);
+        if (i.left)  p.angle -= maxTurn;
+        if (i.right) p.angle += maxTurn;
       }
 
       const thrustVal   = p.thrustVal        ?? CFG.THRUST;
@@ -864,9 +915,14 @@ function update() {
       }
 
       if (i.inertiaDamp !== false) {
-        p.vx *= (p.dragVal ?? CFG.DRAG);
-        p.vy *= (p.dragVal ?? CFG.DRAG);
+        // DAMP: misma aceleración que DRIFT con motores; frena al soltarlos
+        const thrusting = !!(i.thrust || i.reverse || i.strafeLeft || i.strafeRight);
+        if (!thrusting) {
+          p.vx *= 0.94;
+          p.vy *= 0.94;
+        }
       }
+      // DRIFT (inertiaDamp=false): sin drag, inercia indefinida
       p.x  += p.vx;
       p.y  += p.vy;
       p.x   = Math.max(0, Math.min(WORLD_W, p.x));
@@ -942,7 +998,11 @@ function update() {
       const b = room.bullets[i];
       for (const p of Object.values(room.players)) {
         if (p.dead || p.team === b.team || p.pilotingFor) continue;
-        if (Math.hypot(p.x - b.x, p.y - b.y) < CFG.BULLET_RADIUS) {
+        // Swept test: comprueba el segmento recorrido este tick (prevPos → pos actual)
+        const bPrevX = b.x - b.vx, bPrevY = b.y - b.vy;
+        if (distToSegment(p.x, p.y, bPrevX, bPrevY, b.x, b.y) < CFG.BULLET_RADIUS) {
+          // Nave cubierta bajo asteroide flotante → bala bloqueada por el asteroide
+          if (isSheltered(p.x, p.y, room.asteroids)) { room.bullets.splice(i, 1); break; }
           const dmg = b.damage ?? CFG.BULLET_DAMAGE;
           const attacker = room.players[b.ownerId];
           const bulletAngle = Math.atan2(b.y - p.y, b.x - p.x);
@@ -988,6 +1048,10 @@ function update() {
         }
       }
 
+      // Guardar posición previa para swept collision
+      m.prevX = m.x;
+      m.prevY = m.y;
+
       // Persigue la flare
       if (flareTarget) {
         steerMissile(
@@ -1019,7 +1083,11 @@ function update() {
       const m = room.missiles[i];
       for (const p of Object.values(room.players)) {
         if (p.dead || p.team === m.team || p.pilotingFor) continue;
-        if (Math.hypot(p.x - m.x, p.y - m.y) < CFG.MISSILE_RADIUS) {
+        // Swept test con posición previa guardada
+        const mPrevX = m.prevX ?? m.x, mPrevY = m.prevY ?? m.y;
+        if (distToSegment(p.x, p.y, mPrevX, mPrevY, m.x, m.y) < CFG.MISSILE_RADIUS) {
+          // Nave cubierta bajo asteroide flotante → misil bloqueado
+          if (isSheltered(p.x, p.y, room.asteroids)) { room.missiles.splice(i, 1); break; }
           const attacker = room.players[m.ownerId];
           const missileAngle = Math.atan2(m.y - p.y, m.x - p.x);
           applyDamage(p, CFG.MISSILE_DAMAGE, attacker, missileAngle);

@@ -42,6 +42,23 @@ function spawnThrustParticle(wx, wy, angle) {
   });
 }
 
+// Humo de daño: partícula gris-negra lenta que sube levemente
+function spawnSmokeParticle(wx, wy, intensity) {
+  const drift = (Math.random() - 0.5) * 0.6;
+  const size = Math.random() * 3 + 1.5 + intensity * 3;
+  const gray = Math.floor(30 + Math.random() * 40); // 30–70
+  particles.push({
+    x: wx + (Math.random() - 0.5) * 8,
+    y: wy + (Math.random() - 0.5) * 8,
+    vx: drift,
+    vy: -(Math.random() * 0.5 + 0.1),  // sube lentamente
+    life: 1,
+    decay: Math.random() * 0.025 + 0.012,
+    size,
+    color: `rgb(${gray},${gray},${gray})`
+  });
+}
+
 function updateParticles() {
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];

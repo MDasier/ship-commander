@@ -1262,16 +1262,109 @@ kbd.bindingError {
   color: #00ff88;
 }
 
+/* ── NOMBRE DE SALA ── */
+
+#roomNameBar {
+  margin-bottom: 6px;
+}
+
+.roomNameEditor {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#roomNameInput {
+  flex: 1;
+  background: #080c18;
+  border: 1px solid #1e3a4a;
+  color: #aaccdd;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 1px;
+  padding: 5px 10px;
+  outline: none;
+}
+
+#roomNameInput:focus {
+  border-color: #00ccff55;
+  color: #cceeff;
+}
+
+#roomNameSaveBtn {
+  font-size: 11px;
+  padding: 5px 14px;
+  border-color: #00ccff33;
+  color: #00ccff;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+#roomNameSaveBtn:hover {
+  border-color: #00ccff;
+}
+
+.roomNameText {
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: #7799aa;
+  padding: 4px 0 6px;
+  text-align: center;
+}
+
 /* ── HOST BAR (sala de espera) ── */
 
 #hostBar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 6px;
   padding: 8px 14px;
   margin-bottom: 6px;
   border: 1px solid #00ccff15;
   background: #05080f;
+}
+
+.hostToggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ── BARRA DE EQUILIBRIO ── */
+
+#balanceBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  background: #05080f;
+  border: 1px solid #1a2030;
+}
+
+.balTeam {
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.balTeam.green { color: #00ff88; }
+.balTeam.red   { color: #ff3355; }
+
+.balSep {
+  color: #334;
+  font-size: 10px;
+}
+
+.balWarn {
+  margin-left: auto;
+  color: #ffaa44;
+  font-size: 10px;
+  letter-spacing: 0.5px;
 }
 
 .hostBarLabel {

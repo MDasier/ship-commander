@@ -931,6 +931,17 @@ ws.onmessage = e => {
     renderPlayers();
   }
 
+  if (data.type === "balanceError") {
+    const hint = document.getElementById("roomHint");
+    if (hint) {
+      hint.textContent = `⚠ Equipos desequilibrados (Verde: ${data.green} · Rojo: ${data.red}) — iguala los equipos para empezar`;
+      hint.style.color = "#ffaa44";
+      setTimeout(() => {
+        if (hint) { hint.textContent = "Esperando jugadores..."; hint.style.color = ""; }
+      }, 6000);
+    }
+  }
+
   if (data.type === "gameStarted") {
 
     menu.style.display = "none";
@@ -1040,7 +1051,7 @@ function renderRooms(list) {
     if (playing && room.allowJoinMidGame) statusText = "EN PARTIDA · ABIERTA";
 
     div.innerHTML = `
-      <span class="roomId">#${room.id.slice(0, 6)}</span>
+      <span class="roomId">${room.name || '#' + room.id.slice(0, 6)}</span>
       <span class="roomStatus ${playing ? 'playing' : ''} ${playing && room.allowJoinMidGame ? 'open' : ''}">${statusText}</span>
       <span class="roomPlayers">${room.players}/20</span>
       <button ${canJoin ? '' : 'disabled'}>Unirse</button>
@@ -1136,22 +1147,71 @@ function renderPlayers() {
   if (!roomData) return;
 
   playersDiv.innerHTML = "";
+  const isHost = roomData.ownerId === myId;
 
-  // Toggle mid-game join (solo visible al host)
-  if (roomData.ownerId === myId) {
+  // ── Nombre de sala ────────────────────────────
+  const nameBar = document.createElement("div");
+  nameBar.id = "roomNameBar";
+  if (isHost) {
+    nameBar.innerHTML = `
+      <div class="roomNameEditor">
+        <input id="roomNameInput" type="text" maxlength="28"
+          value="${(roomData.name || '').replace(/"/g, '&quot;')}"
+          placeholder="Nombre de la sala..."
+          autocomplete="off" spellcheck="false">
+        <button id="roomNameSaveBtn">Guardar</button>
+      </div>
+    `;
+    playersDiv.appendChild(nameBar);
+    nameBar.querySelector("#roomNameInput").addEventListener("keydown", e => e.stopPropagation());
+    nameBar.querySelector("#roomNameSaveBtn").onclick = () => {
+      const val = nameBar.querySelector("#roomNameInput").value.trim();
+      ws.send(JSON.stringify({ type: "setRoomName", name: val }));
+    };
+  } else if (roomData.name) {
+    nameBar.innerHTML = `<div class="roomNameText">${roomData.name}</div>`;
+    playersDiv.appendChild(nameBar);
+  }
+
+  // ── Panel host: dos toggles ───────────────────
+  if (isHost) {
     const hostBar = document.createElement("div");
     hostBar.id = "hostBar";
     const mjOn = roomData.allowJoinMidGame;
+    const ebOn = roomData.enforceBalance;
     hostBar.innerHTML = `
-      <span class="hostBarLabel">Unirse en partida</span>
-      <button id="toggleMidGameJoin" class="hostToggleBtn ${mjOn ? 'on' : ''}">
-        ${mjOn ? 'Activado' : 'Desactivado'}
-      </button>
+      <div class="hostToggleRow">
+        <span class="hostBarLabel">Unirse en partida</span>
+        <button id="toggleMidGameJoin" class="hostToggleBtn ${mjOn ? 'on' : ''}">${mjOn ? 'ON' : 'OFF'}</button>
+      </div>
+      <div class="hostToggleRow">
+        <span class="hostBarLabel">Equipos equilibrados</span>
+        <button id="toggleEnforceBalance" class="hostToggleBtn ${ebOn ? 'on' : ''}">${ebOn ? 'ON' : 'OFF'}</button>
+      </div>
     `;
-    hostBar.querySelector("#toggleMidGameJoin").onclick = () => {
+    hostBar.querySelector("#toggleMidGameJoin").onclick = () =>
       ws.send(JSON.stringify({ type: "toggleMidGameJoin" }));
-    };
+    hostBar.querySelector("#toggleEnforceBalance").onclick = () =>
+      ws.send(JSON.stringify({ type: "toggleEnforceBalance" }));
     playersDiv.appendChild(hostBar);
+  }
+
+  // ── Barra de equilibrio (visible para todos) ──
+  const gc = Object.values(roomData.players).filter(p => p.team === "green").length;
+  const rc = Object.values(roomData.players).filter(p => p.team === "red").length;
+  const unbalanced = gc !== rc;
+  if (gc > 0 || rc > 0) {
+    const balBar = document.createElement("div");
+    balBar.id = "balanceBar";
+    balBar.innerHTML = `
+      <span class="balTeam green">🟢 ${gc}</span>
+      <span class="balSep">vs</span>
+      <span class="balTeam red">🔴 ${rc}</span>
+      ${roomData.enforceBalance && unbalanced
+        ? `<span class="balWarn">⚠ Desequilibrado — cambia de equipo para iniciar</span>`
+        : ""}
+    `;
+    playersDiv.appendChild(balBar);
   }
 
   Object.values(roomData.players).forEach(player => {
@@ -1650,15 +1710,46 @@ function drawShip(player, camX, camY) {
   ctx.translate(pos.x, pos.y);
   ctx.rotate(player.angle);
 
+  const hpFrac = Math.max(0, player.hp / maxHp);
+
+  // Parpadeo a HP crítica (< 12%)
+  if (!player.dead && hpFrac < 0.12 && Math.random() < 0.12) {
+    ctx.globalAlpha = 0.55 + Math.random() * 0.45;
+  }
+
   ctx.beginPath();
   buildShipPath(ctx, player.shipType);
 
   if (player.dead) {
-    ctx.fillStyle = "#444";
+    ctx.fillStyle = "#333";
   } else {
-    ctx.fillStyle = player.team === "green" ? "#00ff88" : "#ff3355";
+    // Gradiente radial descentrado → sensación de volumen (como asteroides)
+    const sR = shape.shieldR ?? 42;
+    const isGreen = player.team === "green";
+    const hiColor  = isGreen ? "#99ffcc" : "#ff99aa";
+    const midColor = isGreen ? "#00ff88" : "#ff3355";
+    const loColor  = isGreen ? "#003820" : "#220010";
+    const grad = ctx.createRadialGradient(-sR * 0.28, -sR * 0.32, sR * 0.04,
+                                           0,           0,          sR * 0.9);
+    grad.addColorStop(0,    hiColor);
+    grad.addColorStop(0.45, midColor);
+    grad.addColorStop(1,    loColor);
+    ctx.fillStyle = grad;
   }
   ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Overlay de calor progresivo según daño recibido
+  if (!player.dead && hpFrac < 0.55) {
+    const heatIntensity = Math.pow((0.55 - hpFrac) / 0.55, 1.5);
+    ctx.save();
+    ctx.globalAlpha = heatIntensity * 0.45;
+    ctx.beginPath();
+    buildShipPath(ctx, player.shipType);
+    ctx.fillStyle = hpFrac < 0.2 ? "#ff3300" : "#ff8800";
+    ctx.fill();
+    ctx.restore();
+  }
 
   // Hit-flash white overlay
   if (player.hitFlash > 0) {
@@ -1668,20 +1759,6 @@ function drawShip(player, camX, camY) {
     buildShipPath(ctx, player.shipType);
     ctx.fillStyle = "white";
     ctx.fill();
-    ctx.restore();
-  }
-
-  // Escudo: anillo permanente tenue cuando hay escudo activo
-  if ((player.shield ?? 0) > 0 && !player.dead) {
-    const sR = shape.shieldR ?? 42;
-    const dimAlpha = 0.10 * (player.shield / (player.maxShield || 1));
-    ctx.save();
-    ctx.globalAlpha = dimAlpha;
-    ctx.beginPath();
-    ctx.arc(0, 0, sR, 0, Math.PI * 2);
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
     ctx.restore();
   }
 
@@ -1876,13 +1953,37 @@ function drawBullets(camX, camY) {
 
 
 //MISILES
+// ── Cover helpers ─────────────────────────────
+// Distancia mínima de un punto al segmento A→B (igual que servidor)
+function ptSegDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+// Nave "cubierta": posición dentro del radio de un asteroide flotante (z=1, sobre las naves)
+function isSheltered(px, py) {
+  return asteroids.some(a => a.z === 1 && Math.hypot(px - a.x, py - a.y) < a.r);
+}
+
+// Línea de visión bloqueada: algún asteroide de colisión (z=0) intersecta el segmento
+function losBlocked(ax, ay, bx, by) {
+  return asteroids.some(a => a.z === 0 && ptSegDist(a.x, a.y, ax, ay, bx, by) < a.r);
+}
+// ──────────────────────────────────────────────
+
 function radarVisibleEnemies() {
   const me = players[myId];
   if (!me) return [];
-  return Object.values(players).filter(p =>
-    !p.dead && p.team !== me.team && !p.pilotingFor &&
-    Math.hypot(p.x - me.x, p.y - me.y) <= (p.radarSignature || 450)
-  );
+  return Object.values(players).filter(p => {
+    if (p.dead || p.team === me.team || p.pilotingFor) return false;
+    if (Math.hypot(p.x - me.x, p.y - me.y) > (p.radarSignature || 450)) return false;
+    if (isSheltered(p.x, p.y)) return false;       // bajo asteroide flotante → oculto
+    if (losBlocked(me.x, me.y, p.x, p.y)) return false; // asteroide sólido entre medias
+    return true;
+  });
 }
 
 function cycleTarget() {
@@ -2025,12 +2126,18 @@ function drawRadar() {
 
   Object.values(players).forEach(p => {
 
-    // Enemigos solo visibles dentro de su firma radar (o durante ping activo)
+    // Enemigos: filtro de radar (firma, cobertura de asteroide, LOS)
     if (me && p.team !== me.team) {
       const pinging = performance.now() < pingEnemiesUntil;
-      if (!pinging) {
+      if (pinging) {
+        // Ping activo: solo bypass de rango. Cobertura física sigue bloqueando.
+        if (isSheltered(p.x, p.y)) return;
+        if (losBlocked(me.x, me.y, p.x, p.y)) return;
+      } else {
         const dist = Math.hypot(p.x - me.x, p.y - me.y);
         if (dist > (p.radarSignature || 450)) return;
+        if (isSheltered(p.x, p.y)) return;
+        if (losBlocked(me.x, me.y, p.x, p.y)) return;
       }
     }
 
@@ -2196,7 +2303,7 @@ function updateHUD(me) {
   const inertiaEl = document.getElementById("inertiaMode");
   if (inertiaEl) {
     inertiaEl.textContent = inertiaDampActive ? "DAMP" : "DRIFT";
-    inertiaEl.style.color = inertiaDampActive ? "#555" : "#ffcc00";
+    inertiaEl.style.color = inertiaDampActive ? "#555" : "#8aa8b8";
   }
 
   const heatEl = document.getElementById("weaponHeatEl");
@@ -2247,6 +2354,16 @@ function loop() {
 
   applyInterpolatedState();   // compute positions interpolated to now - INTERP_DELAY
 
+  // Auto-clear target lock si el objetivo se esconde bajo cobertura de asteroide
+  if (targetId) {
+    const tgt  = players[targetId];
+    const mePl = players[myId];
+    if (!tgt || tgt.dead ||
+        (mePl && (isSheltered(tgt.x, tgt.y) || losBlocked(mePl.x, mePl.y, tgt.x, tgt.y)))) {
+      targetId = null;
+    }
+  }
+
   updateParticles();
 
   const me = getMe();
@@ -2283,6 +2400,22 @@ function loop() {
   if (me && !me.dead && !me.pilotingFor && bindings.thrust && keys[bindings.thrust]) {
     spawnThrustParticle(me.x, me.y, me.angle);
   }
+
+  // ── Humo de daño para todas las naves con HP bajo (lado trasero)
+  Object.values(players).forEach(p => {
+    if (p.dead || p.pilotingFor) return;
+    const hf = p.hp / (p.maxHp || 100);
+    if (hf >= 0.55) return;
+    // Probabilidad proporcional al daño: más daño = más humo
+    const smokeProbability = hf < 0.15 ? 0.55 : hf < 0.30 ? 0.25 : 0.08;
+    if (Math.random() > smokeProbability) return;
+    // Emitir desde la parte trasera de la nave
+    const smokeX = p.x + Math.cos(p.angle + Math.PI) * 18;
+    const smokeY = p.y + Math.sin(p.angle + Math.PI) * 18;
+    // intensidad 0→1 según gravedad del daño
+    const intensity = Math.max(0, (0.55 - hf) / 0.55);
+    spawnSmokeParticle(smokeX, smokeY, intensity);
+  });
 
   // Background
   ctx.fillStyle = "#050505";
