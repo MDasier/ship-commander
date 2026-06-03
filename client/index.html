@@ -14,10 +14,9 @@
 
     <h1>Ship Commander</h1>
 
-    <div id="lobby">
-
+    <div id="lobby">      
       <div id="nameSection">
-        <span>Tu nombre de piloto</span>
+        <span>Tag</span>
         <input id="nameInput" type="text" maxlength="16" placeholder="Escribe tu nombre..." autocomplete="off"
           spellcheck="false">
         <button id="setNameBtn">Guardar</button>
@@ -25,89 +24,37 @@
 
       <div id="lobbyActions">
         <button id="createRoom">Crear sala</button>
+        <button id="refreshRooms">↺</button> 
       </div>
-
+      
+      
       <h2>Salas disponibles</h2>
-      <button id="refreshRooms">↺</button>
       <div id="rooms"></div>
       <div id="lobbyHint">Crea una sala o únete a una existente para empezar.</div>
-
     </div>
 
     <div id="room" class="hidden">
-
       <div class="roomHeader">
-        <h2>Sala de espera</h2>
-        <button id="leaveRoom">Salir</button>
+        <h2>LOBBY</h2>
+        
       </div>
 
       <div id="players"></div>
+      <div id="roomHint">Esperando jugadores...</div>
+
+      <div id="roomActions">
+        <button id="switchTeam">Cambiar equipo</button>
+        <button id="leaveRoom">Salir</button>
+        <button id="ready" disabled>Go</button>
+      </div>
 
       <!-- ── SELECTOR DE NAVE — generado dinámicamente por buildShipCards() ── -->
       <div id="shipSelector">
         <div class="selectorLabel">NAVE DE COMBATE</div>
         <div id="shipCards"></div>
-      </div>
-
-      <div id="roomActions">
-        <button id="ready" disabled>Listo</button>
-        <button id="switchTeam">Cambiar equipo</button>
-      </div>
-
-      <div id="lobbyControls">
-        <div class="lobbyControlsTitle">CONTROLES</div>
-        <table class="lobbyControlsTable">
-          <tr>
-            <td>Mouse</td>
-            <td>Apuntar / Girar nave</td>
-          </tr>
-          <tr>
-            <td>Clic Izq.</td>
-            <td>Disparar cañón</td>
-          </tr>
-          <tr>
-            <td>Clic Der.</td>
-            <td>Ciclar objetivo (último clic = deslockear)</td>
-          </tr>
-          <tr>
-            <td>W / S</td>
-            <td>Propulsión / Retroceso</td>
-          </tr>
-          <tr>
-            <td>A / D</td>
-            <td>Strafe lateral</td>
-          </tr>
-          <tr>
-            <td>Tab (mantener)</td>
-            <td>Ver marcador</td>
-          </tr>
-          <tr>
-            <td>F</td>
-            <td>Bengala</td>
-          </tr>
-          <tr>
-            <td>R</td>
-            <td>Reaparecer (tras morir, con cooldown)</td>
-          </tr>
-          <tr>
-            <td>Enter</td>
-            <td>Chat</td>
-          </tr>
-          <tr>
-            <td>Del</td>
-            <td>Autodestrucción (mantener 2s)</td>
-          </tr>
-          <tr>
-            <td>F1</td>
-            <td>MobiGlass</td>
-          </tr>
-        </table>
-      </div>
-
-      <div id="roomHint">Esperando jugadores...</div>
+      </div>           
 
     </div>
-
   </div>
 
   <!-- ── HUD ── -->
@@ -120,7 +67,7 @@
       <div>Speed: <span id="speed">0</span></div>
       <div>K/D: <span id="kd">0/0</span></div>
       <div>MSL: <span id="mslCd">LISTO</span></div>
-      <div>FLT: <span id="inertiaMode">DAMP</span></div>
+      <div>FLT: <span id="inertiaMode">CPLD</span></div>
       <div>CAÑÓN: <span id="weaponHeatEl">FRÍO</span></div>
       <div id="abilityRow" style="display:none">[X] <span id="abilityName">ESP</span>: <span id="abilityCd">LISTO</span></div>
     </div>

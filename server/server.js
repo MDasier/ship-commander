@@ -195,7 +195,7 @@ function applyShipStats(p) {
 
 // Aplica daño al escudo primero; el excedente va al HP.
 // hitAngle: ángulo (rad) desde la posición del objetivo hacia el origen del impacto (coord mundo).
-function applyDamage(target, dmg, attacker, hitAngle = null) {
+function applyDamage(room, target, dmg, attacker, hitAngle = null) {
   let dealt = 0;
   if (target.shield > 0 && dmg > 0) {
     const absorbed = Math.min(target.shield, dmg);
@@ -214,11 +214,12 @@ function applyDamage(target, dmg, attacker, hitAngle = null) {
   }
   if (attacker) {
     attacker.damageDealt += dealt;
+
     // Daño del artillero se comparte con el piloto
-    if (attacker.pilotingFor) {
+    /*if (attacker.pilotingFor) {
       const pilot = room.players[attacker.pilotingFor];
       if (pilot) pilot.damageDealt += dealt;
-    }
+    }*/
   }
   return dealt;
 }
@@ -250,6 +251,27 @@ function updateDamageLog(victim, attackerId) {
   else victim.recentDamageFrom.push({ attackerId, time: now });
 }
 
+function registerCrewDamage(victim, attacker, room) {
+  updateDamageLog(victim, attacker.id);
+
+  if (attacker.pilotingFor != null) {
+    const pilot = room.players[attacker.pilotingFor];
+    if (pilot) {
+      updateDamageLog(victim, pilot.id);
+    }
+  }
+
+  if (attacker.gunnerId) {
+    updateDamageLog(victim, attacker.gunnerId);
+  }
+
+  if (attacker.gunnerIds) {
+    attacker.gunnerIds
+      .filter(Boolean)
+      .forEach(id => updateDamageLog(victim, id));
+  }
+}
+
 function killPlayer(p, killer, weapon, room) {
   // Assists: jugadores que dañaron a la víctima en los últimos 10s (≠ killer, ≠ víctima, equipo enemigo)
   const now = Date.now();
@@ -276,8 +298,9 @@ function killPlayer(p, killer, weapon, room) {
   room.shipsDestroyed = true;
   if (killer && killer.id !== p.id) {
     killer.kills++;
+
     // Kills del artillero se comparten con el piloto (y viceversa)
-    if (killer.pilotingFor) {
+    /*if (killer.pilotingFor) {
       const pilot = room.players[killer.pilotingFor];
       if (pilot) pilot.kills++;
     } else if (killer.gunnerId) {
@@ -288,7 +311,7 @@ function killPlayer(p, killer, weapon, room) {
         const g = room.players[gid];
         if (g) g.kills++;
       });
-    }
+    }*/
   }
   // Artilleros mueren con el piloto (Gunship: uno; Capital: hasta 3)
   const crewIds = p.gunnerIds ? p.gunnerIds.filter(Boolean) : (p.gunnerId ? [p.gunnerId] : []);
@@ -1086,7 +1109,7 @@ function fireCapitalBeam(player, room) {
     // Cubierto bajo asteroide flotante → el rayo no daña (pero se detiene ahí)
     if (!isSheltered(hitPlayer.x, hitPlayer.y, room.asteroids)) {
       const beamAngle = Math.atan2(oy - hitPlayer.y, ox - hitPlayer.x);
-      applyDamage(hitPlayer, CFG.CAPITAL_BEAM_DAMAGE, player, beamAngle);
+      applyDamage(room, hitPlayer, CFG.CAPITAL_BEAM_DAMAGE, player, beamAngle);
       updateDamageLog(hitPlayer, player.id);
       // EMP: solo chispas rojas (el rayo de la Capital no "apaga")
       applyEmp(hitPlayer, CFG.EMP_DURATION, false);
@@ -1328,7 +1351,7 @@ function update() {
     
               // Dirección del impacto: desde la nave hacia el asteroide = -(normal)
               const impactAngle = Math.atan2(-ny, -nx);
-              applyDamage(p, Math.floor(damage), null, impactAngle);
+              applyDamage(room, p, Math.floor(damage), null, impactAngle);
 
               if (p.hp <= 0) {
                 killPlayer(p, null, "asteroid", room);
@@ -1359,8 +1382,9 @@ function update() {
           const dmg = b.damage ?? CFG.BULLET_DAMAGE;
           const attacker = room.players[b.ownerId];
           const bulletAngle = Math.atan2(b.y - p.y, b.x - p.x);
-          applyDamage(p, dmg, attacker, bulletAngle);
-          if (attacker) updateDamageLog(p, attacker.id);
+          applyDamage(room, p, dmg, attacker, bulletAngle);
+          //if (attacker) updateDamageLog(p, attacker.id);
+          if (attacker) registerCrewDamage(p, attacker, room);
           if (p.hp <= 0) killPlayer(p, attacker || null, "bullet", room);
           room.bullets.splice(i, 1);
           break;
@@ -1446,8 +1470,9 @@ function update() {
           const attacker = room.players[m.ownerId];
           const missileAngle = Math.atan2(m.y - p.y, m.x - p.x);
           const dmg = m.torpedo ? CFG.TORPEDO_DAMAGE : CFG.MISSILE_DAMAGE;
-          applyDamage(p, dmg, attacker, missileAngle);
-          if (attacker) updateDamageLog(p, attacker.id);
+          applyDamage(room, p, dmg, attacker, missileAngle);
+          //if (attacker) updateDamageLog(p, attacker.id);
+          if (attacker) registerCrewDamage(p, attacker, room);
           if (p.hp <= 0) killPlayer(p, attacker || null, m.torpedo ? "torpedo" : "missile", room);
           room.missiles.splice(i, 1);
           break;
@@ -1481,8 +1506,9 @@ function update() {
         if (dist > CFG.MINE_BLAST_RADIUS) continue;
         const dmg = CFG.MINE_DAMAGE * (1 - dist / CFG.MINE_BLAST_RADIUS);
         const ang = Math.atan2(mine.y - p.y, mine.x - p.x);
-        applyDamage(p, dmg, attacker, ang);
-        if (attacker) updateDamageLog(p, attacker.id);
+        applyDamage(room, p, dmg, attacker, ang);
+        //if (attacker) updateDamageLog(p, attacker.id);
+        if (attacker) registerCrewDamage(p, attacker, room);
         if (p.hp <= 0) killPlayer(p, attacker || null, "mine", room);
       }
       // Marca para efecto visual de explosión (reutiliza empPulses en blanco/naranja)

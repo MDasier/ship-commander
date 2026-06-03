@@ -24,6 +24,7 @@ body {
   padding: 48px 16px 40px;
   overflow-y: auto;
   box-sizing: border-box;
+  font-size: 1.2rem;
 }
 
 h1 {
@@ -93,6 +94,7 @@ input[type="text"]:focus {
   flex-direction: column;
   align-items: center;
   width: 100%;
+  min-width: 980px;
 }
 
 #nameSection {
@@ -103,7 +105,7 @@ input[type="text"]:focus {
   gap: 10px;
   margin-bottom: 20px;
   color: #aaa;
-  font-size: 14px;
+  font-size: 1rem;
 }
 
 #nameInput {
@@ -118,7 +120,7 @@ input[type="text"]:focus {
 }
 
 #rooms {
-  width: min(520px, 92vw);
+  width: min(620px, 100%);
 }
 
 .roomItem {
@@ -128,7 +130,7 @@ input[type="text"]:focus {
   border: 1px solid #222;
   padding: 12px 16px;
   margin-top: 8px;
-  background: #080808;
+  background: #000000;
   gap: 14px;
 }
 
@@ -881,12 +883,13 @@ kbd {
 /* ── SHIP SELECTOR (lobby) ── */
 
 #shipSelector {
-  width: min(480px, 92vw);
+  width: min(980px, 92vw);
   margin: 14px 0 4px;
+  font-size: 1rem;
 }
 
 .selectorLabel {
-  font-size: 9px;
+  font-size: 1rem;
   letter-spacing: 4px;
   color: #444;
   margin-bottom: 8px;
@@ -945,8 +948,6 @@ kbd {
 }
 
 .shipCardName {
-  font-size: 9px;
-  letter-spacing: 3px;
   margin-top: 2px;
 }
 
@@ -967,7 +968,6 @@ kbd {
 }
 
 .sLbl {
-  font-size: 10px;
   letter-spacing: 1px;
   color: #9bc8f1;
   width: 22px;
@@ -1026,11 +1026,9 @@ kbd {
 }
 
 .shipCardDesc {
-  font-size: 8px;
-  letter-spacing: 0.5px;
+  font-size: .8rem;
   color: #2a3a48;
-  text-align: center;
-  line-height: 1.5;
+  text-align: left;
   padding: 0 2px;
 }
 
@@ -1222,7 +1220,7 @@ kbd.bindingError {
 .lobbyControlsTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 1rem;
   color: #777;
 }
 
@@ -1234,7 +1232,7 @@ kbd.bindingError {
 .lobbyControlsTable td:first-child {
   color: #00ccff88;
   white-space: nowrap;
-  min-width: 130px;
+  min-width: auto;
 }
 
 /* ── CREW SLOT (gunship) ── */

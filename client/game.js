@@ -349,6 +349,7 @@ const ws = new WebSocket(_wsProto + "//" + _wsHost);
 
 let uiState = "lobby";
 let currentRoomId = null;
+let gameOverTimer = null;
 
 let myId = null;
 let roomData = null;
@@ -716,6 +717,9 @@ const gameOverEl = document.getElementById("gameOver");
 const restartBtn = document.getElementById("restartBtn");
 
 function showGameOver() {
+  if (uiState !== "inRoom") return;
+  if (!winner) return;
+
   gameOverEl.classList.remove("hidden");
   const isHost = roomData && roomData.ownerId === myId;
   restartBtn.classList.toggle("hidden", !isHost);
@@ -749,6 +753,13 @@ restartBtn.onclick = () => {
 };
 
 document.getElementById("backToLobby").onclick = () => {
+
+  clearTimeout(gameOverTimer);
+  gameOverTimer = null;  
+  winner = null;
+  prevWinner = null;  
+  hideGameOver();
+
   ws.send(JSON.stringify({ type: "leaveRoom" }));
   resetClientState();
   uiState = "lobby";
@@ -973,14 +984,26 @@ document.getElementById("refreshRooms").onclick = () => {
   }));
 };
 
-document.getElementById("ready").onclick = () => {
+const readyBtn = document.getElementById("ready");
+
+readyBtn.onclick = () => {
   if (uiState !== "inRoom") return;
+
   ws.send(JSON.stringify({
     type: "ready"
   }));
+
+  readyBtn.textContent =
+    readyBtn.textContent === "Go"
+      ? "Ready"
+      : "Go";
 };
 
 document.getElementById("leaveRoom").onclick = () => {
+
+  clearTimeout(gameOverTimer);
+  gameOverTimer = null;
+
   ws.send(JSON.stringify({ type: "leaveRoom" }));
   uiState = "lobby";
   currentRoomId = null;
@@ -1000,17 +1023,13 @@ ws.onmessage = e => {
   const data = JSON.parse(e.data);
 
   if (data.type === "init") {
-
     myId = data.id;
     if (data.ships) buildShipCards(data.ships);
     applyName();
-
   }
 
   if (data.type === "rooms") {
-
     renderRooms(data.rooms);
-
   }
 
   if (data.type === "roomJoined") {
@@ -1054,6 +1073,12 @@ ws.onmessage = e => {
   }
 
   if (data.type === "roomRestarted") {
+    
+    clearTimeout(gameOverTimer);
+    gameOverTimer = null;
+    winner = null;
+    prevWinner = null;
+
     resetClientState();
     roomData = data.room;
     uiState = "inRoom";
@@ -1607,9 +1632,7 @@ setInterval(() => {
 }, 33);
 
 function getMe() {
-
   return players[myId];
-
 }
 
 function worldToScreen(x, y, camX, camY) {
@@ -2209,53 +2232,40 @@ function drawShip(player, camX, camY) {
 }
 
 function drawVelocityVector(player, camX, camY) {
-
   const speed =
     Math.hypot(
       player.vx,
       player.vy
     );
-
   if (speed < 0.5) return;
-
   const pos = worldToScreen(
     player.x,
     player.y,
     camX,
     camY
   );
-
   ctx.beginPath();
-
   ctx.moveTo(
     pos.x,
     pos.y
   );
-
   ctx.lineTo(
     pos.x + player.vx * 20,
     pos.y + player.vy * 20
   );
-
   ctx.strokeStyle = "#ffffff44";
-
   ctx.stroke();
-
 }
 
 function drawBullets(camX, camY) {
-
   bullets.forEach(b => {
-
     const pos = worldToScreen(
       b.x,
       b.y,
       camX,
       camY
     );
-
     ctx.beginPath();
-
     ctx.arc(
       pos.x,
       pos.y,
@@ -2263,16 +2273,12 @@ function drawBullets(camX, camY) {
       0,
       Math.PI * 2
     );
-
     ctx.fillStyle =
       b.team === "green"
         ? "#00ff88"
         : "#ff3355";
-
     ctx.fill();
-
   });
-
 }
 
 // Rayo de la Capital: línea brillante con halo y chispas eléctricas, se desvanece.
@@ -2735,7 +2741,7 @@ function updateHUD(me) {
 
   const inertiaEl = document.getElementById("inertiaMode");
   if (inertiaEl) {
-    inertiaEl.textContent = inertiaDampActive ? "DAMP" : "DRIFT";
+    inertiaEl.textContent = inertiaDampActive ? "CPLD " : "DECOUPLED";
     inertiaEl.style.color = inertiaDampActive ? "#555" : "#8aa8b8";
   }
 
@@ -2946,7 +2952,12 @@ function loop() {
 
     if (winner !== prevWinner) {
       prevWinner = winner;
-      setTimeout(showGameOver, 2500);
+
+      clearTimeout(gameOverTimer);
+      gameOverTimer = setTimeout(() => {
+        showGameOver();
+      }, 2500);
+
       if (mobiOpen) closeMobiglass();
     }
 
@@ -3153,114 +3164,159 @@ function loop() {
 
   if (mobiOpen) updateMobiglass();
 
-  // ── Scoreboard (Tab mantenido)
+  // ── Scoreboard (Tab mantenido)  
   if (showScoreboard) {
-    const green = Object.values(players).filter(p => p.team === "green").sort((a, b) => (b.kills || 0) - (a.kills || 0));
-    const red = Object.values(players).filter(p => p.team === "red").sort((a, b) => (b.kills || 0) - (a.kills || 0));
+    const rem = 18; // 1rem base
+  
+    const green = Object.values(players)
+      .filter(p => p.team === "green")
+      .sort((a, b) => (b.kills || 0) - (a.kills || 0));
+  
+    const red = Object.values(players)
+      .filter(p => p.team === "red")
+      .sort((a, b) => (b.kills || 0) - (a.kills || 0));
+  
     const maxRows = Math.max(green.length, red.length, 1);
-    const rowH = 22, titleH = 44, teamH = 28, colH = 18;
-    const bh = titleH + teamH + colH + maxRows * rowH + 14;
-    const bw = Math.min(canvas.width * 0.9, 900);
+  
+    // ── ESCALADO MÁS GRANDE ──
+    const rowH   = rem * 1.8;
+    const titleH = rem * 3;
+    const teamH  = rem * 1.6;
+    const colH   = rem * 1.4;
+  
+    const bh = titleH + teamH + colH + maxRows * rowH + rem;
+    const bw = Math.min(canvas.width * 0.95, 1100); // más ancho
     const bx = (canvas.width - bw) / 2;
-    const by = Math.max(30, (canvas.height - bh) / 2);
+    const by = Math.max(20, (canvas.height - bh) / 2);
     const colW = bw / 2;
-
+  
     ctx.save();
-
+  
     // Panel
-    ctx.fillStyle = "rgba(0,2,8,0.92)";
+    ctx.fillStyle = "rgba(0,2,8,0.94)";
     ctx.fillRect(bx, by, bw, bh);
-    ctx.strokeStyle = "#00ccff18";
+  
+    ctx.strokeStyle = "#00ccff22";
     ctx.lineWidth = 1;
     ctx.strokeRect(bx, by, bw, bh);
-
+  
     // Divisor central
     ctx.beginPath();
     ctx.moveTo(bx + colW, by + titleH);
     ctx.lineTo(bx + colW, by + bh);
-    ctx.strokeStyle = "#ffffff08";
+    ctx.strokeStyle = "#ffffff10";
     ctx.stroke();
-
-    // Título
+  
+    // ── TÍTULO ──
     ctx.textAlign = "center";
-    ctx.font = "11px 'Courier New', monospace";
-    ctx.fillStyle = "#00ccff44";
-    ctx.fillText("MARCADOR  ·  Suelta Tab para cerrar", canvas.width / 2, by + 16);
-
-    // Totales por equipo
+    ctx.font = `bold ${rem}px 'Courier New', monospace`;
+    ctx.fillStyle = "#00ccff66";
+    ctx.fillText(
+      "MARCADOR · Suelta Tab para cerrar",
+      canvas.width / 2,
+      by + rem * 1.4
+    );
+  
+    // ── TOTALES ──
     const sum = (arr, key) => arr.reduce((s, p) => s + (p[key] || 0), 0);
+  
     const gAlive = green.filter(p => !p.dead).length;
     const rAlive = red.filter(p => !p.dead).length;
-    ctx.font = "bold 11px 'Courier New', monospace";
+  
+    ctx.font = `bold ${rem}px 'Courier New', monospace`;
+  
     ctx.textAlign = "left";
     ctx.fillStyle = "#00ff88";
-    ctx.fillText(`▶ VERDE  ${gAlive}/${green.length} vivos  ${sum(green, "kills")}K  ${sum(green, "assists")}A  ${Math.round(sum(green, "damageDealt"))}dmg`, bx + 10, by + 34);
+    ctx.fillText(
+      `▶ VERDE ${gAlive}/${green.length} vivos  ${sum(green, "kills")}K  ${sum(green, "assists")}A  ${Math.round(sum(green, "damageDealt"))} dmg`,
+      bx + rem,
+      by + rem * 2.4
+    );
+  
+    ctx.textAlign = "right";
     ctx.fillStyle = "#ff3355";
-    ctx.textAlign = "right";
-    ctx.fillText(`${sum(red, "kills")}K  ${sum(red, "assists")}A  ${Math.round(sum(red, "damageDealt"))}dmg  ${rAlive}/${red.length} vivos  ROJO ◀`, bx + bw - 10, by + 34);
-
-    // Cabeceras de columna
-    const hy = by + titleH + teamH + colH - 4;
-    ctx.font = "9px 'Courier New', monospace";
-    ctx.fillStyle = "#1e3a4a";
+    ctx.fillText(
+      `${sum(red, "kills")}K  ${sum(red, "assists")}A  ${Math.round(sum(red, "damageDealt"))} dmg  ${rAlive}/${red.length} vivos ◀ ROJO`,
+      bx + bw - rem,
+      by + rem * 2.4
+    );
+  
+    // ── CABECERAS ──
+    const hy = by + titleH + teamH + colH - rem * 0.2;
+  
+    ctx.font = `${rem * 0.9}px 'Courier New', monospace`;
+    ctx.fillStyle = "#2b5a6b";
+  
     ctx.textAlign = "left";
-    ctx.fillText("PILOTO", bx + 22, hy);
+    ctx.fillText("PILOTO", bx + rem * 1.4, hy);
+  
     ctx.textAlign = "right";
-    ctx.fillText("K   D   A    DMG", bx + colW - 10, hy);
+    ctx.fillText("K   D   A    DMG", bx + colW - rem, hy);
+  
     ctx.textAlign = "left";
-    ctx.fillText("PILOTO", bx + colW + 22, hy);
+    ctx.fillText("PILOTO", bx + colW + rem * 1.4, hy);
+  
     ctx.textAlign = "right";
-    ctx.fillText("K   D   A    DMG", bx + bw - 10, hy);
-
+    ctx.fillText("K   D   A    DMG", bx + bw - rem, hy);
+  
     // Separador
     ctx.beginPath();
-    ctx.moveTo(bx, hy + 4); ctx.lineTo(bx + bw, hy + 4);
-    ctx.strokeStyle = "#ffffff08"; ctx.stroke();
-
+    ctx.moveTo(bx, hy + rem * 0.3);
+    ctx.lineTo(bx + bw, hy + rem * 0.3);
+    ctx.strokeStyle = "#ffffff10";
+    ctx.stroke();
+  
     const rowStart = by + titleH + teamH + colH;
-
+  
     [green, red].forEach((team, ti) => {
-      const lx = ti === 0 ? bx + 10 : bx + colW + 10;
-      const rx = ti === 0 ? bx + colW - 10 : bx + bw - 10;
+      const lx = ti === 0 ? bx + rem : bx + colW + rem;
+      const rx = ti === 0 ? bx + colW - rem : bx + bw - rem;
       const tColor = ti === 0 ? "#00ff88" : "#ff3355";
-
+  
       team.forEach((p, i) => {
-        const ry = rowStart + i * rowH + rowH * 0.72;
+        const ry = rowStart + i * rowH + rowH * 0.75;
         const isMe = p.id === myId;
-
-        // Fondo propio
+  
+        // highlight jugador
         if (isMe) {
-          ctx.fillStyle = "rgba(0,204,255,0.05)";
-          ctx.fillRect(ti === 0 ? bx : bx + colW, rowStart + i * rowH, colW, rowH);
+          ctx.fillStyle = "rgba(0,204,255,0.08)";
+          ctx.fillRect(
+            ti === 0 ? bx : bx + colW,
+            rowStart + i * rowH,
+            colW,
+            rowH
+          );
         }
-
-        ctx.globalAlpha = p.dead ? 0.38 : 1;
-
-        // Estado + nombre
+  
+        ctx.globalAlpha = p.dead ? 0.35 : 1;
+  
+        // indicador
         ctx.textAlign = "left";
-        ctx.font = "10px 'Courier New', monospace";
+        ctx.font = `${rem}px 'Courier New', monospace`;
         ctx.fillStyle = p.dead ? "#444" : tColor;
         ctx.fillText(p.dead ? "✕" : "●", lx, ry);
-
-        ctx.font = (isMe ? "bold " : "") + "11px 'Courier New', monospace";
-        ctx.fillStyle = isMe ? "#00ccff" : (p.dead ? "#444" : "#ccc");
-        ctx.fillText((p.name || "Pilot").slice(0, 11), lx + 14, ry);
-
-        // KDA + DMG
+  
+        // nombre
+        ctx.font = `${isMe ? "bold " : ""}${rem}px 'Courier New', monospace`;
+        ctx.fillStyle = isMe ? "#00ccff" : (p.dead ? "#444" : "#ddd");
+        ctx.fillText((p.name || "Pilot").slice(0, 12), lx + rem * 0.9, ry);
+  
+        // stats
         ctx.textAlign = "right";
-        ctx.font = "11px 'Courier New', monospace";
+        ctx.font = `${rem}px 'Courier New', monospace`;
         ctx.fillStyle = p.dead ? "#444" : "#9ab";
+  
         const k = String(p.kills || 0).padStart(2);
         const d = String(p.deaths || 0).padStart(2);
         const a = String(p.assists || 0).padStart(2);
-        const dmg = String(Math.round(p.damageDealt || 0)).padStart(4);
+        const dmg = String(Math.round(p.damageDealt || 0)).padStart(5);
+  
         ctx.fillText(`${k}  ${d}  ${a}  ${dmg}`, rx, ry);
-
+  
         ctx.globalAlpha = 1;
       });
     });
-
-    ctx.textAlign = "left";
+  
     ctx.restore();
   }
 
