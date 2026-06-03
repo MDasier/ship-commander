@@ -42,6 +42,34 @@ const DEFAULTS = {
   RESPAWN_DELAY: 5,
   RESPAWN_COUNT: 3,
 
+  // ── Rayo principal (nave Capital) — disparo primario del piloto
+  CAPITAL_BEAM_DAMAGE: 150,    // muy potente
+  CAPITAL_BEAM_CHARGE_TIME: 75, // ticks (~1.25s) manteniendo pulsado para cargar
+  CAPITAL_BEAM_RANGE: 1400,    // alcance del rayo
+  CAPITAL_BEAM_HALFWIDTH: 14,  // semianchura para detección de impacto
+  CAPITAL_BEAM_LIFE: 8,        // ticks que dura el efecto visual
+  EMP_DURATION: 90,            // ticks (~1.5s) de chispas rojas del rayo de la Capital (solo visual)
+
+  // ── Nave EMP (Disruptor): pulso en área que "apaga" naves enemigas
+  EMP_PULSE_RADIUS: 340,       // radio del estallido alrededor de la nave EMP
+  EMP_PULSE_COOLDOWN: 240,     // ticks (~4s) entre pulsos
+  EMP_DISABLE_MIN: 120,        // duración mínima del apagado (ticks, ~2s)
+  EMP_DISABLE_MAX: 240,        // duración máxima del apagado (ticks, ~4s)
+  EMP_PULSE_LIFE: 18,          // ticks del efecto visual de la onda
+
+  // ── Torpedos (misil grande y más dañino — arma del Disruptor)
+  TORPEDO_DAMAGE: 90,
+  TORPEDO_RADIUS: 26,
+
+  // ── Minas (arma especial del Interceptor)
+  MINE_COOLDOWN: 90,           // ticks entre minas (~1.5s)
+  MINE_MAX_ACTIVE: 4,          // minas activas simultáneas por jugador
+  MINE_ARM_TIME: 30,           // ticks hasta armarse (~0.5s) — no daña a quien la pone
+  MINE_LIFE: 1800,             // ticks de vida (~30s) antes de desactivarse
+  MINE_TRIGGER_RADIUS: 60,     // distancia a la que un enemigo la dispara
+  MINE_BLAST_RADIUS: 120,      // radio de la explosión
+  MINE_DAMAGE: 70,             // daño en el centro (decae con la distancia)
+
   // ── Torreta (nave Capital)
   TURRET_DAMAGE: 40,
   TURRET_COOLDOWN: 6,
@@ -61,7 +89,7 @@ const DEFAULTS = {
   SHIP_TYPES: {
     interceptor: {
       label: "Interceptor",
-      desc: "Muy rápido · Poco armado · Baja firma radar",
+      desc: "Muy rápido · Poco armado · Baja firma radar · Suelta minas [X]",
       maxHp: 50,
       thrustMult: 1.55,
       turnMult: 1.65,
@@ -74,6 +102,9 @@ const DEFAULTS = {
       maxShield: 35,
       shieldRegenRate: 7,      // unidades/segundo
       shieldRegenDelay: 3.5,   // segundos sin daño antes de empezar a recargar
+      // Cápsula de colisión (eje longitudinal +x = proa). front/rear: extremos del
+      // segmento en coords locales; radius: semianchura del casco.
+      collider: { front: 8, rear: -12, radius: 16 },
     },
     fighter: {
       label: "L.Fighter",
@@ -90,6 +121,7 @@ const DEFAULTS = {
       maxShield: 50,
       shieldRegenRate: 6,
       shieldRegenDelay: 4,
+      collider: { front: 8, rear: -12, radius: 18 },
     },
     bomber: {
       label: "Bomber",
@@ -106,6 +138,7 @@ const DEFAULTS = {
       maxShield: 120,
       shieldRegenRate: 8,
       shieldRegenDelay: 5,
+      collider: { front: 12, rear: -14, radius: 20 },
     },
     gunship: {
       label: "Gunship",
@@ -123,6 +156,7 @@ const DEFAULTS = {
       maxShield: 250,
       shieldRegenRate: 10,
       shieldRegenDelay: 6,
+      collider: { front: 14, rear: -16, radius: 30 },
     },
     capital: {
       label: "Capital",
@@ -140,6 +174,28 @@ const DEFAULTS = {
       maxShield: 500,
       shieldRegenRate: 14,
       shieldRegenDelay: 8,
+      // Casco alargado tipo Idris: cápsula larga y ancha que cubre proa→popa.
+      collider: { front: 60, rear: -54, radius: 40 },
+    },
+    emp: {
+      label: "Disruptor",
+      desc: "Sigilo extremo · Pulso EMP [X] apaga naves 2-4s · 4 torpedos · Cañón débil",
+      maxHp: 50,                 // resistencia de Interceptor
+      thrustMult: 1.0,           // velocidad de L.Fighter
+      turnMult: 1.0,
+      dragVal: null,
+      fuelRegenMult: 1.0,
+      maxMissiles: 4,            // 4 torpedos (misil grande)
+      missileCooldown: 200,
+      radarSignature: 150,       // prácticamente indetectable
+      bulletDamage: 8,           // cañón normal, más débil que el Interceptor
+      torpedo: true,             // sus misiles son torpedos
+      // Escudos — ligeros
+      maxShield: 30,
+      shieldRegenRate: 7,
+      shieldRegenDelay: 4,
+      // Casco triangular ancho y corto (pico en la proa)
+      collider: { front: 14, rear: -12, radius: 34 },
     },
   },
 

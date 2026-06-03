@@ -815,6 +815,37 @@ kbd {
   text-align: right;
 }
 
+#muteBtn {
+  flex: 1;
+  background: #001a26;
+  border: 1px solid #00ccff44;
+  color: #00ccff;
+  padding: 8px 12px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.15s, border-color 0.15s;
+}
+#muteBtn:hover { background: #002636; }
+#muteBtn.muted {
+  border-color: #ff445544;
+  color: #ff6677;
+  background: #1a0008;
+}
+
+#musicTrackSel {
+  flex: 1;
+  background: #001a26;
+  border: 1px solid #00ccff44;
+  color: #00ccff;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+#musicTrackSel span { width: auto; }
+
 .mobiSettingsDivider {
   height: 1px;
   background: #00ccff08;

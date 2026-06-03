@@ -122,6 +122,7 @@
       <div>MSL: <span id="mslCd">LISTO</span></div>
       <div>FLT: <span id="inertiaMode">DAMP</span></div>
       <div>CAÑÓN: <span id="weaponHeatEl">FRÍO</span></div>
+      <div id="abilityRow" style="display:none">[X] <span id="abilityName">ESP</span>: <span id="abilityCd">LISTO</span></div>
     </div>
 
     <div id="topCenter">
@@ -184,15 +185,25 @@
 
         <div class="mobiPane hidden" id="pane-ajustes">
           <div class="mobiSettingsSection">
-            <div class="mobiSettingsLabel">VOLUMEN MASTER</div>
             <div class="mobiSettingsRow">
-              <input type="range" id="volMaster" min="0" max="1" step="0.05" value="0.8">
-              <span id="volMasterVal">80%</span>
+              <button id="muteBtn">🔊 Sonido</button>
+            </div>
+            <div class="mobiSettingsLabel">VOLUMEN EFECTOS</div>
+            <div class="mobiSettingsRow">
+              <input type="range" id="volEffects" min="0" max="1" step="0.05" value="0.8">
+              <span id="volEffectsVal">80%</span>
             </div>
             <div class="mobiSettingsLabel">VOLUMEN MÚSICA</div>
             <div class="mobiSettingsRow">
               <input type="range" id="volMusic" min="0" max="1" step="0.05" value="0.5">
               <span id="volMusicVal">50%</span>
+            </div>
+            <div class="mobiSettingsLabel">PISTA DE MÚSICA</div>
+            <div class="mobiSettingsRow">
+              <select id="musicTrackSel">
+                <option value="A">Pista A — Ambiental</option>
+                <option value="B">Pista B — Más presencia</option>
+              </select>
             </div>
           </div>
         </div>

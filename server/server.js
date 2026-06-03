@@ -163,6 +163,8 @@ function applyShipStats(p) {
   p.maxMissiles         = ship.maxMissiles;
   p.missileCooldownBase = ship.missileCooldown;
   p.radarSignature      = ship.radarSignature;
+  p.bulletDamage        = ship.bulletDamage ?? CFG.BULLET_DAMAGE;
+  p.firesTorpedoes      = !!ship.torpedo;
   // Escudos
   p.maxShield             = ship.maxShield      ?? 0;
   p.shield                = p.maxShield;
@@ -171,6 +173,19 @@ function applyShipStats(p) {
   p.shieldHitTimer        = 99999;
   p.shieldFlash           = 0;
   p.shieldHitAngle        = null;
+  // Rayo de la Capital
+  p.beamCharging   = false;
+  p.beamChargeTicks = 0;
+  p.beamCharge     = 0;
+  // EMP / apagado
+  p.empTimer        = 0;
+  p.empMax          = 0;
+  p.emp             = 0;
+  p.empDisableTicks = 0;
+  p.empDisabled     = false;
+  p.empCooldown     = 0;
+  // Minas (Interceptor)
+  p.mineCooldown    = 0;
   // Nave Capital: 3 slots de artillero
   if (p.shipType === "capital") {
     if (!p.gunnerIds)    p.gunnerIds    = [null, null, null];
@@ -248,6 +263,13 @@ function killPlayer(p, killer, weapon, room) {
 
   p.hp = 0;
   p.dead = true;
+  p.beamCharging = false;
+  p.beamChargeTicks = 0;
+  p.beamCharge = 0;
+  p.empTimer = 0;
+  p.emp = 0;
+  p.empDisableTicks = 0;
+  p.empDisabled = false;
   p.deaths++;
   p.deadAt = Date.now();
   p.respawnReadyAt = Date.now() + ((CFG.RESPAWN_DELAY ?? 5) * 1000);
@@ -312,6 +334,9 @@ function createRoom(ownerId, ownerName) {
     players: {},
     bullets: [],
     missiles: [],
+    beams: [],
+    empPulses: [],
+    mines: [],
     flare: [],
     asteroids: createAsteroids(preset.asteroids, W, H),
     winner:  null,
@@ -331,6 +356,9 @@ function startGame(room) {
   room.status = "playing";
   room.bullets  = [];
   room.missiles = [];
+  room.beams    = [];
+  room.empPulses = [];
+  room.mines    = [];
   room.flare    = [];
   room.winner   = null;
   room.shipsDestroyed = false;
@@ -421,6 +449,9 @@ function restartRoom(room) {
   room.status   = "waiting";
   room.bullets  = [];
   room.missiles = [];
+  room.beams    = [];
+  room.empPulses = [];
+  room.mines    = [];
   room.flare    = [];
   room.winner   = null;
   room.killFeed = [];
@@ -754,8 +785,8 @@ wss.on("connection", ws => {
 
     if (msg.type === "flare") {
       const room = rooms[player.roomId];
-      if (!room || player.flaredCooldown > 0) return;    
-      room.flare = room.flare || [];    
+      if (!room || player.flaredCooldown > 0 || player.empDisabled) return;
+      room.flare = room.flare || [];
       room.flare.push({
         id: Date.now() + Math.random(),
         x: player.x,
@@ -769,6 +800,7 @@ wss.on("connection", ws => {
     if (msg.type === "missile") {
       const room = rooms[player.roomId];
       if (!room || player.dead) return;
+      if (player.empDisabled || (player.pilotingFor && room.players[player.pilotingFor]?.empDisabled)) return;
       if (player.missileCooldown > 0) return;
       const active = room.missiles.filter(m => m.ownerId === player.id).length;
       if (active >= (player.maxMissiles ?? CFG.MISSILE_MAX_ACTIVE)) return;
@@ -790,7 +822,8 @@ wss.on("connection", ws => {
         team:     player.team,
         targetId: msg.targetId,
         ownerId:  player.id,
-        life:     CFG.MISSILE_LIFE
+        life:     CFG.MISSILE_LIFE,
+        torpedo:  !!player.firesTorpedoes,   // Disruptor lanza torpedos (más grandes y dañinos)
       });
 
       player.missileCooldown = player.missileCooldownBase ?? CFG.MISSILE_COOLDOWN;
@@ -860,6 +893,7 @@ wss.on("connection", ws => {
         // Artillero: disparo de torreta
         const pilot = room.players[player.pilotingFor];
         if (!pilot || pilot.dead) return;
+        if (pilot.empDisabled) return;   // nave apagada por EMP
         if (player.turretCooldown > 0) return;
         player.turretCooldown = CFG.TURRET_COOLDOWN;
         // Ángulo: Capital usa turretAngles por artillero; Gunship usa turretAngle único
@@ -873,8 +907,13 @@ wss.on("connection", ws => {
           team: player.team, ownerId: player.id,
           damage: CFG.TURRET_DAMAGE,
         });
+      } else if (player.shipType === "capital") {
+        // La Capital no dispara balas: su arma principal es el rayo cargado
+        // (gestionado por los mensajes "beamCharge"). Ignorar "shoot".
+        return;
       } else {
         // Piloto: disparo normal
+        if (player.empDisabled) return;   // nave apagada por EMP
         if (player.bulletCooldown > 0) return;
         player.bulletCooldown = CFG.BULLET_COOLDOWN;
         room.bullets.push({
@@ -882,8 +921,43 @@ wss.on("connection", ws => {
           vx: Math.cos(player.angle) * CFG.BULLET_SPEED,
           vy: Math.sin(player.angle) * CFG.BULLET_SPEED,
           team: player.team, ownerId: player.id,
-          damage: CFG.BULLET_DAMAGE,
+          damage: player.bulletDamage ?? CFG.BULLET_DAMAGE,
         });
+      }
+    }
+
+    // ── Habilidad especial (tecla X): depende del tipo de nave
+    if (msg.type === "special") {
+      const room = rooms[player.roomId];
+      if (!room || player.dead || player.pilotingFor || player.empDisabled) return;
+      if (player.shipType === "emp") {
+        if ((player.empCooldown ?? 0) > 0) return;
+        player.empCooldown = CFG.EMP_PULSE_COOLDOWN;
+        fireEmpPulse(player, room);
+      } else if (player.shipType === "interceptor") {
+        if ((player.mineCooldown ?? 0) > 0) return;
+        player.mineCooldown = CFG.MINE_COOLDOWN;
+        dropMine(player, room);
+      }
+      return;
+    }
+
+    // ── Carga del rayo de la Capital (mantener pulsado para cargar, soltar para disparar)
+    if (msg.type === "beamCharge") {
+      const room = rooms[player.roomId];
+      if (!room || player.dead || player.pilotingFor) return;
+      if (player.shipType !== "capital") return;
+
+      if (msg.charging) {
+        player.beamCharging = true;
+      } else {
+        // Al soltar: si está totalmente cargado, dispara el rayo
+        player.beamCharging = false;
+        if ((player.beamChargeTicks ?? 0) >= CFG.CAPITAL_BEAM_CHARGE_TIME) {
+          fireCapitalBeam(player, room);
+        }
+        player.beamChargeTicks = 0;
+        player.beamCharge = 0;
       }
     }
   });
@@ -908,9 +982,156 @@ function distToSegment(px, py, ax, ay, bx, by) {
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
+// Distancia mínima entre dos segmentos AB y CD (clásico segment-segment).
+// Permite tratar la nave como cápsula (segmento + radio) frente al recorrido
+// barrido de un proyectil, en lugar de un punto.
+function segToSegDist(ax, ay, bx, by, cx, cy, dx, dy) {
+  const ux = bx - ax, uy = by - ay;
+  const vx = dx - cx, vy = dy - cy;
+  const wx = ax - cx, wy = ay - cy;
+  const a = ux * ux + uy * uy;
+  const b = ux * vx + uy * vy;
+  const c = vx * vx + vy * vy;
+  const d = ux * wx + uy * wy;
+  const e = vx * wx + vy * wy;
+  const D = a * c - b * b;
+  let sN, sD = D, tN, tD = D;
+  if (D < 1e-9) { sN = 0; sD = 1; tN = e; tD = c; }
+  else {
+    sN = b * e - c * d;
+    tN = a * e - b * d;
+    if (sN < 0)      { sN = 0;  tN = e;     tD = c; }
+    else if (sN > sD){ sN = sD; tN = e + b; tD = c; }
+  }
+  if (tN < 0) {
+    tN = 0;
+    if (-d < 0) sN = 0; else if (-d > a) sN = sD; else { sN = -d; sD = a; }
+  } else if (tN > tD) {
+    tN = tD;
+    if ((-d + b) < 0) sN = 0; else if ((-d + b) > a) sN = sD; else { sN = -d + b; sD = a; }
+  }
+  const sc = Math.abs(sN) < 1e-9 ? 0 : sN / sD;
+  const tc = Math.abs(tN) < 1e-9 ? 0 : tN / tD;
+  const px = wx + sc * ux - tc * vx;
+  const py = wy + sc * uy - tc * vy;
+  return Math.hypot(px, py);
+}
+
+// Cápsula de colisión de la nave en coords de mundo (segmento de proa a popa + radio).
+function shipCapsule(p) {
+  const ship = CFG.SHIP_TYPES[p.shipType] || CFG.SHIP_TYPES.fighter;
+  const col  = ship.collider || { front: 0, rear: 0, radius: 14 };
+  const cos = Math.cos(p.angle), sin = Math.sin(p.angle);
+  return {
+    fx: p.x + col.front * cos, fy: p.y + col.front * sin,  // proa
+    rx: p.x + col.rear  * cos, ry: p.y + col.rear  * sin,  // popa
+    r:  col.radius,
+  };
+}
+
 // Nave "cubierta": su posición cae dentro del radio de un asteroide flotante (z=1)
 function isSheltered(px, py, asteroids) {
   return asteroids.some(a => a.z === 1 && Math.hypot(px - a.x, py - a.y) < a.r);
+}
+
+// Aplica el efecto EMP a una nave. `ticks` = duración; `disable` = si además la "apaga".
+function applyEmp(target, ticks, disable) {
+  target.empTimer = Math.max(target.empTimer ?? 0, ticks);
+  target.empMax   = Math.max(target.empMax ?? 0, ticks);
+  if (disable) target.empDisableTicks = Math.max(target.empDisableTicks ?? 0, ticks);
+}
+
+// Disparo principal de la nave Capital: un rayo instantáneo (hitscan) muy potente.
+// Traza una línea desde la proa; impacta al primer enemigo en su trayectoria
+// (o se detiene en un asteroide), aplica daño grande y deja un efecto visual.
+function fireCapitalBeam(player, room) {
+  const cos = Math.cos(player.angle), sin = Math.sin(player.angle);
+  const col = (CFG.SHIP_TYPES.capital.collider) || { front: 0 };
+  const ox = player.x + col.front * cos;   // origen en la proa
+  const oy = player.y + col.front * sin;
+  const range = CFG.CAPITAL_BEAM_RANGE;
+  const ex = ox + cos * range, ey = oy + sin * range;
+
+  // Distancia a lo largo del rayo de un punto proyectado sobre la dirección
+  const along = (px, py) => (px - ox) * cos + (py - oy) * sin;
+
+  // 1) Asteroide sólido (z=0) que bloquea el rayo más cerca
+  let blockDist = range;
+  for (const a of room.asteroids) {
+    if (a.z !== 0) continue;
+    const t = along(a.x, a.y);
+    if (t < 0 || t > blockDist) continue;
+    const perp = Math.hypot((ox + cos * t) - a.x, (oy + sin * t) - a.y);
+    if (perp < a.r) {
+      const entry = t - Math.sqrt(Math.max(0, a.r * a.r - perp * perp));
+      if (entry >= 0 && entry < blockDist) blockDist = entry;
+    }
+  }
+
+  // 2) Enemigo más cercano cuya cápsula intersecta el rayo dentro de blockDist
+  let hitPlayer = null, hitDist = blockDist;
+  for (const p of Object.values(room.players)) {
+    if (p.dead || p.team === player.team || p.pilotingFor || p.id === player.id) continue;
+    const cap = shipCapsule(p);
+    const d = segToSegDist(ox, oy, ex, ey, cap.rx, cap.ry, cap.fx, cap.fy);
+    if (d < CFG.CAPITAL_BEAM_HALFWIDTH + cap.r) {
+      const t = Math.max(0, along(p.x, p.y));
+      if (t <= hitDist) { hitDist = t; hitPlayer = p; }
+    }
+  }
+
+  let endX, endY;
+  if (hitPlayer) {
+    endX = ox + cos * hitDist; endY = oy + sin * hitDist;
+    // Cubierto bajo asteroide flotante → el rayo no daña (pero se detiene ahí)
+    if (!isSheltered(hitPlayer.x, hitPlayer.y, room.asteroids)) {
+      const beamAngle = Math.atan2(oy - hitPlayer.y, ox - hitPlayer.x);
+      applyDamage(hitPlayer, CFG.CAPITAL_BEAM_DAMAGE, player, beamAngle);
+      updateDamageLog(hitPlayer, player.id);
+      // EMP: solo chispas rojas (el rayo de la Capital no "apaga")
+      applyEmp(hitPlayer, CFG.EMP_DURATION, false);
+      if (hitPlayer.hp <= 0) killPlayer(hitPlayer, player, "beam", room);
+    }
+  } else {
+    endX = ox + cos * blockDist; endY = oy + sin * blockDist;
+  }
+
+  room.beams.push({
+    x1: ox, y1: oy, x2: endX, y2: endY,
+    team: player.team, ownerId: player.id,
+    life: CFG.CAPITAL_BEAM_LIFE, maxLife: CFG.CAPITAL_BEAM_LIFE,
+  });
+}
+
+// Pulso EMP en área del Disruptor: apaga a todos los enemigos dentro del radio 2-4s.
+function fireEmpPulse(player, room) {
+  const R = CFG.EMP_PULSE_RADIUS;
+  for (const p of Object.values(room.players)) {
+    if (p.dead || p.team === player.team || p.pilotingFor || p.id === player.id) continue;
+    if (Math.hypot(p.x - player.x, p.y - player.y) > R) continue;
+    if (isSheltered(p.x, p.y, room.asteroids)) continue;
+    const dur = CFG.EMP_DISABLE_MIN +
+      Math.floor(Math.random() * (CFG.EMP_DISABLE_MAX - CFG.EMP_DISABLE_MIN + 1));
+    applyEmp(p, dur, true);   // apaga (motor + armas) + chispas rojas
+  }
+  room.empPulses.push({
+    id: Date.now() + Math.random(),
+    x: player.x, y: player.y, r: R, team: player.team,
+    life: CFG.EMP_PULSE_LIFE, maxLife: CFG.EMP_PULSE_LIFE,
+  });
+}
+
+// El Interceptor suelta una mina en su posición; explota al pasar un enemigo por encima.
+function dropMine(player, room) {
+  const active = room.mines.filter(m => m.ownerId === player.id).length;
+  if (active >= CFG.MINE_MAX_ACTIVE) return;
+  room.mines.push({
+    id: Date.now() + Math.random(),
+    x: player.x, y: player.y,
+    team: player.team, ownerId: player.id,
+    arm: CFG.MINE_ARM_TIME,        // cuenta atrás hasta armarse
+    life: CFG.MINE_LIFE,
+  });
 }
 
 // ─────────────────────────────────────────────
@@ -973,16 +1194,33 @@ function update() {
       if (p.missileCooldown > 0) p.missileCooldown--;
       if (p.bulletCooldown  > 0) p.bulletCooldown--;
       if (p.hitFlash        > 0) p.hitFlash--;
+      // Carga del rayo de la Capital (mantener pulsado)
+      if (p.shipType === "capital") {
+        if (p.beamCharging) {
+          p.beamChargeTicks = Math.min(CFG.CAPITAL_BEAM_CHARGE_TIME, (p.beamChargeTicks ?? 0) + 1);
+        }
+        p.beamCharge = (p.beamChargeTicks ?? 0) / CFG.CAPITAL_BEAM_CHARGE_TIME; // 0..1 para el cliente
+      }
+      // EMP: chispas rojas (visual) y apagado (motor + armas)
+      if ((p.empTimer ?? 0) > 0) p.empTimer--; else p.empMax = 0;
+      p.emp = (p.empMax ?? 0) > 0 ? (p.empTimer ?? 0) / p.empMax : 0; // 0..1 para el cliente
+      if ((p.empDisableTicks ?? 0) > 0) p.empDisableTicks--;
+      p.empDisabled = (p.empDisableTicks ?? 0) > 0;
+      if ((p.empCooldown  ?? 0) > 0) p.empCooldown--;
+      if ((p.mineCooldown ?? 0) > 0) p.mineCooldown--;
       if (p.shieldFlash     > 0) p.shieldFlash--;
       if (p.flaredCooldown  > 0) p.flaredCooldown--;
-      // Recarga de escudo
-      if ((p.shieldHitTimer ?? 99999) < (p.shieldRegenDelayTicks ?? 99999)) {
-        p.shieldHitTimer++;
-      } else if ((p.shield ?? 0) < (p.maxShield ?? 0)) {
-        p.shield = Math.min(p.maxShield, p.shield + p.shieldRegenPerTick);
+      // Recarga de escudo (parada mientras la nave está apagada)
+      if (!p.empDisabled) {
+        if ((p.shieldHitTimer ?? 99999) < (p.shieldRegenDelayTicks ?? 99999)) {
+          p.shieldHitTimer++;
+        } else if ((p.shield ?? 0) < (p.maxShield ?? 0)) {
+          p.shield = Math.min(p.maxShield, p.shield + p.shieldRegenPerTick);
+        }
       }
 
-      const i = p.input || {};
+      // Nave apagada por EMP → sin propulsión ni giro (queda a la deriva)
+      const i = p.empDisabled ? { inertiaDamp: false } : (p.input || {});
 
       // En DAMP con nave parada, giro hasta 1.5× más ágil
       const baseTurn = p.turnRateVal ?? CFG.TURN_RATE;
@@ -1112,9 +1350,10 @@ function update() {
       const b = room.bullets[i];
       for (const p of Object.values(room.players)) {
         if (p.dead || p.team === b.team || p.pilotingFor) continue;
-        // Swept test: comprueba el segmento recorrido este tick (prevPos → pos actual)
+        // Swept test: recorrido de la bala (prev→actual) contra la cápsula del casco
         const bPrevX = b.x - b.vx, bPrevY = b.y - b.vy;
-        if (distToSegment(p.x, p.y, bPrevX, bPrevY, b.x, b.y) < CFG.BULLET_RADIUS) {
+        const cap = shipCapsule(p);
+        if (segToSegDist(bPrevX, bPrevY, b.x, b.y, cap.rx, cap.ry, cap.fx, cap.fy) < cap.r + CFG.BULLET_RADIUS) {
           // Nave cubierta bajo asteroide flotante → bala bloqueada por el asteroide
           if (isSheltered(p.x, p.y, room.asteroids)) { room.bullets.splice(i, 1); break; }
           const dmg = b.damage ?? CFG.BULLET_DAMAGE;
@@ -1197,20 +1436,62 @@ function update() {
       const m = room.missiles[i];
       for (const p of Object.values(room.players)) {
         if (p.dead || p.team === m.team || p.pilotingFor) continue;
-        // Swept test con posición previa guardada
+        // Swept test con posición previa guardada, contra la cápsula del casco
         const mPrevX = m.prevX ?? m.x, mPrevY = m.prevY ?? m.y;
-        if (distToSegment(p.x, p.y, mPrevX, mPrevY, m.x, m.y) < CFG.MISSILE_RADIUS) {
+        const cap = shipCapsule(p);
+        const hitR = m.torpedo ? CFG.TORPEDO_RADIUS : CFG.MISSILE_RADIUS;
+        if (segToSegDist(mPrevX, mPrevY, m.x, m.y, cap.rx, cap.ry, cap.fx, cap.fy) < cap.r + hitR) {
           // Nave cubierta bajo asteroide flotante → misil bloqueado
           if (isSheltered(p.x, p.y, room.asteroids)) { room.missiles.splice(i, 1); break; }
           const attacker = room.players[m.ownerId];
           const missileAngle = Math.atan2(m.y - p.y, m.x - p.x);
-          applyDamage(p, CFG.MISSILE_DAMAGE, attacker, missileAngle);
+          const dmg = m.torpedo ? CFG.TORPEDO_DAMAGE : CFG.MISSILE_DAMAGE;
+          applyDamage(p, dmg, attacker, missileAngle);
           if (attacker) updateDamageLog(p, attacker.id);
-          if (p.hp <= 0) killPlayer(p, attacker || null, "missile", room);
+          if (p.hp <= 0) killPlayer(p, attacker || null, m.torpedo ? "torpedo" : "missile", room);
           room.missiles.splice(i, 1);
           break;
         }
       }
+    }
+
+    // ── Beams (rayo de la Capital): solo efecto visual, el daño ya se aplicó al disparar
+    room.beams = (room.beams || []).filter(b => { b.life--; return b.life > 0; });
+
+    // ── Ondas EMP (solo visual; el apagado ya se aplicó al disparar)
+    room.empPulses = (room.empPulses || []).filter(e => { e.life--; return e.life > 0; });
+
+    // ── Minas: se arman, expiran y explotan al pasar un enemigo por encima
+    for (let i = room.mines.length - 1; i >= 0; i--) {
+      const mine = room.mines[i];
+      if (mine.arm > 0) mine.arm--;
+      mine.life--;
+      if (mine.life <= 0) { room.mines.splice(i, 1); continue; }
+      if (mine.arm > 0) continue;   // aún no armada
+      // ¿Enemigo dentro del radio de disparo?
+      const trigger = Object.values(room.players).find(p =>
+        !p.dead && p.team !== mine.team && !p.pilotingFor &&
+        Math.hypot(p.x - mine.x, p.y - mine.y) <= CFG.MINE_TRIGGER_RADIUS);
+      if (!trigger) continue;
+      // Explosión: daño en área que decae con la distancia
+      const attacker = room.players[mine.ownerId];
+      for (const p of Object.values(room.players)) {
+        if (p.dead || p.team === mine.team || p.pilotingFor) continue;
+        const dist = Math.hypot(p.x - mine.x, p.y - mine.y);
+        if (dist > CFG.MINE_BLAST_RADIUS) continue;
+        const dmg = CFG.MINE_DAMAGE * (1 - dist / CFG.MINE_BLAST_RADIUS);
+        const ang = Math.atan2(mine.y - p.y, mine.x - p.x);
+        applyDamage(p, dmg, attacker, ang);
+        if (attacker) updateDamageLog(p, attacker.id);
+        if (p.hp <= 0) killPlayer(p, attacker || null, "mine", room);
+      }
+      // Marca para efecto visual de explosión (reutiliza empPulses en blanco/naranja)
+      room.empPulses.push({
+        id: Date.now() + Math.random(),
+        x: mine.x, y: mine.y, r: CFG.MINE_BLAST_RADIUS, team: mine.team,
+        life: CFG.EMP_PULSE_LIFE, maxLife: CFG.EMP_PULSE_LIFE, blast: true,
+      });
+      room.mines.splice(i, 1);
     }
 
     // ── Flares
@@ -1259,6 +1540,9 @@ function update() {
       players:   room.players,
       bullets:   room.bullets,
       missiles:  room.missiles,
+      beams:     room.beams || [],
+      empPulses: room.empPulses || [],
+      mines:     room.mines || [],
       flare:     room.flare || [],
       asteroids: room.asteroids,
       winner:    room.winner,

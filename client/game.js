@@ -10,6 +10,7 @@ const DEFAULT_BINDINGS = {
   shoot: "e",
   missile: "q",
   flare: "f",
+  special: "x",
   respawn: "r",
   scan: "c",
   inertiaDamp: "z",
@@ -23,6 +24,7 @@ const BINDING_LABELS = {
   shoot: "Disparar (teclado)",
   missile: "Misil (teclado)",
   flare: "Bengala",
+  special: "Habilidad especial (EMP / mina)",
   respawn: "Reaparecer",
   scan: "Escaneo radar",
   inertiaDamp: "Toggle inercia",
@@ -227,25 +229,44 @@ const SHIP_SHAPES = {
     shieldR: 58,
   },
 
-  capital: {
+  emp: {
+    // Triángulo ancho y corto con el pico en el morro (+x = proa)
     body: [
-      [42, 0],
-      [32, -14], [18, -28], [4, -42], [-12, -52],
-      [-28, -50], [-38, -38], [-44, -22],
-      [-48, 0],
-      [-44, 22], [-38, 38],
-      [-28, 50], [-12, 52],
-      [4, 42], [18, 28], [32, 14],
+      [24, 0],            // pico (morro)
+      [-14, -40],         // ala babor (muy ancha)
+      [-6, 0],            // muesca trasera central (motor)
+      [-14, 40],          // ala estribor
     ],
-    engine: [[-48, -24], [-64, 0], [-48, 24]],
-    hpBarW: 130,
-    uiOffY: -62,
-    shieldR: 72,
+    engine: [[-14, -9], [-28, 0], [-14, 9]],
+    hpBarW: 70,
+    uiOffY: -50,
+    shieldR: 46,
+  },
+
+  capital: {
+    // Silueta tipo Idris: proa estrecha y puntiaguda (+x) que se ensancha
+    // progresivamente hacia la popa, donde está el ancho bloque de motores.
+    body: [
+      [85, 0],                                   // proa (punta estrecha)
+      [73, -7], [60, -13], [44, -19],            // morro afilado
+      [26, -27], [6, -35], [-16, -43],           // casco ensanchándose
+      [-38, -46], [-56, -43],                    // sección más ancha (popa)
+      [-67, -35], [-73, -37],                    // góndola de motor (estribor)
+      [-78, -20], [-78, 0], [-78, 20],           // bloque trasero
+      [-73, 37], [-67, 35],                      // góndola de motor (babor)
+      [-56, 43], [-38, 46],                      // sección más ancha (popa)
+      [-16, 43], [6, 35], [26, 27],              // casco estrechándose
+      [44, 19], [60, 13], [73, 7],               // morro afilado
+    ],
+    engine: [[-78, -24], [-98, 0], [-78, 24]],
+    hpBarW: 170,
+    uiOffY: -60,
+    shieldR: 90,
     // Posiciones de las 3 torretas en coordenadas locales de nave
     turretHardpoints: [
-      [12, -36],   // torreta izquierda
-      [12,  36],   // torreta derecha
-      [-32,  0],   // torreta trasera
+      [20, -24],   // torreta de proa izquierda
+      [20, 24],   // torreta de proa derecha
+      [-48, 0],   // torreta trasera
     ],
   },
 };
@@ -334,6 +355,10 @@ let roomData = null;
 
 let players = {};
 let bullets = [];
+let beams = [];
+let empPulses = [];
+let mines = [];
+let prevPulseIds = new Set();   // para sonar el EMP/explosión solo en pulsos nuevos
 let asteroids = [];
 
 let targetId = null;
@@ -497,24 +522,35 @@ function initAjustesPane() {
   if (ajustesReady) return;
   ajustesReady = true;
 
-  const masterSlider = document.getElementById("volMaster");
-  const masterVal = document.getElementById("volMasterVal");
+  const effectsSlider = document.getElementById("volEffects");
+  const effectsVal = document.getElementById("volEffectsVal");
   const musicSlider = document.getElementById("volMusic");
   const musicVal = document.getElementById("volMusicVal");
+  const muteBtn = document.getElementById("muteBtn");
+  const trackSel = document.getElementById("musicTrackSel");
 
-  const savedMaster = parseFloat(localStorage.getItem("vol_master") ?? "0.8");
+  const savedEffects = parseFloat(localStorage.getItem("vol_effects") ?? "0.8");
   const savedMusic = parseFloat(localStorage.getItem("vol_music") ?? "0.5");
+  const savedTrack = localStorage.getItem("music_track") ?? "A";
+  const savedMuted = localStorage.getItem("audio_muted") === "1";
 
-  masterSlider.value = savedMaster;
-  masterVal.textContent = Math.round(savedMaster * 100) + "%";
+  effectsSlider.value = savedEffects;
+  effectsVal.textContent = Math.round(savedEffects * 100) + "%";
   musicSlider.value = savedMusic;
   musicVal.textContent = Math.round(savedMusic * 100) + "%";
+  trackSel.value = savedTrack;
 
-  masterSlider.addEventListener("input", () => {
-    const v = parseFloat(masterSlider.value);
-    masterVal.textContent = Math.round(v * 100) + "%";
-    setMasterVolume(v);
-    localStorage.setItem("vol_master", v);
+  function refreshMuteBtn() {
+    muteBtn.textContent = savedMutedState() ? "🔇 Silenciado" : "🔊 Sonido";
+    muteBtn.classList.toggle("muted", savedMutedState());
+  }
+  function savedMutedState() { return localStorage.getItem("audio_muted") === "1"; }
+
+  effectsSlider.addEventListener("input", () => {
+    const v = parseFloat(effectsSlider.value);
+    effectsVal.textContent = Math.round(v * 100) + "%";
+    setEffectsVolume(v);
+    localStorage.setItem("vol_effects", v);
   });
 
   musicSlider.addEventListener("input", () => {
@@ -524,13 +560,30 @@ function initAjustesPane() {
     localStorage.setItem("vol_music", v);
   });
 
+  trackSel.addEventListener("change", () => {
+    localStorage.setItem("music_track", trackSel.value);
+    setMusicTrack(trackSel.value);
+  });
+
+  muteBtn.addEventListener("click", () => {
+    const next = !savedMutedState();
+    localStorage.setItem("audio_muted", next ? "1" : "0");
+    setMuted(next);
+    refreshMuteBtn();
+  });
+
+  refreshMuteBtn();
 }
 
 function applyStoredVolumes() {
-  const master = parseFloat(localStorage.getItem("vol_master") ?? "0.8");
+  const effects = parseFloat(localStorage.getItem("vol_effects") ?? "0.8");
   const music = parseFloat(localStorage.getItem("vol_music") ?? "0.5");
-  setMasterVolume(master);
+  const track = localStorage.getItem("music_track") ?? "A";
+  const isMutedStored = localStorage.getItem("audio_muted") === "1";
+  setEffectsVolume(effects);
   setMusicVolume(music);
+  setMusicTrack(track);
+  setMuted(isMutedStored);
 }
 
 function updateMobiglass() {
@@ -751,10 +804,10 @@ document.addEventListener("contextmenu", e => e.preventDefault());
 let weaponHeat = 0;          // 0..100
 let mouseLeftHeld = false;
 let weaponFireTimer = null;
-const HEAT_PER_SHOT   = 12;  // calor por disparo (click individual = 0 penalización acumulada)
-const HEAT_DECAY_MS   = 30;  // ms por tick de enfriamiento
-const HEAT_DECAY_AMT  = 2;   // calor que baja por tick
-const BASE_FIRE_MS    = 130; // intervalo base (ms) al mantener pulsado
+const HEAT_PER_SHOT = 12;  // calor por disparo (click individual = 0 penalización acumulada)
+const HEAT_DECAY_MS = 30;  // ms por tick de enfriamiento
+const HEAT_DECAY_AMT = 2;   // calor que baja por tick
+const BASE_FIRE_MS = 130; // intervalo base (ms) al mantener pulsado
 
 function fireWeapon() {
   const me = getMe();
@@ -777,6 +830,27 @@ function stopAutoFire() {
   if (weaponFireTimer) { clearTimeout(weaponFireTimer); weaponFireTimer = null; }
 }
 
+// ── Rayo de la Capital: mantener pulsado para cargar, soltar para disparar
+let beamHeld = false;
+function isCapitalPilot() {
+  const me = getMe();
+  return !!(me && !me.dead && me.shipType === "capital" && !me.pilotingFor);
+}
+function startBeamCharge() {
+  if (beamHeld) return;            // ignora repetición de tecla
+  beamHeld = true;
+  ws.send(JSON.stringify({ type: "beamCharge", charging: true }));
+}
+function releaseBeamCharge() {
+  if (!beamHeld) return;
+  beamHeld = false;
+  const me = getMe();
+  if (me && (me.beamCharge ?? 0) >= 0.999) playBeamFireSound();  // solo si llegó a disparar
+  ws.send(JSON.stringify({ type: "beamCharge", charging: false }));
+}
+let beamWasReady = false;     // para sonar el aviso eléctrico al quedar listo el rayo
+let abilityWasReady = true;   // idem para la habilidad [X] (arranca lista → sin aviso inicial)
+
 // Enfriamiento pasivo de arma
 setInterval(() => {
   if (weaponHeat > 0) weaponHeat = Math.max(0, weaponHeat - HEAT_DECAY_AMT);
@@ -787,6 +861,7 @@ canvas.addEventListener("mousedown", e => {
   const me = getMe();
   if (!me || me.dead) return;
   if (e.button === 0) {
+    if (isCapitalPilot()) { startBeamCharge(); return; }
     stopAutoFire();
     mouseLeftHeld = true;
     fireWeapon();
@@ -797,10 +872,10 @@ canvas.addEventListener("mousedown", e => {
 });
 
 canvas.addEventListener("mouseup", e => {
-  if (e.button === 0) stopAutoFire();
+  if (e.button === 0) { releaseBeamCharge(); stopAutoFire(); }
 });
 
-canvas.addEventListener("mouseleave", () => stopAutoFire());
+canvas.addEventListener("mouseleave", () => { releaseBeamCharge(); stopAutoFire(); });
 
 // ── Spectator
 function cycleSpectator() {
@@ -1043,6 +1118,18 @@ ws.onmessage = e => {
     });
 
     // Non-interpolated state: apply immediately
+    beams = data.beams || [];
+    empPulses = data.empPulses || [];
+    mines = data.mines || [];
+    // Sonido al aparecer una onda EMP / explosión de mina nueva
+    const seen = new Set();
+    empPulses.forEach(e => {
+      seen.add(e.id);
+      if (!prevPulseIds.has(e.id)) {
+        if (e.blast) playExplosionSound(); else playEmpSound();
+      }
+    });
+    prevPulseIds = seen;
     asteroids = data.asteroids || [];
     world = data.world || world;
     winner = data.winner;
@@ -1070,7 +1157,7 @@ function renderRooms(list) {
     const canJoin = !playing || room.allowJoinMidGame;
 
     const sizeLabels = { small: "3K", medium: "6K", large: "10K", huge: "15K" };
-    const sizeLabel  = sizeLabels[room.worldSize] || "6K";
+    const sizeLabel = sizeLabels[room.worldSize] || "6K";
     let statusText = playing ? "EN PARTIDA" : "EN ESPERA";
     if (playing && room.allowJoinMidGame) statusText = "EN PARTIDA · ABIERTA";
     statusText += ` · ${sizeLabel}`;
@@ -1109,7 +1196,7 @@ function speedRating(mult) {
 function radarRating(sig) {
   if (sig >= 3000) return "+++";   // muy visible
   if (sig >= 1500) return "++";
-  if (sig >= 800)  return "+";
+  if (sig >= 800) return "+";
   return "−−";                     // firma baja = difícil de detectar
 }
 
@@ -1120,10 +1207,10 @@ function buildShipCards(ships) {
   }
 
   const vals = Object.values(ships);
-  const maxHp     = Math.max(...vals.map(s => s.maxHp));
-  const maxSpeed  = Math.max(...vals.map(s => s.thrustMult));
-  const maxMsl    = Math.max(...vals.map(s => s.maxMissiles));
-  const maxRadar  = Math.max(...vals.map(s => s.radarSignature));
+  const maxHp = Math.max(...vals.map(s => s.maxHp));
+  const maxSpeed = Math.max(...vals.map(s => s.thrustMult));
+  const maxMsl = Math.max(...vals.map(s => s.maxMissiles));
+  const maxRadar = Math.max(...vals.map(s => s.radarSignature));
   const maxShield = Math.max(...vals.map(s => s.maxShield ?? 0));
 
   function segs(value, max, invert = false, n = 10) {
@@ -1139,7 +1226,7 @@ function buildShipCards(ships) {
     btn.className = "shipCard" + (type === "fighter" ? " selected" : "");
     btn.dataset.type = type;
     const mslDisplay = ship.crewCapacity > 1 ? `${ship.maxMissiles}+20` : ship.maxMissiles;
-    const velDisplay  = Math.round(ship.thrustMult * 100) + "%";
+    const velDisplay = Math.round(ship.thrustMult * 100) + "%";
     btn.innerHTML = `
       <canvas class="shipPreview" id="${previewIdPrefix}${type}" width="90" height="54"></canvas>
       <div class="shipCardName">${ship.label || type.toUpperCase()}</div>
@@ -1204,12 +1291,12 @@ function renderPlayers() {
     hostBar.id = "hostBar";
     const mjOn = roomData.allowJoinMidGame;
     const ebOn = roomData.enforceBalance;
-    const ws_  = roomData.worldSize || "medium";
+    const ws_ = roomData.worldSize || "medium";
     const SIZES = [
-      { key: "small",  label: "Pequeño 3K",  sub: "15 ast."  },
-      { key: "medium", label: "Medio 6K",    sub: "40 ast."  },
-      { key: "large",  label: "Grande 10K",  sub: "80 ast."  },
-      { key: "huge",   label: "Enorme 15K",  sub: "130 ast." },
+      { key: "small", label: "Pequeño 3K", sub: "15 ast." },
+      { key: "medium", label: "Medio 6K", sub: "40 ast." },
+      { key: "large", label: "Grande 10K", sub: "80 ast." },
+      { key: "huge", label: "Enorme 15K", sub: "130 ast." },
     ];
     hostBar.innerHTML = `
       <div class="hostToggleRow">
@@ -1319,7 +1406,7 @@ function renderPlayers() {
         const slotDiv = document.createElement("div");
         slotDiv.className = "crewSlot";
         const gunner = gid ? roomData.players[gid] : null;
-        const isMe   = gid === myId;
+        const isMe = gid === myId;
 
         if (gunner) {
           slotDiv.innerHTML = `
@@ -1412,8 +1499,12 @@ addEventListener("keydown", e => {
 
   // Fallback teclado: shoot / missile
   if (bindings.shoot && key === bindings.shoot) {
-    ws.send(JSON.stringify({ type: "shoot" }));
-    playShootSound();
+    if (isCapitalPilot()) {
+      startBeamCharge();
+    } else {
+      ws.send(JSON.stringify({ type: "shoot" }));
+      playShootSound();
+    }
   }
   if (bindings.missile && key === bindings.missile && targetId) {
     ws.send(JSON.stringify({ type: "missile", targetId }));
@@ -1451,6 +1542,14 @@ addEventListener("keydown", e => {
     ws.send(JSON.stringify({ type: "flare" }));
   }
 
+  // Habilidad especial (EMP del Disruptor / mina del Interceptor)
+  if (bindings.special && key === bindings.special) {
+    const meNow = getMe();
+    if (meNow && !meNow.dead && !meNow.pilotingFor) {
+      ws.send(JSON.stringify({ type: "special" }));
+    }
+  }
+
   if (e.key === "F1") {
     e.preventDefault();
     initAudio();
@@ -1476,6 +1575,7 @@ addEventListener("keyup", e => {
 
   if (e.key === "Tab") showScoreboard = false;
   if (e.key === "Delete" && sdState === "charging") cancelSd();
+  if (bindings.shoot && e.key.toLowerCase() === bindings.shoot && beamHeld) releaseBeamCharge();
 });
 
 const CFG_RESPAWN_DELAY = 5; // debe coincidir con server config RESPAWN_DELAY
@@ -1483,7 +1583,17 @@ const CFG_RESPAWN_DELAY = 5; // debe coincidir con server config RESPAWN_DELAY
 setInterval(() => {
   if (hud.classList.contains("hidden")) return;
   const me = getMe();
-  if (!me || me.dead) return;
+  if (!me || me.dead) { beamHeld = false; beamWasReady = false; abilityWasReady = true; return; }  // evita carga "atascada" tras morir
+  // Aviso eléctrico al quedar el rayo totalmente cargado (solo en el flanco de subida)
+  const beamReady = me.shipType === "capital" && (me.beamCharge ?? 0) >= 0.999;
+  if (beamReady && !beamWasReady) playBeamReadySound();
+  beamWasReady = beamReady;
+  // Aviso al quedar lista la habilidad [X] (EMP / mina), solo en el flanco de subida
+  const hasAbility = !me.pilotingFor && (me.shipType === "emp" || me.shipType === "interceptor");
+  const abilityCd = me.shipType === "emp" ? (me.empCooldown ?? 0) : (me.mineCooldown ?? 0);
+  const abilityReady = hasAbility && abilityCd <= 0;
+  if (abilityReady && !abilityWasReady) playAbilityReadySound();
+  abilityWasReady = abilityReady;
   const targetAngle = Math.atan2(mouseY - canvas.height / 2, mouseX - canvas.width / 2);
   ws.send(JSON.stringify({
     type: "input",
@@ -1691,8 +1801,8 @@ function getAsteroidProps(ast) {
   const pts = [];
   for (let i = 0; i < numPts; i++) {
     const baseAngle = (i / numPts) * Math.PI * 2;
-    const jitter    = (rand() - 0.5) * (Math.PI * 2 / numPts) * 0.55;
-    const r         = ast.r * (0.52 + rand() * 0.48);
+    const jitter = (rand() - 0.5) * (Math.PI * 2 / numPts) * 0.55;
+    const r = ast.r * (0.52 + rand() * 0.48);
     pts.push([Math.cos(baseAngle + jitter) * r, Math.sin(baseAngle + jitter) * r]);
   }
 
@@ -1725,7 +1835,7 @@ function drawOneAsteroid(a, camX, camY) {
   // Sombra proyectada para asteroides flotantes (z=1)
   if (isAbove) {
     ctx.shadowColor = 'rgba(0,0,0,0.75)';
-    ctx.shadowBlur  = 16;
+    ctx.shadowBlur = 16;
     ctx.shadowOffsetX = 6;
     ctx.shadowOffsetY = 8;
   }
@@ -1740,20 +1850,20 @@ function drawOneAsteroid(a, camX, camY) {
   const hlX = -a.r * 0.28;
   const hlY = -a.r * 0.32;
   const grad = ctx.createRadialGradient(hlX, hlY, a.r * 0.05, 0, 0, a.r);
-  grad.addColorStop(0,    pal.hi);
+  grad.addColorStop(0, pal.hi);
   grad.addColorStop(0.55, pal.fill);
-  grad.addColorStop(1,    pal.lo);
+  grad.addColorStop(1, pal.lo);
   ctx.fillStyle = grad;
   ctx.fill();
 
   // Apagar sombra para el trazo
-  ctx.shadowColor    = 'transparent';
-  ctx.shadowBlur     = 0;
-  ctx.shadowOffsetX  = 0;
-  ctx.shadowOffsetY  = 0;
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
 
   ctx.strokeStyle = isBelow ? '#1c1c1c' : isAbove ? '#585858' : pal.stroke;
-  ctx.lineWidth   = isAbove ? 1.2 : isBelow ? 0.5 : 0.8;
+  ctx.lineWidth = isAbove ? 1.2 : isBelow ? 0.5 : 0.8;
   ctx.stroke();
 
   ctx.restore();
@@ -1804,14 +1914,14 @@ function drawShip(player, camX, camY) {
     // Gradiente radial descentrado → sensación de volumen (como asteroides)
     const sR = shape.shieldR ?? 42;
     const isGreen = player.team === "green";
-    const hiColor  = isGreen ? "#99ffcc" : "#ff99aa";
+    const hiColor = isGreen ? "#99ffcc" : "#ff99aa";
     const midColor = isGreen ? "#00ff88" : "#ff3355";
-    const loColor  = isGreen ? "#003820" : "#220010";
+    const loColor = isGreen ? "#003820" : "#220010";
     const grad = ctx.createRadialGradient(-sR * 0.28, -sR * 0.32, sR * 0.04,
-                                           0,           0,          sR * 0.9);
-    grad.addColorStop(0,    hiColor);
+      0, 0, sR * 0.9);
+    grad.addColorStop(0, hiColor);
     grad.addColorStop(0.45, midColor);
-    grad.addColorStop(1,    loColor);
+    grad.addColorStop(1, loColor);
     ctx.fillStyle = grad;
   }
   ctx.fill();
@@ -1877,6 +1987,110 @@ function drawShip(player, camX, camY) {
     ctx.restore();
   }
 
+  // ── EMP: chispas rojas envolviendo a la nave impactada por el rayo de la Capital
+  const emp = player.emp ?? 0;
+  if (!player.dead && emp > 0.01) {
+    const R = shape.shieldR ?? 60;
+    ctx.save();
+    // Resplandor rojo
+    ctx.globalAlpha = 0.10 + 0.25 * emp;
+    const g = ctx.createRadialGradient(0, 0, R * 0.45, 0, 0, R * 1.3);
+    g.addColorStop(0,   "#ffffff00");
+    g.addColorStop(0.7, "#ff222266");
+    g.addColorStop(1,   "#ffffff00");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, R * 1.3, 0, Math.PI * 2); ctx.fill();
+
+    // Arcos eléctricos rojos serpenteando alrededor del casco
+    const arcs = Math.round(2 + emp * 6);
+    ctx.strokeStyle = "#ff5566";
+    ctx.lineWidth = 1.4;
+    ctx.globalAlpha = 0.45 + 0.55 * emp;
+    for (let k = 0; k < arcs; k++) {
+      const a0 = Math.random() * Math.PI * 2;
+      const segs = 5;
+      ctx.beginPath();
+      for (let i = 0; i <= segs; i++) {
+        const ang = a0 + (i / segs) * (0.6 + Math.random() * 0.5);
+        const rr = R * (0.95 + (Math.random() - 0.5) * 0.5);
+        const x = Math.cos(ang) * rr, y = Math.sin(ang) * rr;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Chispas radiales
+    ctx.globalAlpha = 0.3 + 0.6 * emp;
+    ctx.strokeStyle = "#ffaaaa";
+    ctx.lineWidth = 1.3;
+    for (let k = 0; k < 5; k++) {
+      const ang = Math.random() * Math.PI * 2;
+      const r0 = R * 0.5, r1 = R * (1.1 + Math.random() * 0.35);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(ang) * r0, Math.sin(ang) * r0);
+      ctx.lineTo(Math.cos(ang) * r1, Math.sin(ang) * r1);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── Carga del rayo (Capital): efecto pequeño concentrado en la punta (proa)
+  const charge = player.beamCharge ?? 0;
+  if (!player.dead && player.shipType === "capital" && charge > 0.02) {
+    const nose = shape.body[0];            // vértice frontal del casco
+    const isGreen = player.team === "green";
+    const col = isGreen ? "#00ff88" : "#ff3355";
+    const hi  = isGreen ? "#aaffdd" : "#ffd0dd";
+    const full = charge >= 0.99;
+    const now = performance.now();
+    const baseR = 6 + charge * 9;          // orbe pequeño que crece con la carga
+
+    ctx.save();
+    ctx.translate(nose[0], nose[1]);
+
+    // Orbe de energía
+    const pulse = full ? 0.7 + 0.3 * Math.sin(now / 45) : 1;
+    const orbR = baseR * pulse;
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, orbR);
+    g.addColorStop(0,   "#ffffff");
+    g.addColorStop(0.5, col);
+    g.addColorStop(1,   "#ffffff00");
+    ctx.globalAlpha = 0.55 + 0.45 * charge;
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, orbR, 0, Math.PI * 2); ctx.fill();
+
+    // Anillo de progreso de carga → lectura clara de cuánto falta
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = full ? "#ffffff" : hi;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, baseR + 5, -Math.PI / 2, -Math.PI / 2 + charge * Math.PI * 2);
+    ctx.stroke();
+
+    // Pequeñas chispas alrededor del orbe
+    const sparks = Math.round(2 + charge * 4);
+    ctx.strokeStyle = hi;
+    ctx.lineWidth = 1.1;
+    ctx.globalAlpha = 0.5 + 0.5 * charge;
+    for (let k = 0; k < sparks; k++) {
+      const a0 = Math.random() * Math.PI * 2;
+      const r0 = orbR * 0.7, r1 = orbR * (1.2 + Math.random() * 0.6);
+      const a1 = a0 + (Math.random() - 0.5) * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a0) * r0, Math.sin(a0) * r0);
+      ctx.lineTo(Math.cos(a1) * r1, Math.sin(a1) * r1);
+      ctx.stroke();
+    }
+
+    // Destello blanco parpadeante al estar listo
+    if (full) {
+      ctx.globalAlpha = 0.5 + 0.5 * Math.sin(now / 45);
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(0, 0, baseR * 0.55, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // Engine glow (only when alive)
   if (!player.dead) {
     ctx.beginPath();
@@ -1913,15 +2127,15 @@ function drawShip(player, camX, camY) {
   // ── 3 Torretas de la Capital (posiciones fijas en el casco, ángulo independiente)
   if (player.shipType === "capital" && !player.dead) {
     const hardpoints = shape.turretHardpoints || [];
-    const gunnerIds  = player.gunnerIds || [];
-    const angles     = player.turretAngles || {};
-    const tColor     = player.team === "green" ? "#007744" : "#881122";
+    const gunnerIds = player.gunnerIds || [];
+    const angles = player.turretAngles || {};
+    const tColor = player.team === "green" ? "#007744" : "#881122";
     const cosA = Math.cos(player.angle);
     const sinA = Math.sin(player.angle);
 
     hardpoints.forEach((hp, idx) => {
       const hasGunner = !!(gunnerIds[idx]);
-      const tAngle    = hasGunner ? (angles[gunnerIds[idx]] ?? 0) : 0;
+      const tAngle = hasGunner ? (angles[gunnerIds[idx]] ?? 0) : 0;
       // Transformar hardpoint a coordenadas de pantalla
       const sx = pos.x + hp[0] * cosA - hp[1] * sinA;
       const sy = pos.y + hp[0] * sinA + hp[1] * cosA;
@@ -2061,6 +2275,113 @@ function drawBullets(camX, camY) {
 
 }
 
+// Rayo de la Capital: línea brillante con halo y chispas eléctricas, se desvanece.
+function drawBeams(camX, camY) {
+  beams.forEach(b => {
+    const a = worldToScreen(b.x1, b.y1, camX, camY);
+    const c = worldToScreen(b.x2, b.y2, camX, camY);
+    const frac = Math.max(0, (b.life ?? 0) / (b.maxLife || 1));
+    const col = b.team === "green" ? "#00ff88" : "#ff3355";
+
+    ctx.save();
+    ctx.lineCap = "round";
+    // Halo exterior
+    ctx.globalAlpha = 0.22 * frac;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 20 * frac + 6;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+    // Cuerpo
+    ctx.globalAlpha = 0.6 * frac;
+    ctx.lineWidth = 9 * frac + 3;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+    // Núcleo blanco
+    ctx.globalAlpha = 0.95 * frac;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 3 * frac + 1.5;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+    // Chispas eléctricas serpenteando a lo largo del rayo
+    const dx = c.x - a.x, dy = c.y - a.y;
+    const nl = Math.hypot(dx, dy) || 1;
+    const nx = -dy / nl, ny = dx / nl;
+    ctx.globalAlpha = 0.85 * frac;
+    ctx.strokeStyle = b.team === "green" ? "#cfffe6" : "#ffd6e0";
+    ctx.lineWidth = 1.5;
+    const segs = 12;
+    ctx.beginPath();
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const j = (i === 0 || i === segs) ? 0 : (Math.random() - 0.5) * 16;
+      const px = a.x + dx * t + nx * j;
+      const py = a.y + dy * t + ny * j;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+// Onda expansiva del pulso EMP (rojo) y de la explosión de mina (naranja).
+function drawEmpPulses(camX, camY) {
+  empPulses.forEach(e => {
+    const pos = worldToScreen(e.x, e.y, camX, camY);
+    const frac = Math.max(0, (e.life ?? 0) / (e.maxLife || 1));
+    const prog = 1 - frac;                 // 0→1 a medida que se expande
+    const radius = e.r * prog;
+    const col = e.blast ? "255,150,40" : "255,40,60";
+    ctx.save();
+    // Anillo de choque
+    ctx.globalAlpha = frac * 0.8;
+    ctx.strokeStyle = `rgba(${col},1)`;
+    ctx.lineWidth = 4 * frac + 1;
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2); ctx.stroke();
+    // Relleno tenue
+    ctx.globalAlpha = frac * 0.15;
+    ctx.fillStyle = `rgba(${col},1)`;
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2); ctx.fill();
+    // Chispas radiales
+    ctx.globalAlpha = frac * 0.7;
+    ctx.strokeStyle = e.blast ? "#ffddaa" : "#ff8899";
+    ctx.lineWidth = 1.4;
+    for (let k = 0; k < 8; k++) {
+      const ang = (k / 8) * Math.PI * 2 + prog;
+      ctx.beginPath();
+      ctx.moveTo(pos.x + Math.cos(ang) * radius * 0.7, pos.y + Math.sin(ang) * radius * 0.7);
+      ctx.lineTo(pos.x + Math.cos(ang) * radius, pos.y + Math.sin(ang) * radius);
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+}
+
+// Minas: solo visibles para el propio equipo (sigilo). Disco parpadeante.
+function drawMines(camX, camY) {
+  const me = getMe();
+  const myTeam = me ? me.team : null;
+  const now = performance.now();
+  mines.forEach(mn => {
+    if (mn.team !== myTeam) return;        // ocultas a los enemigos
+    const pos = worldToScreen(mn.x, mn.y, camX, camY);
+    const armed = (mn.arm ?? 0) <= 0;
+    const blink = 0.5 + 0.5 * Math.sin(now / (armed ? 120 : 300));
+    const col = mn.team === "green" ? "#00ff88" : "#ff3355";
+    ctx.save();
+    // Cuerpo
+    ctx.fillStyle = "#161616";
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // Luz parpadeante (roja si aún no armada, color de equipo si armada)
+    ctx.globalAlpha = blink;
+    ctx.fillStyle = armed ? col : "#ffaa00";
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, 2.5, 0, Math.PI * 2); ctx.fill();
+    // Anillo tenue del radio de disparo (referencia para el dueño)
+    ctx.globalAlpha = 0.12;
+    ctx.strokeStyle = col;
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, 60, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  });
+}
+
 
 //MISILES
 // ── Cover helpers ─────────────────────────────
@@ -2121,10 +2442,12 @@ function drawMissiles(camX, camY) {
 
     const pos = worldToScreen(m.x, m.y, camX, camY);
     const angle = Math.atan2(m.vy, m.vx);
+    const s = m.torpedo ? 1.7 : 1;   // los torpedos son más grandes
 
     ctx.save();
     ctx.translate(pos.x, pos.y);
     ctx.rotate(angle);
+    ctx.scale(s, s);
 
     // Exhaust glow
     const grad = ctx.createRadialGradient(-7, 0, 0, -7, 0, 9);
@@ -2136,7 +2459,7 @@ function drawMissiles(camX, camY) {
     ctx.fill();
 
     // Body
-    ctx.fillStyle = "#ffcc44";
+    ctx.fillStyle = m.torpedo ? "#ff8844" : "#ffcc44";
     ctx.beginPath();
     ctx.ellipse(0, 0, 9, 3, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -2431,6 +2754,26 @@ function updateHUD(me) {
     }
   }
 
+  // Habilidad especial [X]: EMP (Disruptor) / mina (Interceptor)
+  const abilityRow = document.getElementById("abilityRow");
+  if (abilityRow) {
+    const hasAbility = !me.pilotingFor && (me.shipType === "emp" || me.shipType === "interceptor");
+    abilityRow.style.display = hasAbility ? "" : "none";
+    if (hasAbility) {
+      const isEmp = me.shipType === "emp";
+      const cd = isEmp ? (me.empCooldown ?? 0) : (me.mineCooldown ?? 0);
+      document.getElementById("abilityName").textContent = isEmp ? "EMP" : "MINA";
+      const cdEl = document.getElementById("abilityCd");
+      if (cd > 0) {
+        cdEl.textContent = Math.ceil(cd / 60) + "s";
+        cdEl.style.color = "#777";
+      } else {
+        cdEl.textContent = "LISTO";
+        cdEl.style.color = me.team === "green" ? "#00ff88" : "#ff5577";
+      }
+    }
+  }
+
   const alive =
     Object.values(players)
       .filter(p => !p.dead)
@@ -2466,10 +2809,10 @@ function loop() {
 
   // Auto-clear target lock si el objetivo se esconde bajo cobertura de asteroide
   if (targetId) {
-    const tgt  = players[targetId];
+    const tgt = players[targetId];
     const mePl = players[myId];
     if (!tgt || tgt.dead ||
-        (mePl && (isSheltered(tgt.x, tgt.y) || losBlocked(mePl.x, mePl.y, tgt.x, tgt.y)))) {
+      (mePl && (isSheltered(tgt.x, tgt.y) || losBlocked(mePl.x, mePl.y, tgt.x, tgt.y)))) {
       targetId = null;
     }
   }
@@ -2539,11 +2882,15 @@ function loop() {
   drawGrid(camX, camY);
   drawAsteroids(camX, camY, false); // z=0 y z=-1 (debajo de las naves)
 
+  drawMines(camX, camY);            // minas bajo las naves (solo equipo propio)
+
   Object.values(players).forEach(p => drawVelocityVector(p, camX, camY));
   Object.values(players).forEach(p => drawShip(p, camX, camY));
 
   drawParticles(ctx, camX, camY);
   drawBullets(camX, camY);
+  drawBeams(camX, camY);
+  drawEmpPulses(camX, camY);        // ondas EMP / explosiones de mina
   drawMissiles(camX, camY);
   drawFlares(camX, camY);
 
@@ -2582,6 +2929,17 @@ function loop() {
       }
       ctx.textAlign = "left";
     }
+
+    // Aviso de nave apagada por EMP
+    if (!me.dead && me.empDisabled) {
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = "bold 26px 'Courier New', monospace";
+      ctx.fillStyle = `rgba(255,70,90,${0.6 + 0.4 * Math.sin(performance.now() / 90)})`;
+      ctx.fillText("⚡ SISTEMAS APAGADOS", canvas.width / 2, canvas.height / 2 - 70);
+      ctx.restore();
+      ctx.textAlign = "left";
+    }
   }
 
   if (winner) {
@@ -2608,7 +2966,7 @@ function loop() {
 
     const sorted = Object.values(players).sort((a, b) => {
       if (a.team !== b.team) return a.team === winner ? -1 : 1;
-      return (b.kills||0) - (a.kills||0);
+      return (b.kills || 0) - (a.kills || 0);
     });
 
     ctx.font = "11px 'Courier New', monospace";
@@ -2620,10 +2978,10 @@ function loop() {
     sorted.forEach((p, i) => {
       ctx.fillStyle = p.team === "green" ? "#00ff88" : "#ff3355";
       const name = (p.name || "Pilot").slice(0, 12).padEnd(12);
-      const k    = String(p.kills   || 0).padStart(3);
-      const d    = String(p.deaths  || 0).padStart(3);
-      const a    = String(p.assists || 0).padStart(3);
-      const dmg  = String(Math.round(p.damageDealt || 0)).padStart(5);
+      const k = String(p.kills || 0).padStart(3);
+      const d = String(p.deaths || 0).padStart(3);
+      const a = String(p.assists || 0).padStart(3);
+      const dmg = String(Math.round(p.damageDealt || 0)).padStart(5);
       const me_m = p.id === myId ? " ◄" : "";
       ctx.fillText(name + "    " + k + " " + d + " " + a + " " + dmg + me_m, cx, cy - 6 + i * 24);
     });
@@ -2797,8 +3155,8 @@ function loop() {
 
   // ── Scoreboard (Tab mantenido)
   if (showScoreboard) {
-    const green = Object.values(players).filter(p => p.team === "green").sort((a,b)=>(b.kills||0)-(a.kills||0));
-    const red   = Object.values(players).filter(p => p.team === "red"  ).sort((a,b)=>(b.kills||0)-(a.kills||0));
+    const green = Object.values(players).filter(p => p.team === "green").sort((a, b) => (b.kills || 0) - (a.kills || 0));
+    const red = Object.values(players).filter(p => p.team === "red").sort((a, b) => (b.kills || 0) - (a.kills || 0));
     const maxRows = Math.max(green.length, red.length, 1);
     const rowH = 22, titleH = 44, teamH = 28, colH = 18;
     const bh = titleH + teamH + colH + maxRows * rowH + 14;
@@ -2830,16 +3188,16 @@ function loop() {
     ctx.fillText("MARCADOR  ·  Suelta Tab para cerrar", canvas.width / 2, by + 16);
 
     // Totales por equipo
-    const sum = (arr, key) => arr.reduce((s,p) => s + (p[key]||0), 0);
-    const gAlive = green.filter(p=>!p.dead).length;
-    const rAlive = red.filter(p=>!p.dead).length;
+    const sum = (arr, key) => arr.reduce((s, p) => s + (p[key] || 0), 0);
+    const gAlive = green.filter(p => !p.dead).length;
+    const rAlive = red.filter(p => !p.dead).length;
     ctx.font = "bold 11px 'Courier New', monospace";
     ctx.textAlign = "left";
     ctx.fillStyle = "#00ff88";
-    ctx.fillText(`▶ VERDE  ${gAlive}/${green.length} vivos  ${sum(green,"kills")}K  ${sum(green,"assists")}A  ${Math.round(sum(green,"damageDealt"))}dmg`, bx + 10, by + 34);
+    ctx.fillText(`▶ VERDE  ${gAlive}/${green.length} vivos  ${sum(green, "kills")}K  ${sum(green, "assists")}A  ${Math.round(sum(green, "damageDealt"))}dmg`, bx + 10, by + 34);
     ctx.fillStyle = "#ff3355";
     ctx.textAlign = "right";
-    ctx.fillText(`${sum(red,"kills")}K  ${sum(red,"assists")}A  ${Math.round(sum(red,"damageDealt"))}dmg  ${rAlive}/${red.length} vivos  ROJO ◀`, bx + bw - 10, by + 34);
+    ctx.fillText(`${sum(red, "kills")}K  ${sum(red, "assists")}A  ${Math.round(sum(red, "damageDealt"))}dmg  ${rAlive}/${red.length} vivos  ROJO ◀`, bx + bw - 10, by + 34);
 
     // Cabeceras de columna
     const hy = by + titleH + teamH + colH - 4;
@@ -2862,7 +3220,7 @@ function loop() {
     const rowStart = by + titleH + teamH + colH;
 
     [green, red].forEach((team, ti) => {
-      const lx = ti === 0 ? bx + 10    : bx + colW + 10;
+      const lx = ti === 0 ? bx + 10 : bx + colW + 10;
       const rx = ti === 0 ? bx + colW - 10 : bx + bw - 10;
       const tColor = ti === 0 ? "#00ff88" : "#ff3355";
 
@@ -2892,9 +3250,9 @@ function loop() {
         ctx.textAlign = "right";
         ctx.font = "11px 'Courier New', monospace";
         ctx.fillStyle = p.dead ? "#444" : "#9ab";
-        const k   = String(p.kills   || 0).padStart(2);
-        const d   = String(p.deaths  || 0).padStart(2);
-        const a   = String(p.assists || 0).padStart(2);
+        const k = String(p.kills || 0).padStart(2);
+        const d = String(p.deaths || 0).padStart(2);
+        const a = String(p.assists || 0).padStart(2);
         const dmg = String(Math.round(p.damageDealt || 0)).padStart(4);
         ctx.fillText(`${k}  ${d}  ${a}  ${dmg}`, rx, ry);
 
