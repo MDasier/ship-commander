@@ -1,28 +1,64 @@
 # Ship Commander
 
-> **Beta** — Juego de combate espacial multijugador en el navegador, creado para practicar combate en equipo al estilo Star Citizen.
+> **Beta** — Combate espacial multijugador en tiempo real para el navegador, inspirado en el dogfighting en equipo de Star Citizen.
 
-Combate espacial en tiempo real, en equipo, que funciona completamente en el navegador. Sin instalaciones, sin plugins — abre el cliente y vuela.
+Vuela, dispara y coordina con tu equipo directamente en el navegador. **Sin instalaciones, sin plugins, sin cuentas** — abre el cliente y al combate.
+
+**Lo esencial:**
+- 🛰 **Multijugador en tiempo real** con servidor autoritativo a 60 fps
+- 🚀 **6 naves** con armas, habilidades y roles distintos, incluidas **naves multitripuladas**
+- 🤝 **3 modos**: PvP por equipos, Co-op vs IA por oleadas y práctica en solitario
+- 🤖 **IA de combate** con oleadas escaladas hasta un jefe Capital
+- 🎛 **Panel de configuración en vivo** para ajustar todas las variables del juego
+- 🎨 Render Canvas 2D y **audio 100% procedural**, sin assets externos
+
+---
+
+## Tabla de contenidos
+
+- [Características](#características)
+- [Modos de juego](#modos-de-juego)
+- [Naves de Combate](#naves-de-combate)
+- [Stack Tecnológico](#stack-tecnológico)
+- [Inicio rápido](#inicio-rápido)
+- [Controles](#controles)
+- [Estructura del Proyecto](#estructura-del-proyecto)
+- [Arquitectura Técnica Detallada](#arquitectura-técnica-detallada)
 
 ---
 
 ## Características
 
 ### Gameplay
-- **Combate 2 equipos** — Verde vs Rojo, hasta 6 jugadores por sala
+- **Combate por equipos** — Verde vs Rojo, hasta 6 jugadores por sala
 - **Servidor autoritativo** — toda la física y las colisiones se ejecutan en el servidor; sin trampas desde el cliente
 - **6 tipos de nave** con stats y armas diferenciados (ver sección Naves)
 - **Naves multitripuladas** — Gunship (2) y Capital (4) llevan artilleros que controlan torretas independientes
-- **Misiles guiados** con guía proporcional, selección de objetivo con clic derecho y contramedidas de bengala
-- **Asteroides** como terreno con daño por colisión
+- **Misiles guiados** con guía proporcional, selección de objetivo con retículo de lock y contramedidas de bengala
+- **Asteroides** como terreno con daño por colisión y cobertura (rompen la línea de visión y el lock)
 - **Sistema de combustible** — regeneración pasiva lenta; empuje y retroceso consumen fuel
 - **Autodestrucción** — mantén Supr 2 s para iniciar cuenta atrás de 5 s; Supr de nuevo cancela
-- **Límite de tiempo** configurable por partida (por defecto 3 minutos); al acabar el tiempo gana el equipo con más supervivientes o más bajas, o empate
+- **Límite de tiempo** configurable por partida (por defecto 3 minutos)
+
+### Modos de juego
+
+El menú principal permite elegir cómo jugar:
+
+| Modo | Descripción | Vidas |
+|---|---|---|
+| **PvP por equipos** | Verde vs Rojo. Al acabar el tiempo gana el equipo con más supervivientes, más bajas o empate. | **Reaparición infinita** hasta que acaba el tiempo |
+| **Co-op vs IA (oleadas)** | Todos los jugadores en un equipo contra oleadas de naves controladas por IA, cada vez más difíciles hasta el jefe (Capital). El host lo activa con un interruptor en el lobby. La dificultad **escala con el número de jugadores**. | **3 vidas compartidas** de equipo |
+| **Práctica en solitario** | Sala privada para un jugador. Submodo **Vuelo libre** (escenario vacío para practicar controles y armas) o **Oleadas** (las mismas rondas de IA en solitario). Duración, tamaño de escenario y nave configurables. | Vuelo libre: infinitas · Oleadas: 3 |
+
+> En modo **Oleadas** se muestra en el HUD la oleada actual, los enemigos restantes y las vidas de equipo. Al superar la última oleada: *"¡OLEADAS SUPERADAS!"*; si el equipo agota sus vidas: *"HAS CAÍDO"*.
 
 ### Multijugador y Salas
+- **Menú principal** — punto de entrada con: Buscar partidas, Práctica en solitario, Ver controles y Apoyar el proyecto
 - Lobby con creación de sala, unirse, cambio de equipo y sistema de listo
+- **Opciones de host** — tamaño de escenario, equipos equilibrados, unirse en partida y **Co-op vs IA**
 - **Reinicio de sala** — el host puede reiniciar la partida sin disolver la sala
-- Nombres de piloto con persistencia via `localStorage`
+- **Reconexión automática** — si se pierde la conexión con el servidor, se muestra un overlay y se reintenta conectar sin recargar manualmente
+- Nombres de piloto con persistencia vía `localStorage` y confirmación visual al guardar
 - **Chat en partida** — pulsa Enter, escribe, Enter para enviar
 
 ### Naves de Combate
@@ -40,27 +76,37 @@ Los stats salen directamente de `server/config.js` (`SHIP_TYPES`). Velocidad/gir
 
 **Armas y habilidades por nave:**
 
-- **Interceptor** — cañón estándar + misiles. Habilidad **[X]: suelta minas** que explotan al pasar un enemigo cerca (hasta 4 activas, solo visibles para tu equipo).
+- **Interceptor** — cañón estándar + misiles. Habilidad **[X]: suelta minas** que explotan al pasar un enemigo cerca (hasta 4 activas, solo visibles para tu equipo). Cada mina muestra un **temporizador circular** de vida y el HUD lleva un indicador de las 4 ranuras con su tiempo restante.
 - **L.Fighter / Bomber** — cañón estándar + misiles guiados. El Bomber es un tanque lento con muchos misiles.
 - **Gunship** — cañón del piloto + **1 torreta de artillero** independiente. Necesita un 2.º jugador para tripular la torreta.
-- **Capital** — **sin cañón normal**; su arma principal es un **rayo de carga** ([clic]/[E] mantener ~1,25 s y soltar): hitscan muy potente (150 dmg) que aplica chispas EMP visuales. Lleva además **3 torretas** para 3 artilleros.
+- **Capital** — **sin cañón normal**; su arma principal es un **rayo de carga** ([clic]/[E] mantener ~1,25 s y soltar): hitscan muy potente (150 dmg) con efecto de impacto propio (nodo de energía + chispas eléctricas azul/blancas). Soltar el rayo por mouseleave/perder el foco lo **cancela** (no dispara). Lleva además **3 torretas** para 3 artilleros.
 - **Disruptor** — **sigilo extremo** (casi invisible en radar). Cañón débil (8 dmg) + **4 torpedos** (misil más grande, 90 dmg). Habilidad **[X]: pulso EMP en área** que *apaga* a los enemigos cercanos (motor + armas) durante 2-4 s.
 
-La **firma radar** determina a qué distancia los enemigos pueden verte en el radar y el HUD: el Disruptor y el Interceptor son casi invisibles hasta tenerlos encima; el Capital se detecta desde lejísimos.
+La **firma radar** determina a qué distancia los enemigos pueden verte en el radar y el HUD: el Disruptor y el Interceptor son casi invisibles hasta tenerlos encima; el Capital se detecta desde lejísimos. En el selector de naves, la barra **FIR** (firma) refleja esta señal.
+
+**Artilleros (torreteros).** En las naves multitripuladas (Gunship, Capital) un segundo jugador puede embarcarse como artillero y controlar una torreta independiente:
+- En el **lobby**, desde la lista de jugadores (plazas de torreta libres).
+- **En partida**, un jugador muerto puede elegir **reaparecer directamente en una torreta** aliada libre desde el panel de muerte.
+- Al reaparecer (tecla `R`) sin torreta reservada, el artillero es eyectado como caza independiente.
 
 Cada nave tiene una geometría canvas distinta definida en `client/game.js` (`SHIP_SHAPES`): aguja (Interceptor), delta (L.Fighter), ala volante (Bomber), casco ancho (Gunship), silueta alargada tipo Idris (Capital) y triángulo ancho y corto con el pico en la proa (Disruptor).
 
 ### HUD y UI
 - HP / Escudo / Combustible / Velocidad / K/D / Cooldown de misil en tiempo real
+- **Retículo de objetivo** — al lockear, un retículo estilo space-sim sobre el enemigo (anillo giratorio, corchetes de esquina y distancia). El lock se pierde automáticamente al morir, al esconderse el objetivo tras un asteroide o al romperse la línea de visión
 - **Indicador de habilidad [X]** — muestra `LISTO` o el cooldown restante del EMP (Disruptor) o la mina (Interceptor); suena un blip al quedar lista
+- **Temporizador de minas** — hasta 4 ranuras con anillo de carga circular y segundos restantes (Interceptor)
 - **Carga del rayo** (Capital) — orbe de energía en la proa con anillo de progreso y aviso eléctrico al estar listo; aviso "⚡ SISTEMAS APAGADOS" cuando un EMP te deja a la deriva
+- **HUD de oleadas** (modo Co-op / Práctica oleadas) — oleada actual, enemigos restantes, **vidas de equipo** (♥) y banner central al iniciar cada ronda
 - **Contador de partida** centrado en la parte superior (naranja en el último minuto, rojo parpadeante en los últimos 15 s)
 - **Kill feed** — con color de equipo, icono de arma, desaparece a los 5 s
 - **Modo espectador** — sigue a jugadores vivos con Tab tras morir
+- **Panel de muerte** — selector de nave para reaparecer, opción de **entrar de artillero** en una torreta aliada y botón de **salir al lobby**; indica reapariciones (∞ en PvP, vidas de equipo en oleadas)
+- **Overlay de reconexión** — pantalla central cuando se pierde la conexión, con reintento automático
 - **MobiGlass** (F1) inspirado en Star Citizen:
   - *PILOTO* — barras de integridad estructural, cuadrícula de stats, cooldown de misil
-  - *PARTIDA* — marcador por equipo, jugadores vivos
-  - *CONTROLES* — referencia completa de teclas
+  - *PARTIDA* — marcador por equipo, jugadores vivos y botón de **salir al lobby**
+  - *CONTROLES* — referencia completa de teclas (reasignables)
   - *AJUSTES* — botón mute, sliders independientes de **volumen de efectos** y **música**, y selector de **pista de música** (A ambiental / B con más presencia); todo guardado en localStorage
 
 ### Configuración en tiempo real
@@ -74,6 +120,7 @@ Un servidor HTTP independiente en el **puerto 8081** expone un panel admin web d
 - **Rayo de la Capital** (daño, tiempo de carga, alcance, anchura)
 - **EMP** (radio del pulso, cooldown, duración del apagado) y **minas** (cooldown, radio de disparo/explosión, daño, vida)
 - Bengalas (duración, radio, cooldown)
+- **IA / Dificultad** (modo oleadas) — velocidad, agilidad de giro, error de puntería y cadencia de disparo de los bots
 - Asteroides (umbral de impacto, factor de daño)
 
 Los cambios se aplican **inmediatamente** a las partidas en curso y se persisten en `server/config.json`.
@@ -84,11 +131,12 @@ Los cambios se aplican **inmediatamente** a las partidas en curso y se persisten
 - Screen shake al recibir daño o explosiones cercanas
 - Flash de impacto en naves dañadas
 - Misiles alargados con brillo de escape
-- Efectos del rayo de la Capital (haz con halo + chispas), pulso EMP (onda roja), minas y explosiones
+- Rayo de la Capital con haz, halo y chispas, y **efecto de impacto propio** (nodo de energía + descarga eléctrica azul/blanca en la nave golpeada, distinto del EMP)
+- Pulso EMP (onda roja), minas con temporizador y explosiones de partículas
 - Audio procedural via **Web Audio API** (sin archivos externos):
-  - **2 pistas de música** seleccionables (A: drone ambiental con pings; B: acorde apilado más brillante con pulso de bajo)
+  - **2 pistas de música** seleccionables (A: drone ambiental con pings; B: **Lo-Fi Chill arcade** — pad de acordes con warble de cinta, beat boom-bap relajado, bajo, melodía dispersa y crujido de vinilo)
   - Bus de audio: fuentes → (música | efectos) → mute → salida, con volúmenes independientes
-  - SFX: cañón, explosión, lanzamiento de misil, alarma de misil entrante, fanfarria de victoria, pitidos de autodestrucción, carga/disparo del rayo, EMP, blip de habilidad lista
+  - SFX: cañón, explosión, lanzamiento de misil, alarma de misil entrante, pitidos de autodestrucción, carga/disparo del rayo, EMP, blip de habilidad lista
 
 ---
 
@@ -165,13 +213,13 @@ Abre `http://localhost:8081` para acceder al panel admin y modificar cualquier v
 ```
 ship-commander/
 ├── client/
-│   ├── index.html      # Menú, HUD, MobiGlass, Game Over, selector de nave
-│   ├── game.js         # Cliente WebSocket, loop de renderizado, input, lógica UI
-│   ├── particles.js    # Campo de estrellas, sistema de partículas (explosiones, empuje)
+│   ├── index.html      # Menú principal, lobby, práctica, HUD, MobiGlass, Game Over, panel de muerte, overlay de reconexión
+│   ├── game.js         # Cliente WebSocket, loop de renderizado, input, IA de UI, navegación de menús
+│   ├── particles.js    # Campo de estrellas, sistema de partículas (explosiones, empuje, impacto del rayo)
 │   ├── sounds.js       # Música y efectos de sonido procedurales (Web Audio API)
-│   └── styles.css      # Todos los estilos UI
+│   └── styles.css      # Todos los estilos UI (convención: unidades rem, texto ≥ 16px)
 └── server/
-    ├── server.js       # Servidor autoritativo — física, colisiones, salas, timer
+    ├── server.js       # Servidor autoritativo — física, colisiones, salas, timer, IA de bots, oleadas
     ├── config.js       # Carga y exporta la configuración (con defaults y persistencia)
     ├── config.json     # Valores personalizados (generado automáticamente al guardar)
     ├── admin.html      # Panel admin web (servido en puerto 8081)
@@ -184,7 +232,11 @@ ship-commander/
 
 - **Servidor autoritativo a 60 fps** (`const FPS = 60`) — los clientes solo envían inputs; el servidor ejecuta toda la física, detección de colisiones, cooldowns, condición de victoria, puntuación y atribución de bajas.
 - **El cliente es solo render** — recibe el estado del servidor, interpola y gestiona efectos locales (partículas, sonido, temporizador de autodestrucción). No predice física.
+- **IA reutiliza la simulación** — los bots son jugadores normales (`isBot`) cuyo `input` lo fija una rutina de IA en el servidor; reaprovechan toda la física, colisiones y render sin código especial en el cliente.
+- **Sistema de oleadas desacoplado** — un conjunto de rondas escaladas (`WAVES`) y un gestor (`manageWaves`) controlan la aparición de bots, los intermedios y el resultado; se usa igual en Co-op multijugador y en práctica en solitario.
+- **Reglas de vidas por modo** — PvP/vuelo libre: reaparición infinita hasta el tiempo; oleadas: pool compartido de vidas de equipo (`teamLives`).
 - **Superficie anti-trampa** — todos los cooldowns y validaciones viven en el servidor: los muertos no actúan, una nave apagada por EMP no se mueve ni dispara, el cañón/EMP/mina/torpedo respetan su cooldown, los nombres se sanean y solo el host reinicia.
+- **Resiliencia de conexión** — al caer el WebSocket, el cliente muestra un overlay y reintenta la conexión automáticamente.
 - **Configuración en caliente** — los valores de `CFG` se leen cada tick; cambiar un valor en el panel admin se aplica inmediatamente sin reiniciar el servidor ni las partidas.
 
 ---
@@ -233,26 +285,28 @@ El cliente envía objetos JSON con un campo `type`. Los principales son:
 | `getRooms` | Al entrar al lobby | — |
 | `setName` | Al guardar el nombre | `name` |
 | `createRoom` | Botón "Crear sala" | — |
+| `startSolo` | Botón "Empezar práctica" | `mode` (`"waves"`/`"free"`), `size`, `durationS`, `shipType` |
 | `joinRoom` | Botón "Unirse" | `roomId` |
-| `leaveRoom` | Botón "Salir" | — |
+| `leaveRoom` | Botón "Salir" / "Volver al lobby" | — |
 | `setWorldSize` | Host, en lobby | `size` |
 | `setRoomName` | Host, en lobby | `name` |
 | `toggleEnforceBalance` | Host, en lobby | — |
+| `toggleCoop` | Host, en lobby | — (modo Co-op vs IA) |
 | `toggleMidGameJoin` | Host, en partida | — |
 | `ready` | Botón "Listo" | — |
-| `switchTeam` | Botón "Cambiar equipo" | — |
-| `selectShip` | Clic en carta de nave | `shipType` |
-| `boardShip` | Embarcar como artillero | `targetId` |
+| `switchTeam` | Botón "Cambiar equipo" (bloqueado en Co-op) | — |
+| `selectShip` | Clic en carta de nave (lobby o panel de muerte) | `shipType` |
+| `boardShip` | Embarcar como artillero (lobby o, muerto, en partida) | `targetId` |
 | `leaveShip` | Salir como artillero | — |
 | `input` | Cada 33 ms mientras se juega | `thrust`, `reverse`, `strafeLeft`, `strafeRight`, `targetAngle`, `inertiaDamp` |
 | `shoot` | Clic izq. / `E` | — (ignorado en Capital, que usa el rayo) |
-| `beamCharge` | Capital: pulsar/soltar disparo | `charging` (bool) — al soltar a tope dispara el rayo |
+| `beamCharge` | Capital: pulsar/soltar disparo | `charging` (bool), `cancel` (bool) — dispara solo al soltar a tope sin cancelar |
 | `special` | Tecla `X` | — (EMP en Disruptor / mina en Interceptor) |
 | `missile` | Tecla `Q` | `targetId` (torpedo si la nave es Disruptor) |
 | `flare` | Tecla `F` | — |
 | `respawn` | Tecla `R` tras morir | — |
 | `selfDestruct` | `Supr` ×2 s | — |
-| `restartGame` | Host, en Game Over | — |
+| `restartGame` | Host, en Game Over (no en práctica) | — |
 | `chat` | Enter, escribe, Enter | `text` |
 
 ### Mensajes servidor → cliente
@@ -273,20 +327,23 @@ El servidor hace **broadcast** a todos los clientes de una sala usando `broadcas
 El mensaje `state` contiene el mundo completo cada tick:
 
 ```
-players, bullets, missiles, beams, empPulses, mines,
-flare, asteroids, winner, killFeed, timeLeft, world
+players, bullets, missiles, beams, empPulses, mines, flare, asteroids,
+winner, killFeed, timeLeft, world,
+solo, waveMode, wave, waveTotal, enemiesLeft, waveBanner, teamLives
 ```
 
-- `players` — mapa de jugadores (posición, ángulo, hp, escudo, cooldowns, `beamCharge`, `emp`, `empDisabled`, `empCooldown`, `mineCooldown`…).
-- `beams` — rayos de la Capital (solo efecto visual; el daño ya se aplicó al dispararse).
+- `players` — mapa de jugadores y **bots** (posición, ángulo, hp, escudo, cooldowns, `beamCharge`, `beamHit`, `emp`, `empDisabled`, `empCooldown`, `mineCooldown`…). Los bots de IA son jugadores normales con `isBot`.
+- `beams` — rayos de la Capital (solo efecto visual; el daño ya se aplicó). Cada uno con `id` y `hit` para el efecto de impacto en cliente.
 - `empPulses` — ondas EMP y explosiones de mina (visual, con `blast` para distinguir).
-- `mines` — minas activas (el cliente solo dibuja las de su propio equipo).
+- `mines` — minas activas con `life`/`maxLife` y `arm`/`maxArm` para el temporizador (el cliente solo dibuja las de su propio equipo).
+- **Campos de oleadas** — `solo`, `waveMode`, `wave`/`waveTotal`, `enemiesLeft`, `waveBanner` (texto temporal) y `teamLives` (vidas compartidas; `null` cuando el respawn es infinito).
 
 ### Game loop del servidor
 
 `setInterval(update, 1000 / FPS)` con `FPS = 60` — se ejecuta cada ~16,6 ms y, por cada sala en juego:
 
 1. **Jugadores** — por cada jugador vivo:
+   - Si es un **bot de IA** (`isBot`): calcula su `input` (persigue al humano más cercano, orbita a distancia de combate y dispara cañón/misiles cuando está alineado; la Capital carga y suelta el rayo) antes de aplicar la física.
    - Si es **artillero**: sincroniza posición/ángulo con el piloto y fija el ángulo de su torreta (la Capital guarda un ángulo por artillero en `turretAngles`).
    - Decrementa cooldowns (misil, bala, EMP, mina) y temporizadores **EMP** (`empTimer` visual, `empDisableTicks` de apagado).
    - **Carga del rayo** (Capital): si `beamCharging`, acumula `beamChargeTicks` y publica `beamCharge` (0..1).
@@ -299,8 +356,9 @@ flare, asteroids, winner, killFeed, timeLeft, world
 5. **Ondas EMP** (`empPulses`) — decaen (visual); el apagado se aplicó al lanzar el pulso.
 6. **Minas** — se arman, expiran y, al entrar un enemigo en su radio de disparo, **explotan** con daño en área que decae con la distancia.
 7. **Bengalas** — decaen por vida.
-8. **Timer** y **condición de victoria** — gana quien deja al rival sin jugadores (vidas agotadas) o, al acabar el tiempo, el equipo con más supervivientes/bajas (o empate).
-9. **Broadcast** — envía el estado completo a todos los clientes de la sala.
+8. **Oleadas** (solo modo Co-op / práctica): `manageWaves()` gestiona la progresión — aparición de la siguiente ronda tras un intermedio, victoria al superar todas, derrota al agotar las vidas de equipo, y limpieza de bots muertos. La dificultad de cada ronda escala con el número de jugadores.
+9. **Timer** y **condición de victoria** — en PvP normal gana, al acabar el tiempo, el equipo con más supervivientes/bajas (o empate); el respawn es infinito. En oleadas, el resultado lo decide `manageWaves()`.
+10. **Broadcast** — envía el estado completo a todos los clientes de la sala.
 
 ### Modelo de colisiones
 

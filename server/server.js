@@ -272,6 +272,35 @@ function registerCrewDamage(victim, attacker, room) {
   }
 }
 
+// Desvincula a un artillero de su nave, liberando la plaza en el piloto.
+function detachGunner(room, gunner) {
+  if (!gunner || !gunner.pilotingFor) return;
+  const pilot = room.players[gunner.pilotingFor];
+  if (pilot) {
+    if (pilot.gunnerIds) {
+      const idx = pilot.gunnerIds.indexOf(gunner.id);
+      if (idx !== -1) pilot.gunnerIds[idx] = null;
+    }
+    if (pilot.gunnerId === gunner.id) pilot.gunnerId = null;
+    if (pilot.turretAngles) delete pilot.turretAngles[gunner.id];
+  }
+  gunner.pilotingFor = null;
+  gunner.turretIndex = undefined;
+}
+
+// Libera todas las plazas de una nave y desvincula a su tripulación
+// (al destruirse la nave o al salir/desconectarse el piloto).
+function clearCrewSeats(room, pilot) {
+  const crewIds = pilot.gunnerIds ? pilot.gunnerIds.filter(Boolean) : (pilot.gunnerId ? [pilot.gunnerId] : []);
+  for (const gid of crewIds) {
+    const g = room.players[gid];
+    if (g) { g.pilotingFor = null; g.turretIndex = undefined; }
+  }
+  if (pilot.gunnerIds) pilot.gunnerIds = [null, null, null];
+  pilot.gunnerId = null;
+  if (pilot.turretAngles) pilot.turretAngles = {};
+}
+
 function killPlayer(p, killer, weapon, room) {
   // Assists: jugadores que dañaron a la víctima en los últimos 10s (≠ killer, ≠ víctima, equipo enemigo)
   const now = Date.now();
@@ -325,6 +354,9 @@ function killPlayer(p, killer, weapon, room) {
       gunner.respawnReadyAt = Date.now() + ((CFG.RESPAWN_DELAY ?? 5) * 1000);
     }
   }
+  // La nave fue destruida: libera las plazas y desvincula a la tripulación para que
+  // al reaparecer puedan reelegir nave o volver a embarcar en otra torreta.
+  clearCrewSeats(room, p);
 }
 function createAsteroids(count, W, H) {
   const arr = [];
@@ -373,6 +405,7 @@ function createRoom(ownerId, ownerName) {
 function joinRoom(player, room) {
   player.roomId = room.id;
   room.players[player.id] = player;
+  if (room.coopMode) player.team = "green";   // co-op: todos en el mismo equipo
 }
 
 function startGame(room) {
@@ -385,7 +418,7 @@ function startGame(room) {
   room.flare    = [];
   room.winner   = null;
   room.shipsDestroyed = false;
-  room.timeLeft = CFG.GAME_DURATION_S * FPS;
+  room.timeLeft = (room.durationS ?? CFG.GAME_DURATION_S) * FPS;
 
   // ── 1ª pasada: pilotos y jugadores solos (no artilleros)
   let green = 0, red = 0;
@@ -413,7 +446,9 @@ function startGame(room) {
     p.assists        = 0;
     p.recentDamageFrom = [];
 
-    if (p.team !== "green" && p.team !== "red") {
+    if (room.coopMode) {
+      p.team = "green";          // co-op: todos los humanos juntos vs IA
+    } else if (p.team !== "green" && p.team !== "red") {
       if (green <= red) { p.team = "green"; green++; }
       else              { p.team = "red";   red++;   }
     }
@@ -453,6 +488,17 @@ function startGame(room) {
   });
 
   room.gameValid = green > 0 && red > 0;
+
+  // Co-op vs IA: arranca el modo oleadas (los bots aparecen por rondas)
+  if (room.coopMode) {
+    room.waveMode  = true;
+    room.wave      = 0;
+    room.waveState = "intermission";
+    room.waveTimer = 3 * FPS;     // primera oleada en ~3s
+    room.teamLives = TEAM_LIVES;  // pool de vidas compartido del equipo
+    setWaveBanner(room, "PREPARAOS...", 3000);
+  }
+
   broadcastRoom(room, { type: "gameStarted" });
 }
 
@@ -470,6 +516,12 @@ function pushKill(room, killer, victim, weapon) {
 
 function restartRoom(room) {
   room.status   = "waiting";
+  // Co-op: elimina los bots y reinicia el estado de oleadas
+  Object.keys(room.players).forEach(pid => { if (room.players[pid].isBot) delete room.players[pid]; });
+  room.waveMode  = false;
+  room.wave      = 0;
+  room.waveState = null;
+  room.waveBanner = null;
   room.bullets  = [];
   room.missiles = [];
   room.beams    = [];
@@ -520,17 +572,9 @@ function removeFromRoom(player) {
   const room = rooms[player.roomId];
   if (!room) return;
 
-  // Limpiar vínculos de tripulación
-  if (player.gunnerId) {
-    const gunner = room.players[player.gunnerId];
-    if (gunner) gunner.pilotingFor = null;
-    player.gunnerId = null;
-  }
-  if (player.pilotingFor) {
-    const pilot = room.players[player.pilotingFor];
-    if (pilot) pilot.gunnerId = null;
-    player.pilotingFor = null;
-  }
+  // Limpiar vínculos de tripulación (artillero y/o piloto, Gunship y Capital)
+  detachGunner(room, player);     // si era artillero, libera su plaza
+  clearCrewSeats(room, player);   // si pilotaba, desvincula a sus artilleros
 
   delete room.players[player.id];
   player.roomId = null;
@@ -545,7 +589,7 @@ function removeFromRoom(player) {
 const MAX_PLAYERS = 20;
 
 function roomList() {
-  return Object.values(rooms).map(r => ({
+  return Object.values(rooms).filter(r => !r.solo).map(r => ({
     id:               r.id,
     name:             r.name || "Nueva sala",
     players:          Object.keys(r.players).length,
@@ -600,9 +644,44 @@ wss.on("connection", ws => {
       return;
     }
 
+    // Práctica en solitario: sala privada (no listada ni unible) que arranca al instante
+    // con un solo jugador y un temporizador configurable.
+    if (msg.type === "startSolo") {
+      const room = createRoom(id, player.name);
+      room.solo = true;
+      room.name = "Práctica";
+      // Tamaño de mundo
+      const preset = WORLD_PRESETS[msg.size] || WORLD_PRESETS.medium;
+      room.worldSize = WORLD_PRESETS[msg.size] ? msg.size : "medium";
+      room.worldW = preset.w; room.worldH = preset.h;
+      room.asteroids = createAsteroids(preset.asteroids, preset.w, preset.h);
+      // Duración (s): >0 acota a [30, 3600]; 0 o vacío = prácticamente ilimitada
+      const secs = Number(msg.durationS);
+      room.durationS = (Number.isFinite(secs) && secs > 0) ? Math.min(3600, Math.max(30, secs)) : 999999;
+
+      joinRoom(player, room);
+      player.team = "green";
+      if (CFG.SHIP_TYPES[msg.shipType]) player.shipType = msg.shipType;
+      send(ws, { type: "roomJoined", roomId: room.id });
+      startGame(room);          // arranca ya (1 jugador); gameValid=false → sin condición de victoria
+
+      // Modo oleadas: enemigos por rondas escaladas hasta el jefe (Capital)
+      if (msg.mode === "waves") {
+        room.waveMode  = true;
+        room.wave      = 0;
+        room.waveState = "intermission";
+        room.waveTimer = 2 * FPS;     // primera oleada en ~2s
+        room.teamLives = TEAM_LIVES;  // pool de vidas compartido
+        setWaveBanner(room, "PREPÁRATE...", 2000);
+      }
+
+      broadcastRoomList();
+      return;
+    }
+
     if (msg.type === "joinRoom") {
       const room = rooms[msg.roomId];
-      if (!room) return;
+      if (!room || room.solo) return;
       if (room.status === "playing" && !room.allowJoinMidGame) return;
       if (Object.keys(room.players).length >= MAX_PLAYERS) return;
       joinRoom(player, room);
@@ -637,6 +716,21 @@ wss.on("connection", ws => {
       const room = rooms[player.roomId];
       if (!room || room.ownerId !== player.id) return;
       room.allowJoinMidGame = !room.allowJoinMidGame;
+      broadcastRoom(room, { type: "roomUpdate", room });
+      broadcastRoomList();
+      return;
+    }
+
+    // Modo co-op vs IA: todos los jugadores en un equipo (verde) contra oleadas de bots
+    if (msg.type === "toggleCoop") {
+      const room = rooms[player.roomId];
+      if (!room || room.ownerId !== player.id || room.status !== "waiting") return;
+      room.coopMode = !room.coopMode;
+      if (room.coopMode) {
+        room.enforceBalance = false;
+        // Todos al equipo verde (humanos juntos contra la IA)
+        Object.values(room.players).forEach(p => { p.team = "green"; });
+      }
       broadcastRoom(room, { type: "roomUpdate", room });
       broadcastRoomList();
       return;
@@ -700,6 +794,7 @@ wss.on("connection", ws => {
     if (msg.type === "switchTeam") {
       const room = rooms[player.roomId];
       if (!room) return;
+      if (room.coopMode) return;   // en co-op todos van juntos vs IA, sin cambio de equipo
       if (room.status === "playing") {
         if (!player.dead) return;
         player.team = player.team === "green" ? "red" : "green";
@@ -751,6 +846,8 @@ wss.on("connection", ws => {
           player.turretAngles = {};
         }
       }
+      // Si estaba muerto con una torreta reservada y ahora elige nave propia, soltar la plaza
+      if (deadInGame && player.pilotingFor) detachGunner(room, player);
       player.shipType = msg.shipType;
       if (inLobby) broadcastRoom(room, { type: "roomUpdate", room });
       return;
@@ -758,17 +855,27 @@ wss.on("connection", ws => {
 
     if (msg.type === "boardShip") {
       const room = rooms[player.roomId];
-      if (!room || room.status !== "waiting") return;
+      if (!room) return;
+      // Permitido en el lobby, o en partida si el jugador está muerto (elige reaparecer
+      // de torretero en una nave aliada con torreta libre).
+      const inLobby     = room.status === "waiting";
+      const deadInGame  = room.status === "playing" && player.dead;
+      if (!inLobby && !deadInGame) return;
+
       const target = room.players[msg.targetId];
-      if (!target) return;
-      if (player.pilotingFor) return;
+      if (!target || target.dead) return;          // no se aborda una nave destruida
       if (player.id === msg.targetId) return;
+      // En partida solo se aborda una nave del propio equipo
+      if (deadInGame && target.team !== player.team) return;
+
+      // Si ya tenía una plaza reservada (o su piloto murió), liberarla antes de reasignar
+      if (player.pilotingFor) detachGunner(room, player);
 
       if (target.shipType === "gunship") {
         if (target.gunnerId) return;
         target.gunnerId    = player.id;
         player.pilotingFor = target.id;
-        player.team        = target.team;
+        if (inLobby) player.team = target.team;
       } else if (target.shipType === "capital") {
         if (!target.gunnerIds) target.gunnerIds = [null, null, null];
         const slot = target.gunnerIds.indexOf(null);
@@ -776,7 +883,7 @@ wss.on("connection", ws => {
         target.gunnerIds[slot] = player.id;
         player.pilotingFor  = target.id;
         player.turretIndex  = slot;
-        player.team         = target.team;
+        if (inLobby) player.team = target.team;
         if (!target.turretAngles) target.turretAngles = {};
       } else {
         return;
@@ -788,18 +895,7 @@ wss.on("connection", ws => {
     if (msg.type === "leaveShip") {
       const room = rooms[player.roomId];
       if (!room || !player.pilotingFor) return;
-      const pilot = room.players[player.pilotingFor];
-      if (pilot) {
-        if (pilot.shipType === "capital" && pilot.gunnerIds) {
-          const idx = pilot.gunnerIds.indexOf(player.id);
-          if (idx !== -1) pilot.gunnerIds[idx] = null;
-          if (pilot.turretAngles) delete pilot.turretAngles[player.id];
-        } else {
-          pilot.gunnerId = null;
-        }
-      }
-      player.pilotingFor = null;
-      player.turretIndex = undefined;
+      detachGunner(room, player);
       broadcastRoom(room, { type: "roomUpdate", room });
       return;
     }
@@ -862,38 +958,52 @@ wss.on("connection", ws => {
     if (msg.type === "respawn") {
       const room = rooms[player.roomId];
       if (!room || room.status !== "playing" || !player.dead) return;
-      if ((player.respawnsLeft ?? 0) <= 0) return;
       if (Date.now() < (player.respawnReadyAt ?? 0)) return;
-      player.respawnsLeft--;
+      // Vidas: en modo oleadas (co-op / solo-oleadas) hay un pool compartido del equipo;
+      // en PVP normal / vuelo libre el respawn es infinito (hasta que acabe el tiempo).
+      if (room.waveMode) {
+        if ((room.teamLives ?? 0) <= 0) return;
+        room.teamLives--;
+      }
+      // ¿Tiene una torreta reservada en una nave aliada viva? (eligió "ir de torretero")
+      const seatPilot = player.pilotingFor ? room.players[player.pilotingFor] : null;
+      const seatValid = seatPilot && !seatPilot.dead && seatPilot.team === player.team &&
+        (((seatPilot.gunnerIds || []).includes(player.id)) || seatPilot.gunnerId === player.id);
+
       player.dead   = false;
       player.deadAt = null;
-      // Artillero eyectado: sale como caza independiente
-      if (player.pilotingFor) {
-        const pilot = room.players[player.pilotingFor];
-        if (pilot) {
-          if (pilot.shipType === "capital" && pilot.gunnerIds) {
-            const idx = pilot.gunnerIds.indexOf(player.id);
-            if (idx !== -1) pilot.gunnerIds[idx] = null;
-            if (pilot.turretAngles) delete pilot.turretAngles[player.id];
-          } else {
-            pilot.gunnerId = null;
-          }
+
+      if (seatValid) {
+        // Reaparece directamente como artillero de la nave aliada
+        player.team           = seatPilot.team;
+        player.hp = 1; player.maxHp = 1;         // muere con el piloto
+        player.shield = 0; player.maxShield = 0;
+        player.maxMissiles    = CFG.GUNNER_MISSILES ?? 20;
+        player.missileCooldownBase = CFG.GUNNER_MISSILE_COOLDOWN ?? 55;
+        player.missileCooldown = 0; player.bulletCooldown = 0; player.turretCooldown = 0;
+        player.x = seatPilot.x; player.y = seatPilot.y;
+        player.vx = 0; player.vy = 0; player.angle = seatPilot.angle;
+        if (seatPilot.shipType === "capital") {
+          if (!seatPilot.turretAngles) seatPilot.turretAngles = {};
+          seatPilot.turretAngles[player.id] = seatPilot.angle;
         }
-        player.pilotingFor = null;
-        player.turretIndex = undefined;
-        player.shipType    = "fighter";
+      } else {
+        // Sin reserva válida: eyectar como caza independiente (mantiene la nave elegida)
+        detachGunner(room, player);
+        if (!CFG.SHIP_TYPES[player.shipType]) player.shipType = "fighter";
+        applyShipStats(player);
+        player.vx = 0; player.vy = 0; player.angle = 0;
+        player.missileCooldown = 0; player.bulletCooldown = 0;
+        const rsp = spawnPos(player.team, room);
+        player.x = rsp.x; player.y = rsp.y;
       }
-      applyShipStats(player);
-      player.vx = 0; player.vy = 0; player.angle = 0;
-      player.missileCooldown = 0; player.bulletCooldown = 0;
-      const rsp = spawnPos(player.team, room);
-      player.x = rsp.x; player.y = rsp.y;
       return;
     }
 
     if (msg.type === "restartGame") {
       const room = rooms[player.roomId];
       if (!room || room.ownerId !== player.id || room.status !== "playing") return;
+      if (room.solo) return;   // las salas de práctica no se reinician (se sale al lobby)
       restartRoom(room);
       broadcastRoomList();
       return;
@@ -974,9 +1084,11 @@ wss.on("connection", ws => {
       if (msg.charging) {
         player.beamCharging = true;
       } else {
-        // Al soltar: si está totalmente cargado, dispara el rayo
+        // Al soltar: dispara solo si está totalmente cargado Y no es una cancelación
+        // (mouseleave / pérdida de foco / muerte). Así el rayo no se dispara por un
+        // release involuntario.
         player.beamCharging = false;
-        if ((player.beamChargeTicks ?? 0) >= CFG.CAPITAL_BEAM_CHARGE_TIME) {
+        if (!msg.cancel && (player.beamChargeTicks ?? 0) >= CFG.CAPITAL_BEAM_CHARGE_TIME) {
           fireCapitalBeam(player, room);
         }
         player.beamChargeTicks = 0;
@@ -1103,7 +1215,7 @@ function fireCapitalBeam(player, room) {
     }
   }
 
-  let endX, endY;
+  let endX, endY, didHit = false;
   if (hitPlayer) {
     endX = ox + cos * hitDist; endY = oy + sin * hitDist;
     // Cubierto bajo asteroide flotante → el rayo no daña (pero se detiene ahí)
@@ -1111,8 +1223,8 @@ function fireCapitalBeam(player, room) {
       const beamAngle = Math.atan2(oy - hitPlayer.y, ox - hitPlayer.x);
       applyDamage(room, hitPlayer, CFG.CAPITAL_BEAM_DAMAGE, player, beamAngle);
       updateDamageLog(hitPlayer, player.id);
-      // EMP: solo chispas rojas (el rayo de la Capital no "apaga")
-      applyEmp(hitPlayer, CFG.EMP_DURATION, false);
+      hitPlayer.beamHit = CFG.CAPITAL_BEAM_LIFE; // marca de impacto del rayo (efecto propio, no EMP)
+      didHit = true;
       if (hitPlayer.hp <= 0) killPlayer(hitPlayer, player, "beam", room);
     }
   } else {
@@ -1120,8 +1232,10 @@ function fireCapitalBeam(player, room) {
   }
 
   room.beams.push({
+    id: Date.now() + Math.random(),
     x1: ox, y1: oy, x2: endX, y2: endY,
     team: player.team, ownerId: player.id,
+    hit: didHit,
     life: CFG.CAPITAL_BEAM_LIFE, maxLife: CFG.CAPITAL_BEAM_LIFE,
   });
 }
@@ -1153,7 +1267,9 @@ function dropMine(player, room) {
     x: player.x, y: player.y,
     team: player.team, ownerId: player.id,
     arm: CFG.MINE_ARM_TIME,        // cuenta atrás hasta armarse
+    maxArm: CFG.MINE_ARM_TIME,
     life: CFG.MINE_LIFE,
+    maxLife: CFG.MINE_LIFE,        // para el temporizador en cliente
   });
 }
 
@@ -1174,6 +1290,194 @@ function steerMissile(m, tx, ty, maxTurn, thrust) {
   const newSpeed = Math.min(currentSpeed + thrust, CFG.MISSILE_SPEED_MAX);
   m.vx = Math.cos(newAngle) * newSpeed;
   m.vy = Math.sin(newAngle) * newSpeed;
+}
+
+// ─────────────────────────────────────────────
+// Bots + oleadas (solo práctica en modo "waves")
+// ─────────────────────────────────────────────
+
+const BOT_NAMES = {
+  interceptor: "INTERCEPTOR", fighter: "CAZA", bomber: "BOMBARDERO",
+  gunship: "CAÑONERA", capital: "CAPITAL", emp: "DISRUPTOR",
+};
+
+// Oleadas escaladas: cada vez más naves/dureza hasta el jefe (Capital).
+const WAVES = [
+  { ships: ["interceptor", "interceptor"] },
+  { ships: ["fighter", "fighter", "fighter"] },
+  { ships: ["bomber", "fighter", "fighter"] },
+  { ships: ["gunship", "interceptor", "interceptor"] },
+  { ships: ["capital", "fighter", "fighter"], boss: true },
+];
+
+const TEAM_LIVES = 3;   // vidas compartidas del equipo en modo oleadas (co-op / solo)
+
+let botCounter = 0;
+
+// Posición de aparición de un bot: dentro del mundo y lejos de los humanos vivos.
+function botSpawnPos(room) {
+  const W = room.worldW, H = room.worldH;
+  const humans = Object.values(room.players).filter(p => !p.isBot && !p.pilotingFor && !p.dead);
+  for (let i = 0; i < 25; i++) {
+    const x = W * (0.18 + Math.random() * 0.64);
+    const y = H * (0.18 + Math.random() * 0.64);
+    if (humans.every(h => Math.hypot(h.x - x, h.y - y) > 900)) return { x, y };
+  }
+  return { x: W * 0.5, y: H * 0.5 };
+}
+
+function makeBot(room, shipType) {
+  const bot = createPlayer(crypto.randomUUID());
+  bot.isBot = true;
+  bot.name = BOT_NAMES[shipType] || "ENEMIGO";
+  bot.team = "red";
+  bot.shipType = shipType;
+  bot.roomId = room.id;
+  bot.ready = true;
+  bot.dead = false;
+  bot.respawnsLeft = 0;               // los bots no reaparecen
+  bot.orbitSeed = (botCounter++) % 2;
+  applyShipStats(bot);
+  // Dificultad (configurable en caliente desde el panel admin): los bots son más
+  // lentos/torpes que un humano para que sean alcanzables.
+  bot.thrustVal        *= CFG.AI_SPEED_MULT ?? 0.55;
+  bot.reverseThrustVal *= CFG.AI_SPEED_MULT ?? 0.55;
+  bot.turnRateVal      *= CFG.AI_TURN_MULT  ?? 0.55;
+  bot.aimJitter = (Math.random() - 0.5) * (CFG.AI_AIM_JITTER ?? 0.22);
+  const pos = botSpawnPos(room);
+  bot.x = pos.x; bot.y = pos.y;
+  bot.angle = Math.random() * Math.PI * 2;
+  bot.fuel = 100;
+  room.players[bot.id] = bot;
+  return bot;
+}
+
+function spawnWave(room, n) {
+  const wave = WAVES[n - 1];
+  if (!wave) return;
+  const ships = [...wave.ships];
+  // Escala la dificultad con el nº de jugadores humanos (co-op): naves extra por jugador
+  const humans = Object.values(room.players).filter(p => !p.isBot && !p.pilotingFor).length || 1;
+  for (let i = 0; i < humans - 1; i++) {
+    // Jefe: más escoltas; oleadas normales: repite tipos de la oleada
+    ships.push(wave.boss ? "fighter" : wave.ships[i % wave.ships.length]);
+  }
+  ships.forEach(t => makeBot(room, t));
+}
+
+// IA de un bot: persigue al humano más cercano, orbita a distancia y dispara.
+function computeBotAI(bot, room) {
+  let target = null, best = Infinity;
+  for (const q of Object.values(room.players)) {
+    if (q.dead || q.team === bot.team || q.pilotingFor || q.isBot) continue;
+    const d = Math.hypot(q.x - bot.x, q.y - bot.y);
+    if (d < best) { best = d; target = q; }
+  }
+  if (!target) { bot.input = { inertiaDamp: true }; bot.beamCharging = false; return; }
+
+  const dx = target.x - bot.x, dy = target.y - bot.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const aim = Math.atan2(dy, dx) + bot.aimJitter;
+  const input = { targetAngle: aim, inertiaDamp: true };
+
+  const preferred = bot.shipType === "capital" ? 650 : bot.shipType === "bomber" ? 480 : 320;
+  if (dist > preferred * 1.15) input.thrust = true;
+  else if (dist < preferred * 0.6) input.reverse = true;
+  else if (((Date.now() / 1500 | 0) + bot.orbitSeed) % 2 === 0) input.strafeLeft = true;
+  else input.strafeRight = true;
+  bot.input = input;
+
+  if (bot.empDisabled) { bot.beamCharging = false; return; }
+
+  let diff = aim - bot.angle;
+  while (diff >  Math.PI) diff -= 2 * Math.PI;
+  while (diff < -Math.PI) diff += 2 * Math.PI;
+  const aligned = Math.abs(diff) < 0.2;
+
+  // Capital: carga y suelta el rayo (no tiene cañón normal)
+  if (bot.shipType === "capital") {
+    if (aligned && dist < CFG.CAPITAL_BEAM_RANGE) {
+      bot.beamCharging = true;
+      if ((bot.beamChargeTicks ?? 0) >= CFG.CAPITAL_BEAM_CHARGE_TIME) {
+        fireCapitalBeam(bot, room);
+        bot.beamCharging = false; bot.beamChargeTicks = 0; bot.beamCharge = 0;
+      }
+    } else {
+      bot.beamCharging = false;
+    }
+    return;
+  }
+
+  // Cañón
+  if (aligned && dist < 720 && (bot.bulletCooldown ?? 0) <= 0) {
+    bot.bulletCooldown = Math.round(CFG.BULLET_COOLDOWN * (CFG.AI_FIRE_COOLDOWN_MULT ?? 1.6));
+    room.bullets.push({
+      x: bot.x, y: bot.y,
+      vx: Math.cos(bot.angle) * CFG.BULLET_SPEED,
+      vy: Math.sin(bot.angle) * CFG.BULLET_SPEED,
+      team: bot.team, ownerId: bot.id,
+      damage: bot.bulletDamage ?? CFG.BULLET_DAMAGE,
+    });
+  }
+  // Misiles ocasionales
+  if (aligned && dist < 1300 && (bot.missileCooldown ?? 0) <= 0 && (bot.maxMissiles ?? 0) > 0 && Math.random() < 0.02) {
+    bot.missileCooldown = bot.missileCooldownBase ?? CFG.MISSILE_COOLDOWN;
+    room.missiles.push({
+      id: Date.now() + Math.random(),
+      x: bot.x, y: bot.y,
+      vx: Math.cos(bot.angle) * CFG.MISSILE_SPEED_INIT,
+      vy: Math.sin(bot.angle) * CFG.MISSILE_SPEED_INIT,
+      team: bot.team, targetId: target.id, ownerId: bot.id,
+      life: CFG.MISSILE_LIFE, torpedo: !!bot.firesTorpedoes,
+    });
+  }
+}
+
+// Gestiona la progresión de oleadas de una sala solo.
+function setWaveBanner(room, text, ms = 3000) {
+  room.waveBanner = text;
+  room.waveBannerUntil = Date.now() + ms;
+}
+
+function manageWaves(room) {
+  if (room.winner) return;
+
+  // Derrota: equipo sin vidas compartidas y todos los humanos muertos
+  const humans = Object.values(room.players).filter(p => !p.isBot && !p.pilotingFor);
+  if (humans.length && (room.teamLives ?? 0) <= 0 && humans.every(p => p.dead)) {
+    room.winner = "red";
+    setWaveBanner(room, "DERROTA", 6000);
+    return;
+  }
+
+  // Limpia bots muertos pasado un momento (deja ver la explosión)
+  Object.values(room.players).forEach(p => {
+    if (p.isBot && p.dead && p.deadAt && Date.now() - p.deadAt > 1500) delete room.players[p.id];
+  });
+
+  const livingBots = Object.values(room.players).filter(p => p.isBot && !p.dead).length;
+
+  if (room.waveState === "intermission") {
+    if (--room.waveTimer <= 0) {
+      room.wave++;
+      if (room.wave > WAVES.length) {
+        room.winner = "green";              // todas las oleadas superadas
+        setWaveBanner(room, "¡PRÁCTICA COMPLETADA!", 6000);
+        return;
+      }
+      spawnWave(room, room.wave);
+      room.waveState = "active";
+      setWaveBanner(room, WAVES[room.wave - 1].boss ? `OLEADA ${room.wave} — ¡CAPITAL!` : `OLEADA ${room.wave}`);
+    }
+    return;
+  }
+
+  // active → cuando no queden bots vivos, intermedio antes de la siguiente
+  if (livingBots === 0) {
+    room.waveState = "intermission";
+    room.waveTimer = 3 * FPS;
+    setWaveBanner(room, room.wave >= WAVES.length ? "¡ÚLTIMA OLEADA SUPERADA!" : `OLEADA ${room.wave} SUPERADA`);
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -1211,12 +1515,16 @@ function update() {
         return;
       }
 
+      // IA: fija el input del bot (y dispara) antes de aplicar el movimiento
+      if (p.isBot) computeBotAI(p, room);
+
       p.lockedByMissile = false;
       p.lockedOnMe      = 0;
 
       if (p.missileCooldown > 0) p.missileCooldown--;
       if (p.bulletCooldown  > 0) p.bulletCooldown--;
       if (p.hitFlash        > 0) p.hitFlash--;
+      if ((p.beamHit ?? 0)  > 0) p.beamHit--;
       // Carga del rayo de la Capital (mantener pulsado)
       if (p.shipType === "capital") {
         if (p.beamCharging) {
@@ -1523,6 +1831,9 @@ function update() {
     // ── Flares
     room.flare = (room.flare || []).filter(f => { f.life--; return f.life > 0; });
 
+    // ── Oleadas (solo práctica)
+    if (room.waveMode) manageWaves(room);
+
     // ── Timer
     if (room.timeLeft > 0) room.timeLeft--;
 
@@ -1574,7 +1885,15 @@ function update() {
       winner:    room.winner,
       killFeed:  room.killFeed,
       timeLeft:  Math.max(0, Math.ceil(room.timeLeft / FPS)),
-      world:     { width: room.worldW, height: room.worldH }
+      world:     { width: room.worldW, height: room.worldH },
+      // Modo oleadas (solo práctica)
+      solo:      !!room.solo,
+      waveMode:  !!room.waveMode,
+      teamLives: room.waveMode ? (room.teamLives ?? 0) : null,
+      wave:      room.wave || 0,
+      waveTotal: WAVES.length,
+      enemiesLeft: room.waveMode ? Object.values(room.players).filter(p => p.isBot && !p.dead).length : 0,
+      waveBanner: (room.waveMode && room.waveBannerUntil > Date.now()) ? room.waveBanner : null,
     });
   });
 }

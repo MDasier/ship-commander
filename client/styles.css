@@ -829,7 +829,11 @@ kbd {
   border-radius: 3px;
   transition: background 0.15s, border-color 0.15s;
 }
-#muteBtn:hover { background: #002636; }
+
+#muteBtn:hover {
+  background: #002636;
+}
+
 #muteBtn.muted {
   border-color: #ff445544;
   color: #ff6677;
@@ -846,7 +850,10 @@ kbd {
   cursor: pointer;
   border-radius: 3px;
 }
-#musicTrackSel span { width: auto; }
+
+#musicTrackSel span {
+  width: auto;
+}
 
 .mobiSettingsDivider {
   height: 1px;
@@ -1077,15 +1084,82 @@ kbd {
   width: 100%;
 }
 
+#deadTurretSection {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  border-top: 1px solid #1e2d44;
+  padding-top: 0.625rem;
+}
+
+#deadTurretLabel {
+  font-size: 1rem;
+  letter-spacing: 0.25rem;
+  color: #6ab8cc;
+  text-align: center;
+}
+
+#deadTurretOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.deadTurretBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+  padding: 0.5rem 0.875rem;
+  background: transparent;
+  border: 1px solid #ffffff22;
+  color: #aaa;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.deadTurretBtn:hover {
+  border-color: #00ccff66;
+  background: #00ccff0a;
+  color: #00ccff;
+}
+
+.deadTurretBtn.reserved {
+  border-color: #00ff8866;
+  background: #00ff880f;
+  color: #00ff88;
+}
+
+.deadTurretBtn .dtName {
+  font-size: 1rem;
+  letter-spacing: 0.0625rem;
+}
+
+.deadTurretBtn .dtType {
+  font-size: 1rem;
+  color: #00ccff99;
+  letter-spacing: 0.125rem;
+}
+
+.deadTurretBtn .dtStatus {
+  font-size: 1rem;
+  color: #778899;
+}
+
 #deadPanelActions {
   display: flex;
   gap: 10px;
 }
 
-#deadSwitchTeamBtn {
-  font-size: 10px;
-  letter-spacing: 1px;
-  padding: 5px 14px;
+#deadSwitchTeamBtn,
+#deadLeaveBtn {
+  font-size: 1rem;
+  letter-spacing: 0.0625rem;
+  padding: 0.5rem 1rem;
   border-color: #ffffff22;
   color: #888;
 }
@@ -1095,11 +1169,35 @@ kbd {
   color: #00ccff;
 }
 
+#deadLeaveBtn:hover {
+  border-color: #ff335544;
+  color: #ff6677;
+}
+
 #deadPanelHint {
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: #334455;
+  font-size: 1rem;
+  letter-spacing: 0.0625rem;
+  color: #556677;
   text-align: center;
+}
+
+.mobiLeaveBtn {
+  font-size: 1rem;
+  letter-spacing: 0.0625rem;
+  padding: 0.5rem 1rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  background: transparent;
+  border: 1px solid #ff335533;
+  color: #ff6677;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.mobiLeaveBtn:hover {
+  background: #ff33550f;
+  border-color: #ff335588;
 }
 
 /* Ship type tag in player list */
@@ -1429,8 +1527,13 @@ kbd.bindingError {
   letter-spacing: 1px;
 }
 
-.balTeam.green { color: #00ff88; }
-.balTeam.red   { color: #ff3355; }
+.balTeam.green {
+  color: #00ff88;
+}
+
+.balTeam.red {
+  color: #ff3355;
+}
 
 .balSep {
   color: #334;
@@ -1508,15 +1611,269 @@ kbd.bindingError {
 /* ── GAME OVER HINTS ── */
 
 .gameOverHint {
-  font-size: 11px;
-  letter-spacing: 2px;
-  color: #555;
-  margin-bottom: 14px;
+  font-size: 1rem;
+  letter-spacing: 0.125rem;
+  color: #778899;
+  margin-bottom: 0.875rem;
   text-align: center;
+  max-width: 32rem;
 }
 
 #gameOver {
   flex-direction: column;
   gap: 0;
+  align-items: center;
+}
+
+/* ── CONEXIÓN PERDIDA ── */
+
+#connLost {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 4, 8, 0.82);
+  backdrop-filter: blur(2px);
+}
+
+#connLostInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem 2.5rem;
+  border: 1px solid #ff335544;
+  background: rgba(10, 0, 4, 0.6);
+  text-align: center;
+  max-width: 90vw;
+}
+
+#connLostIcon {
+  font-size: 3rem;
+  color: #ff6677;
+  animation: connPulse 1s ease-in-out infinite;
+}
+
+#connLostTitle {
+  font-size: 2rem;
+  letter-spacing: 0.375rem;
+  color: #ff3355;
+  font-weight: bold;
+}
+
+#connLostMsg {
+  font-size: 1.25rem;
+  color: #cfd8e3;
+}
+
+#connLostHint {
+  font-size: 1rem;
+  color: #778899;
+  max-width: 28rem;
+}
+
+#connLostReload {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  letter-spacing: 0.0625rem;
+  padding: 0.5rem 1.25rem;
+  background: transparent;
+  border: 1px solid #00ccff55;
+  color: #00ccff;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+#connLostReload:hover {
+  background: #00ccff12;
+  border-color: #00ccff;
+}
+
+@keyframes connPulse {
+
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.92);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* ── MENÚ PRINCIPAL ── */
+
+#mainMenu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 34rem;
+}
+
+#mainMenuActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.menuBigBtn {
+  font-size: 1.25rem;
+  letter-spacing: 0.125rem;
+  padding: 1rem 1.5rem;
+  width: 100%;
+  background: rgba(0, 204, 255, 0.04);
+  border: 1px solid #00ccff44;
+  color: #cfe8f5;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.menuBigBtn:hover {
+  background: rgba(0, 204, 255, 0.12);
+  border-color: #00ccff;
+  color: #00ccff;
+}
+
+.menuBigBtn.support {
+  border-color: #ff558844;
+  color: #ff99aa;
+  background: rgba(255, 85, 136, 0.04);
+}
+
+.menuBigBtn.support:hover {
+  border-color: #ff5588;
+  color: #ff99aa;
+  background: rgba(255, 85, 136, 0.12);
+}
+
+.menuBigBtn.start {
+  border-color: #00ff8855;
+  color: #00ff88;
+  background: rgba(0, 255, 136, 0.05);
+  margin-top: 0.5rem;
+}
+
+.menuBigBtn.start:hover {
+  border-color: #00ff88;
+  background: rgba(0, 255, 136, 0.14);
+}
+
+.menuBackBtn {
+  align-self: flex-start;
+  font-size: 1rem;
+  letter-spacing: 0.0625rem;
+  padding: 0.4rem 0.9rem;
+  background: transparent;
+  border: 1px solid #ffffff22;
+  color: #889;
+  font-family: inherit;
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+
+.menuBackBtn:hover {
+  border-color: #00ccff66;
+  color: #00ccff;
+}
+
+#nameSavedMsg {
+  color: #00ff88;
+  font-size: 1rem;
+  letter-spacing: 0.0625rem;
+}
+
+/* ── PRÁCTICA SOLO ── */
+
+#soloSetup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  max-width: min(1000px, 96vw);
+}
+
+.soloOpt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.soloOptLabel {
+  font-size: 1rem;
+  letter-spacing: 0.1875rem;
+  color: #6ab8cc;
+}
+
+.soloChoices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.soloChoice {
+  font-size: 1rem;
+  letter-spacing: 0.0625rem;
+  padding: 0.5rem 1.1rem;
+  background: transparent;
+  border: 1px solid #ffffff22;
+  color: #aab;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.soloChoice:hover {
+  border-color: #00ccff66;
+  color: #00ccff;
+}
+
+.soloChoice.selected {
+  border-color: #00ccff;
+  color: #00ccff;
+  background: rgba(0, 204, 255, 0.12);
+}
+
+#soloShipCards {
+  display: flex;
+  flex-wrap: nowrap;     /* una sola fila como el selector del lobby (las cartas se encogen) */
+  gap: 0.5rem;
+  justify-content: center;
+  width: 100%;
+}
+
+.soloHint {
+  font-size: 1rem;
+  color: #778899;
+  text-align: center;
+  max-width: 32rem;
+}
+
+/* ── CONTROLES (pantalla de menú) ── */
+
+#controlsScreen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 34rem;
+}
+
+#menuControlsBody {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   align-items: center;
 }

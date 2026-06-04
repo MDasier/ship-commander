@@ -26,6 +26,26 @@ function spawnExplosion(wx, wy, team) {
   }
 }
 
+// Impacto del rayo de la Capital: chispas eléctricas brillantes y rápidas que se
+// proyectan desde el punto de impacto. Efecto propio del rayo (no reutiliza el EMP).
+function spawnBeamImpact(wx, wy, team) {
+  const hot = team === "green" ? "#aaffdd" : "#ffd0dc";
+  const palette = ["#ffffff", "#cfe8ff", hot];
+  for (let i = 0; i < 22; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 9 + 2;
+    particles.push({
+      x: wx, y: wy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1,
+      decay: Math.random() * 0.06 + 0.04,   // se apagan rápido (chispa)
+      size: Math.random() * 2.2 + 0.6,
+      color: palette[Math.floor(Math.random() * palette.length)]
+    });
+  }
+}
+
 function spawnThrustParticle(wx, wy, angle) {
   const spread = (Math.random() - 0.5) * 0.7;
   const backAngle = angle + Math.PI + spread;

@@ -99,9 +99,10 @@ function startRecording(action, keyEl) {
   document.addEventListener("keydown", recordingHandler, true);
 }
 
-function renderControlesPane() {
+function renderControlesPane(targetId = "pane-controles") {
   cancelRecording();
-  const pane = document.getElementById("pane-controles");
+  const pane = document.getElementById(targetId);
+  if (!pane) return;
   pane.innerHTML = "";
 
   const table = document.createElement("table");
@@ -138,7 +139,7 @@ function renderControlesPane() {
   resetBtn.onclick = () => {
     bindings = { ...DEFAULT_BINDINGS };
     saveBindings();
-    renderControlesPane();
+    renderControlesPane(targetId);
   };
 
   const fixedDiv = document.createElement("div");
@@ -332,6 +333,8 @@ function drawShipPreviews() {
     if (el) drawShipPreviewInto(el, type, shape);
     const el2 = document.getElementById("dead-prev-" + type);
     if (el2) drawShipPreviewInto(el2, type, shape);
+    const el3 = document.getElementById("solo-prev-" + type);
+    if (el3) drawShipPreviewInto(el3, type, shape);
   }
 }
 
@@ -345,7 +348,63 @@ addEventListener("resize", () => {
 
 const _wsProto = location.protocol === "https:" ? "wss:" : "ws:";
 const _wsHost = location.hostname ? location.host : "localhost:8080";
-const ws = new WebSocket(_wsProto + "//" + _wsHost);
+const _wsURL = _wsProto + "//" + _wsHost;
+const ws = new WebSocket(_wsURL);
+
+// ── Feedback de pérdida de conexión + reconexión automática ──
+// El estado del jugador vive en el servidor atado a la conexión; al reconectar se
+// recarga la página para empezar una sesión limpia y coherente.
+let _connLost = false;
+let _reconnectTimer = null;
+let _reconnectProbe = null;
+
+function showConnLost() {
+  if (_connLost) return;
+  _connLost = true;
+  const el = document.getElementById("connLost");
+  if (el) el.classList.remove("hidden");
+  scheduleReconnect(500);
+}
+
+function scheduleReconnect(delay) {
+  clearTimeout(_reconnectTimer);
+  _reconnectTimer = setTimeout(tryReconnect, delay);
+}
+
+function tryReconnect() {
+  // Cierra cualquier sonda previa
+  if (_reconnectProbe) { try { _reconnectProbe.onopen = _reconnectProbe.onerror = null; _reconnectProbe.close(); } catch (e) {} }
+  try {
+    _reconnectProbe = new WebSocket(_wsURL);
+  } catch (e) {
+    scheduleReconnect(2000);
+    return;
+  }
+  _reconnectProbe.onopen = () => {
+    // Servidor disponible de nuevo → recargar para reiniciar la sesión limpiamente
+    try { _reconnectProbe.close(); } catch (e) {}
+    location.reload();
+  };
+  _reconnectProbe.onerror = () => {
+    try { _reconnectProbe.close(); } catch (e) {}
+    scheduleReconnect(2000); // reintenta cada 2 s mientras el servidor no responda
+  };
+}
+
+ws.addEventListener("close", showConnLost);
+ws.addEventListener("error", showConnLost);
+
+// Animación de los puntos suspensivos del overlay
+setInterval(() => {
+  if (!_connLost) return;
+  const dots = document.getElementById("connLostDots");
+  if (dots) dots.textContent = ".".repeat((Math.floor(Date.now() / 500) % 3) + 1);
+}, 500);
+
+{
+  const _reloadBtn = document.getElementById("connLostReload");
+  if (_reloadBtn) _reloadBtn.onclick = () => location.reload();
+}
 
 let uiState = "lobby";
 let currentRoomId = null;
@@ -360,6 +419,17 @@ let beams = [];
 let empPulses = [];
 let mines = [];
 let prevPulseIds = new Set();   // para sonar el EMP/explosión solo en pulsos nuevos
+let prevBeamIds = new Set();    // para lanzar el burst de impacto del rayo solo una vez
+
+// ── Modo oleadas (solo práctica) ──
+let soloMode = false;
+let waveMode = false;
+let teamLives = null;   // vidas compartidas del equipo en modo oleadas (null = respawn infinito)
+let waveNum = 0;
+let waveTotal = 0;
+let enemiesLeft = 0;
+let waveBanner = null;
+let waveBannerShownAt = 0;
 let asteroids = [];
 
 let targetId = null;
@@ -703,14 +773,31 @@ function updateMobiPartida() {
     `;
   }
 
-  mobiStatusEl.innerHTML =
+  // Salida al lobby siempre disponible durante la partida (host o no)
+  const leaveHtml = `
+    <div class="mobiDivider"></div>
+    <button id="mobiLeaveBtn" class="mobiLeaveBtn">↩ Salir al lobby</button>
+  `;
+
+  const html =
     renderTeam(green, "#00ff88", "EQUIPO VERDE") +
     renderTeam(red, "#ff3355", "EQUIPO ROJO") +
-    hostHtml;
+    hostHtml +
+    leaveHtml;
+
+  // Solo reescribir el DOM si el contenido cambió. Reescribirlo cada frame recreaba
+  // los botones y rompía el clic (mousedown y mouseup caían en elementos distintos).
+  if (html === _mobiPartidaSig) return;
+  _mobiPartidaSig = html;
+  mobiStatusEl.innerHTML = html;
 
   const mobiToggle = document.getElementById("mobiToggleMidGame");
   if (mobiToggle) mobiToggle.onclick = () => ws.send(JSON.stringify({ type: "toggleMidGameJoin" }));
+
+  const mobiLeave = document.getElementById("mobiLeaveBtn");
+  if (mobiLeave) mobiLeave.onclick = returnToLobby;
 }
+let _mobiPartidaSig = "";
 
 // ── Game Over
 const gameOverEl = document.getElementById("gameOver");
@@ -722,11 +809,12 @@ function showGameOver() {
 
   gameOverEl.classList.remove("hidden");
   const isHost = roomData && roomData.ownerId === myId;
-  restartBtn.classList.toggle("hidden", !isHost);
+  // En práctica (solo) no hay reinicio ni pistas host/invitado: solo "Volver al lobby"
+  restartBtn.classList.toggle("hidden", soloMode || !isHost);
   const hostHint = document.getElementById("gameOverHostHint");
   const guestHint = document.getElementById("gameOverGuestHint");
-  if (hostHint) hostHint.classList.toggle("hidden", !isHost);
-  if (guestHint) guestHint.classList.toggle("hidden", isHost);
+  if (hostHint) hostHint.classList.toggle("hidden", soloMode || !isHost);
+  if (guestHint) guestHint.classList.toggle("hidden", soloMode || isHost);
   playVictorySound();
   stopMusic();
   hideDeadPanel();
@@ -746,35 +834,39 @@ function resetClientState() {
   asteroidCache.clear();
   cancelSd();
   hideDeadPanel();
+  soloMode = false; waveMode = false; waveNum = 0; enemiesLeft = 0; waveBanner = null; teamLives = null;
 }
 
 restartBtn.onclick = () => {
   ws.send(JSON.stringify({ type: "restartGame" }));
 };
 
-document.getElementById("backToLobby").onclick = () => {
-
+// Vuelve al lobby desde cualquier estado (game over, partida en curso o muerto).
+// Centraliza toda la limpieza para que no haya estados a medias ("doble salida").
+function returnToLobby() {
   clearTimeout(gameOverTimer);
-  gameOverTimer = null;  
+  gameOverTimer = null;
   winner = null;
-  prevWinner = null;  
-  hideGameOver();
+  prevWinner = null;
 
   ws.send(JSON.stringify({ type: "leaveRoom" }));
-  resetClientState();
+  resetClientState();          // limpia winner/prevWinner, players, target, etc.
   uiState = "lobby";
   currentRoomId = null;
   roomData = null;
+
   resetAudio();
   hideGameOver();
+  hideDeadPanel();
   closeMobiglass();
+  closeChat();
   menu.style.display = "";
   hud.classList.add("hidden");
-  roomDiv.classList.add("hidden");
-  lobbyDiv.classList.remove("hidden");
+  showMenuScreen("mainMenu");   // volver al hub principal
   updateUI();
-  ws.send(JSON.stringify({ type: "getRooms" }));
-};
+}
+
+document.getElementById("backToLobby").onclick = returnToLobby;
 
 // ── Chat
 const chatContainer = document.getElementById("chatContainer");
@@ -852,12 +944,14 @@ function startBeamCharge() {
   beamHeld = true;
   ws.send(JSON.stringify({ type: "beamCharge", charging: true }));
 }
-function releaseBeamCharge() {
+// cancel=true → soltar sin disparar (mouseleave, perder foco, muerte). Evita que
+// el rayo se dispare por un release involuntario aunque estuviera cargado.
+function releaseBeamCharge(cancel = false) {
   if (!beamHeld) return;
   beamHeld = false;
   const me = getMe();
-  if (me && (me.beamCharge ?? 0) >= 0.999) playBeamFireSound();  // solo si llegó a disparar
-  ws.send(JSON.stringify({ type: "beamCharge", charging: false }));
+  if (!cancel && me && (me.beamCharge ?? 0) >= 0.999) playBeamFireSound();  // solo si llegó a disparar
+  ws.send(JSON.stringify({ type: "beamCharge", charging: false, cancel }));
 }
 let beamWasReady = false;     // para sonar el aviso eléctrico al quedar listo el rayo
 let abilityWasReady = true;   // idem para la habilidad [X] (arranca lista → sin aviso inicial)
@@ -886,7 +980,11 @@ canvas.addEventListener("mouseup", e => {
   if (e.button === 0) { releaseBeamCharge(); stopAutoFire(); }
 });
 
-canvas.addEventListener("mouseleave", () => { releaseBeamCharge(); stopAutoFire(); });
+// El ratón sale del canvas: cancelar la carga (no disparar) para no soltar el rayo sin querer
+canvas.addEventListener("mouseleave", () => { releaseBeamCharge(true); stopAutoFire(); });
+
+// Perder el foco de la ventana (alt-tab, clic fuera): cancelar la carga del rayo
+addEventListener("blur", () => { releaseBeamCharge(true); stopAutoFire(); });
 
 // ── Spectator
 function cycleSpectator() {
@@ -944,19 +1042,28 @@ const nameInput = document.getElementById("nameInput");
 const savedName = localStorage.getItem("spacetactics_name");
 if (savedName) nameInput.value = savedName;
 
-function applyName() {
+let _nameSavedTimer = null;
+function applyName(showFeedback = false) {
   const name = nameInput.value.trim() || "Pilot";
   nameInput.value = name;
   localStorage.setItem("spacetactics_name", name);
   if (ws.readyState === 1) {
     ws.send(JSON.stringify({ type: "setName", name }));
   }
+  if (showFeedback) {
+    const msg = document.getElementById("nameSavedMsg");
+    if (msg) {
+      msg.classList.remove("hidden");
+      clearTimeout(_nameSavedTimer);
+      _nameSavedTimer = setTimeout(() => msg.classList.add("hidden"), 1800);
+    }
+  }
 }
 
-document.getElementById("setNameBtn").onclick = applyName;
+document.getElementById("setNameBtn").onclick = () => applyName(true);
 
 nameInput.addEventListener("keydown", e => {
-  if (e.key === "Enter") applyName();
+  if (e.key === "Enter") applyName(true);
 });
 
 function requireName() {
@@ -999,23 +1106,72 @@ readyBtn.onclick = () => {
       : "Go";
 };
 
-document.getElementById("leaveRoom").onclick = () => {
-
-  clearTimeout(gameOverTimer);
-  gameOverTimer = null;
-
-  ws.send(JSON.stringify({ type: "leaveRoom" }));
-  uiState = "lobby";
-  currentRoomId = null;
-  roomDiv.classList.add("hidden");
-  lobbyDiv.classList.remove("hidden");
-  updateUI();
-};
+document.getElementById("leaveRoom").onclick = returnToLobby;
 
 document.getElementById("switchTeam").onclick = () => {
   ws.send(JSON.stringify({
     type: "switchTeam"
   }));
+};
+
+// ── Navegación del menú principal ──────────────
+// Enlace de donaciones — reemplázalo por el tuyo (PayPal.me, Ko-fi, etc.)
+const SUPPORT_URL = "https://www.paypal.com/paypalme/";
+
+const MENU_SCREENS = ["mainMenu", "lobby", "soloSetup", "controlsScreen", "room"];
+function showMenuScreen(name) {
+  MENU_SCREENS.forEach(s => {
+    const el = document.getElementById(s);
+    if (el) el.classList.toggle("hidden", s !== name);
+  });
+}
+
+document.getElementById("menuPlayOnline").onclick = () => {
+  if (!requireName()) return;
+  showMenuScreen("lobby");
+  ws.send(JSON.stringify({ type: "getRooms" }));
+};
+
+document.getElementById("menuSolo").onclick = () => showMenuScreen("soloSetup");
+
+document.getElementById("menuControls").onclick = () => {
+  renderControlesPane("menuControlsBody");
+  showMenuScreen("controlsScreen");
+};
+
+document.getElementById("menuSupport").onclick = () => {
+  window.open(SUPPORT_URL, "_blank", "noopener");
+};
+
+document.querySelectorAll("[data-back]").forEach(btn => {
+  btn.onclick = () => showMenuScreen("mainMenu");
+});
+
+// Grupos de opción (duración / tamaño) de la práctica solo
+function wireChoiceGroup(groupId) {
+  const group = document.getElementById(groupId);
+  if (!group) return;
+  group.addEventListener("click", e => {
+    const btn = e.target.closest(".soloChoice");
+    if (!btn) return;
+    group.querySelectorAll(".soloChoice").forEach(b => b.classList.toggle("selected", b === btn));
+  });
+}
+wireChoiceGroup("soloMode");
+wireChoiceGroup("soloDuration");
+wireChoiceGroup("soloSize");
+
+document.getElementById("soloStart").onclick = () => {
+  applyName();                       // guarda el tag actual (sin exigirlo en solo)
+  initAudio();
+  applyStoredVolumes();
+  const modeBtn = document.querySelector("#soloMode .soloChoice.selected");
+  const durBtn  = document.querySelector("#soloDuration .soloChoice.selected");
+  const sizeBtn = document.querySelector("#soloSize .soloChoice.selected");
+  const mode = modeBtn ? modeBtn.dataset.mode : "waves";
+  const durationS = durBtn ? Number(durBtn.dataset.secs) : 300;
+  const size = sizeBtn ? sizeBtn.dataset.size : "medium";
+  ws.send(JSON.stringify({ type: "startSolo", mode, size, durationS, shipType: soloSelectedShip }));
 };
 
 ws.onmessage = e => {
@@ -1037,8 +1193,7 @@ ws.onmessage = e => {
     currentRoomId = data.roomId;
     uiState = "inRoom";
 
-    lobbyDiv.classList.add("hidden");
-    roomDiv.classList.remove("hidden");
+    showMenuScreen("room");
     updateUI();
   }
 
@@ -1087,14 +1242,18 @@ ws.onmessage = e => {
     closeMobiglass();
     hud.classList.add("hidden");
     menu.style.display = "";
-    lobbyDiv.classList.add("hidden");
-    roomDiv.classList.remove("hidden");
+    showMenuScreen("room");
     renderPlayers();
     resetAudio();
     updateUI();
   }
 
   if (data.type === "state") {
+    // Ignorar estados tardíos que llegan tras salir de la sala: el servidor sigue
+    // emitiendo a 60fps hasta procesar el leaveRoom y esos frames re-asignaban
+    // `winner`, reprogramando el game over (bug de "doble salida" al lobby).
+    if (uiState !== "inRoom") return;
+
     const incoming = data.players || {};
 
     // Detect newly dead → explosion + shake
@@ -1111,7 +1270,7 @@ ws.onmessage = e => {
             shakeMag = Math.max(shakeMag, Math.max(0, (500 - dist) / 500) * 14);
           }
         }
-        if (p.id === myId) { cancelSd(); clientDeadAt = Date.now(); }
+        if (p.id === myId) { cancelSd(); clientDeadAt = Date.now(); targetId = null; }
       }
       // Detectar respawn (dead → alive)
       if (!p.dead && deadIds.has(p.id)) {
@@ -1144,6 +1303,13 @@ ws.onmessage = e => {
 
     // Non-interpolated state: apply immediately
     beams = data.beams || [];
+    // Burst de impacto (partículas) solo al aparecer un beam nuevo que ha golpeado
+    const seenBeams = new Set();
+    beams.forEach(b => {
+      seenBeams.add(b.id);
+      if (b.hit && !prevBeamIds.has(b.id)) spawnBeamImpact(b.x2, b.y2, b.team);
+    });
+    prevBeamIds = seenBeams;
     empPulses = data.empPulses || [];
     mines = data.mines || [];
     // Sonido al aparecer una onda EMP / explosión de mina nueva
@@ -1160,6 +1326,20 @@ ws.onmessage = e => {
     winner = data.winner;
     killFeed = data.killFeed || [];
     updateTimer(data.timeLeft);
+
+    // Modo oleadas (solo práctica)
+    soloMode = !!data.solo;
+    waveMode = !!data.waveMode;
+    teamLives = (data.teamLives === undefined ? null : data.teamLives);
+    waveNum = data.wave || 0;
+    waveTotal = data.waveTotal || 0;
+    enemiesLeft = data.enemiesLeft || 0;
+    if (data.waveBanner && data.waveBanner !== waveBanner) {
+      waveBanner = data.waveBanner;
+      waveBannerShownAt = Date.now();
+    } else if (!data.waveBanner) {
+      waveBanner = null;
+    }
   }
 
 };
@@ -1260,7 +1440,7 @@ function buildShipCards(ships) {
         <div class="sRow sRowShield"><span class="sLbl" style="color:#6ab8cc">SHD</span><div class="sBar">${segs(ship.maxShield ?? 0, maxShield)}</div><span class="sVal">${ship.maxShield ?? 0}</span></div>
         <div class="sRow"><span class="sLbl">VEL</span><div class="sBar">${segs(ship.thrustMult, maxSpeed)}</div><span class="sVal">${velDisplay}</span></div>
         <div class="sRow"><span class="sLbl">MSL</span><div class="sBar">${segs(ship.maxMissiles, maxMsl)}</div><span class="sVal">${mslDisplay}</span></div>
-        <div class="sRow"><span class="sLbl">SIG</span><div class="sBar">${segs(ship.radarSignature, maxRadar)}</div><span class="sVal">${ship.radarSignature}</span></div>
+        <div class="sRow"><span class="sLbl" title="Firma de radar: a mayor firma, antes te detectan">FIR</span><div class="sBar">${segs(ship.radarSignature, maxRadar)}</div><span class="sVal">${ship.radarSignature}</span></div>
       </div>
       <div class="shipCardDesc">${ship.desc || ""}</div>
     `;
@@ -1271,13 +1451,17 @@ function buildShipCards(ships) {
   container.innerHTML = "";
   const deadContainer = document.getElementById("deadShipCards");
   deadContainer.innerHTML = "";
+  const soloContainer = document.getElementById("soloShipCards");
+  if (soloContainer) soloContainer.innerHTML = "";
 
   for (const [type, ship] of Object.entries(ships)) {
     container.appendChild(makeCard(type, ship, "prev-"));
     deadContainer.appendChild(makeCard(type, ship, "dead-prev-"));
+    if (soloContainer) soloContainer.appendChild(makeCard(type, ship, "solo-prev-"));
   }
 
   drawShipPreviews();
+  syncSoloShipSelector(soloSelectedShip);
 }
 
 function renderPlayers() {
@@ -1316,6 +1500,7 @@ function renderPlayers() {
     hostBar.id = "hostBar";
     const mjOn = roomData.allowJoinMidGame;
     const ebOn = roomData.enforceBalance;
+    const coopOn = roomData.coopMode;
     const ws_ = roomData.worldSize || "medium";
     const SIZES = [
       { key: "small", label: "Pequeño 3K", sub: "15 ast." },
@@ -1325,10 +1510,14 @@ function renderPlayers() {
     ];
     hostBar.innerHTML = `
       <div class="hostToggleRow">
+        <span class="hostBarLabel">Co-op vs IA (oleadas)</span>
+        <button id="toggleCoop" class="hostToggleBtn ${coopOn ? 'on' : ''}">${coopOn ? 'ON' : 'OFF'}</button>
+      </div>
+      <div class="hostToggleRow">
         <span class="hostBarLabel">Unirse en partida</span>
         <button id="toggleMidGameJoin" class="hostToggleBtn ${mjOn ? 'on' : ''}">${mjOn ? 'ON' : 'OFF'}</button>
       </div>
-      <div class="hostToggleRow">
+      <div class="hostToggleRow" ${coopOn ? 'style="opacity:.4;pointer-events:none"' : ''}>
         <span class="hostBarLabel">Equipos equilibrados</span>
         <button id="toggleEnforceBalance" class="hostToggleBtn ${ebOn ? 'on' : ''}">${ebOn ? 'ON' : 'OFF'}</button>
       </div>
@@ -1343,6 +1532,8 @@ function renderPlayers() {
         </div>
       </div>
     `;
+    hostBar.querySelector("#toggleCoop").onclick = () =>
+      ws.send(JSON.stringify({ type: "toggleCoop" }));
     hostBar.querySelector("#toggleMidGameJoin").onclick = () =>
       ws.send(JSON.stringify({ type: "toggleMidGameJoin" }));
     hostBar.querySelector("#toggleEnforceBalance").onclick = () =>
@@ -1353,11 +1544,22 @@ function renderPlayers() {
     playersDiv.appendChild(hostBar);
   }
 
+  // Botón "Cambiar equipo": sin sentido en co-op (todos juntos vs IA)
+  const switchBtn = document.getElementById("switchTeam");
+  if (switchBtn) switchBtn.classList.toggle("hidden", !!roomData.coopMode);
+
   // ── Barra de equilibrio (visible para todos) ──
   const gc = Object.values(roomData.players).filter(p => p.team === "green").length;
   const rc = Object.values(roomData.players).filter(p => p.team === "red").length;
   const unbalanced = gc !== rc;
-  if (gc > 0 || rc > 0) {
+  if (roomData.coopMode) {
+    const balBar = document.createElement("div");
+    balBar.id = "balanceBar";
+    balBar.innerHTML = `<span class="balTeam green">🟢 ${gc} jugador(es)</span>
+      <span class="balSep">vs</span>
+      <span class="balTeam red">🤖 IA · OLEADAS</span>`;
+    playersDiv.appendChild(balBar);
+  } else if (gc > 0 || rc > 0) {
     const balBar = document.createElement("div");
     balBar.id = "balanceBar";
     balBar.innerHTML = `
@@ -1467,7 +1669,19 @@ function renderPlayers() {
 }
 
 function syncShipSelector(type) {
-  document.querySelectorAll(".shipCard").forEach(card => {
+  // Acotado a lobby + panel de muerte (no toca las cards de la pantalla solo)
+  ["shipCards", "deadShipCards"].forEach(cid => {
+    document.querySelectorAll(`#${cid} .shipCard`).forEach(card => {
+      card.classList.toggle("selected", card.dataset.type === type);
+    });
+  });
+}
+
+// Selección de nave en la pantalla de práctica solo (solo estado local)
+let soloSelectedShip = "fighter";
+function syncSoloShipSelector(type) {
+  soloSelectedShip = type;
+  document.querySelectorAll("#soloShipCards .shipCard").forEach(card => {
     card.classList.toggle("selected", card.dataset.type === type);
   });
 }
@@ -1482,10 +1696,20 @@ function handleShipCardClick(e) {
 document.getElementById("shipCards").addEventListener("click", handleShipCardClick);
 document.getElementById("deadShipCards").addEventListener("click", handleShipCardClick);
 
+const _soloShipCards = document.getElementById("soloShipCards");
+if (_soloShipCards) _soloShipCards.addEventListener("click", e => {
+  const card = e.target.closest(".shipCard");
+  if (card) syncSoloShipSelector(card.dataset.type);
+});
+
 // Botón cambiar equipo desde el panel de muerte
 document.getElementById("deadSwitchTeamBtn").addEventListener("click", () => {
   ws.send(JSON.stringify({ type: "switchTeam" }));
 });
+
+// Botón salir al lobby desde el panel de muerte (un jugador muerto puede abandonar
+// la partida sin tener que esperar al game over)
+document.getElementById("deadLeaveBtn").addEventListener("click", returnToLobby);
 
 const deadPanel = document.getElementById("deadPanel");
 
@@ -1493,10 +1717,61 @@ function showDeadPanel() {
   deadPanel.classList.remove("hidden");
   const me = getMe();
   if (me) syncShipSelector(me.shipType || "fighter");
+  _deadTurretSig = "";
+  renderDeadTurretOptions();
 }
 
 function hideDeadPanel() {
   deadPanel.classList.add("hidden");
+  _deadTurretSig = "";
+}
+
+// Opciones de "ir de torretero": naves aliadas vivas (Gunship/Capital) con torreta
+// libre que un jugador muerto puede abordar para reaparecer como artillero.
+let _deadTurretSig = "";
+function renderDeadTurretOptions() {
+  const section = document.getElementById("deadTurretSection");
+  const optsEl = document.getElementById("deadTurretOptions");
+  if (!section || !optsEl) return;
+
+  const me = players[myId];
+  if (!me) { section.classList.add("hidden"); return; }
+
+  const myReservedPilot = me.pilotingFor || null;
+  const entries = [];
+  Object.values(players).forEach(p => {
+    if (p.dead || p.team !== me.team || p.pilotingFor) return;
+    if (p.shipType !== "gunship" && p.shipType !== "capital") return;
+    const free = p.shipType === "gunship"
+      ? (p.gunnerId ? 0 : 1)
+      : (p.gunnerIds || [null, null, null]).filter(x => !x).length;
+    const reservedHere = myReservedPilot === p.id;
+    if (free > 0 || reservedHere) {
+      entries.push({ id: p.id, name: p.name || "Pilot", type: p.shipType, free, reservedHere });
+    }
+  });
+
+  // Evita re-render innecesario del DOM
+  const sig = entries.map(e => `${e.id}:${e.free}:${e.reservedHere ? 1 : 0}`).join("|");
+  if (sig === _deadTurretSig) return;
+  _deadTurretSig = sig;
+
+  if (entries.length === 0) { section.classList.add("hidden"); optsEl.innerHTML = ""; return; }
+  section.classList.remove("hidden");
+
+  optsEl.innerHTML = entries.map(e => {
+    const label = SHIP_LABELS[e.type] || e.type.toUpperCase();
+    const status = e.reservedHere ? "RESERVADA · [R] para entrar" : `${e.free} torreta(s) libre(s)`;
+    return `<button class="deadTurretBtn${e.reservedHere ? ' reserved' : ''}" data-pid="${e.id}">
+      <span class="dtName">${e.name}</span>
+      <span class="dtType">${label}</span>
+      <span class="dtStatus">${status}</span>
+    </button>`;
+  }).join("");
+
+  optsEl.querySelectorAll(".deadTurretBtn").forEach(btn => {
+    btn.onclick = () => ws.send(JSON.stringify({ type: "boardShip", targetId: btn.dataset.pid }));
+  });
 }
 
 // Las previews se dibujan en buildShipCards() al recibir el init del servidor
@@ -1549,7 +1824,9 @@ addEventListener("keydown", e => {
 
   if (bindings.respawn && key === bindings.respawn) {
     const meNow = getMe();
-    if (meNow && meNow.dead && (meNow.respawnsLeft ?? 0) > 0) {
+    // Vidas: en oleadas hace falta pool del equipo > 0; en PVP/vuelo libre es infinito
+    const canRespawn = waveMode ? (teamLives ?? 0) > 0 : true;
+    if (meNow && meNow.dead && canRespawn) {
       const elapsed = clientDeadAt ? Date.now() - clientDeadAt : 99999;
       if (elapsed >= (CFG_RESPAWN_DELAY * 1000)) {
         ws.send(JSON.stringify({ type: "respawn" }));
@@ -2010,7 +2287,7 @@ function drawShip(player, camX, camY) {
     ctx.restore();
   }
 
-  // ── EMP: chispas rojas envolviendo a la nave impactada por el rayo de la Capital
+  // ── EMP: chispas rojas envolviendo a la nave apagada por el pulso EMP del Disruptor
   const emp = player.emp ?? 0;
   if (!player.dead && emp > 0.01) {
     const R = shape.shieldR ?? 60;
@@ -2052,6 +2329,41 @@ function drawShip(player, camX, camY) {
       ctx.beginPath();
       ctx.moveTo(Math.cos(ang) * r0, Math.sin(ang) * r0);
       ctx.lineTo(Math.cos(ang) * r1, Math.sin(ang) * r1);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── Impacto del rayo de la Capital: descarga eléctrica azul/blanca envolviendo
+  //    el casco (efecto propio, distinto del rojo del EMP).
+  const beamHit = (player.beamHit ?? 0) / 8; // CAPITAL_BEAM_LIFE = 8
+  if (!player.dead && beamHit > 0.01) {
+    const R = shape.shieldR ?? 60;
+    ctx.save();
+    // Resplandor azul-blanco
+    ctx.globalAlpha = 0.15 + 0.4 * beamHit;
+    const g = ctx.createRadialGradient(0, 0, R * 0.3, 0, 0, R * 1.25);
+    g.addColorStop(0,   "#ffffffaa");
+    g.addColorStop(0.6, "#66ccffaa");
+    g.addColorStop(1,   "#ffffff00");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, R * 1.25, 0, Math.PI * 2); ctx.fill();
+
+    // Arcos eléctricos blancos crepitando alrededor del casco
+    ctx.strokeStyle = "#cfeeff";
+    ctx.lineWidth = 1.6;
+    ctx.globalAlpha = 0.5 + 0.5 * beamHit;
+    const arcs = Math.round(3 + beamHit * 5);
+    for (let k = 0; k < arcs; k++) {
+      const a0 = Math.random() * Math.PI * 2;
+      const segs = 4;
+      ctx.beginPath();
+      for (let i = 0; i <= segs; i++) {
+        const ang = a0 + (i / segs) * (0.5 + Math.random() * 0.6);
+        const rr = R * (0.85 + (Math.random() - 0.5) * 0.6);
+        const x = Math.cos(ang) * rr, y = Math.sin(ang) * rr;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
       ctx.stroke();
     }
     ctx.restore();
@@ -2221,13 +2533,69 @@ function drawShip(player, camX, camY) {
     ctx.restore();
   }
 
-  // ── Target lock ring (always visible if targeted) ──
+  // ── Target lock reticle (estilo space-sim) ──
   if (player.id === targetId) {
+    drawTargetReticle(pos.x, pos.y, player);
+  }
+}
+
+// Retículo de objetivo: anillo giratorio discontinuo + corchetes de esquina +
+// cruz central + etiqueta de distancia. Sustituye al antiguo círculo amarillo.
+function drawTargetReticle(sx, sy, target) {
+  const now = performance.now();
+  const R = 34;
+  const pulse = 0.7 + 0.3 * Math.sin(now / 220);
+  const col = "255,70,70"; // rojo hostil
+
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  // Anillo giratorio discontinuo
+  const spin = (now / 2600) % (Math.PI * 2);
+  ctx.rotate(spin);
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  ctx.setLineDash([6, 10]);
+  ctx.strokeStyle = `rgba(${col},${0.35 * pulse})`;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.rotate(-spin);
+
+  // 4 corchetes de esquina (que "respiran" con el pulso)
+  const b = R + 4 + 3 * pulse;
+  const len = 11;
+  ctx.strokeStyle = `rgba(${col},${pulse})`;
+  ctx.lineWidth = 2.5;
+  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([cx, cy]) => {
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 28, 0, Math.PI * 2);
-    ctx.strokeStyle = "#ffff00";
-    ctx.lineWidth = 2;
+    ctx.moveTo(cx * b - cx * len, cy * b);
+    ctx.lineTo(cx * b, cy * b);
+    ctx.lineTo(cx * b, cy * b - cy * len);
     ctx.stroke();
+  });
+
+  // Cruz central tenue
+  ctx.strokeStyle = `rgba(${col},${0.5 * pulse})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-5, 0); ctx.lineTo(5, 0);
+  ctx.moveTo(0, -5); ctx.lineTo(0, 5);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Etiqueta de distancia + LOCK
+  const me = getMe();
+  if (me) {
+    const dist = Math.round(Math.hypot(target.x - me.x, target.y - me.y));
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.font = "bold 13px 'Courier New', monospace";
+    ctx.fillStyle = `rgba(${col},${pulse})`;
+    ctx.fillText(`⊕ LOCK · ${dist}m`, sx, sy + b + 18);
+    ctx.restore();
+    ctx.textAlign = "left";
   }
 }
 
@@ -2322,6 +2690,34 @@ function drawBeams(camX, camY) {
       if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
     ctx.stroke();
+
+    // ── Nodo de impacto en el extremo (efecto propio del rayo) ──
+    if (b.hit) {
+      const t = performance.now() / 1000;
+      // Halo radial palpitante
+      const haloR = (12 + 6 * Math.sin(t * 30)) * frac + 4;
+      const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, haloR * 1.8);
+      grad.addColorStop(0, `rgba(255,255,255,${0.9 * frac})`);
+      grad.addColorStop(0.4, `${col}cc`);
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.globalAlpha = frac;
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(c.x, c.y, haloR * 1.8, 0, Math.PI * 2); ctx.fill();
+
+      // Destellos radiales (estrella de impacto)
+      ctx.globalAlpha = 0.9 * frac;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      const rays = 6;
+      for (let i = 0; i < rays; i++) {
+        const a2 = (i / rays) * Math.PI * 2 + t * 2;
+        const len2 = haloR * (1.4 + 0.5 * Math.sin(t * 25 + i));
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y);
+        ctx.lineTo(c.x + Math.cos(a2) * len2, c.y + Math.sin(a2) * len2);
+        ctx.stroke();
+      }
+    }
     ctx.restore();
   });
 }
@@ -2384,8 +2780,108 @@ function drawMines(camX, camY) {
     ctx.globalAlpha = 0.12;
     ctx.strokeStyle = col;
     ctx.beginPath(); ctx.arc(pos.x, pos.y, 60, 0, Math.PI * 2); ctx.stroke();
+
+    // Temporizador circular: anillo que se vacía a medida que se agota la vida de la mina
+    const lifeFrac = Math.max(0, Math.min(1, (mn.life ?? 0) / (mn.maxLife || 1)));
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = 2;
+    // Pista de fondo
+    ctx.globalAlpha = 0.18;
+    ctx.strokeStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2); ctx.stroke();
+    // Arco de vida restante (empieza arriba y decrece en sentido horario)
+    ctx.globalAlpha = 0.95;
+    ctx.strokeStyle = lifeFrac < 0.25 ? "#ff4455" : lifeFrac < 0.5 ? "#ffaa00" : col;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 10, -Math.PI / 2, -Math.PI / 2 + lifeFrac * Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   });
+}
+
+// HUD del modo oleadas: indicador de oleada/enemigos + banner central temporal.
+function drawWaveHud() {
+  if (!waveMode) return;
+
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.font = "14px 'Courier New', monospace";
+  ctx.fillStyle = "#ff8899";
+  const label = waveNum > 0 ? `OLEADA ${waveNum}/${waveTotal}` : "PREPARANDO...";
+  const vidas = teamLives != null ? `  ·  VIDAS EQUIPO: ${"♥".repeat(Math.max(0, teamLives)) || "0"}` : "";
+  ctx.fillText(`${label}  ·  ENEMIGOS: ${enemiesLeft}${vidas}`, canvas.width / 2, 70);
+  ctx.restore();
+
+  if (waveBanner) {
+    const t = Date.now() - waveBannerShownAt;
+    const dur = 2600;
+    if (t < dur) {
+      const a = t < 300 ? t / 300 : (t > dur - 600 ? Math.max(0, (dur - t) / 600) : 1);
+      const boss = /CAPITAL/.test(waveBanner);
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.globalAlpha = a;
+      ctx.fillStyle = boss ? "#ff3355" : "#ffcc44";
+      ctx.font = "bold 44px 'Courier New', monospace";
+      ctx.shadowColor = boss ? "#ff335588" : "#ffcc4488";
+      ctx.shadowBlur = 24;
+      ctx.fillText(waveBanner, canvas.width / 2, canvas.height * 0.28);
+      ctx.restore();
+      ctx.textAlign = "left";
+    }
+  }
+}
+
+// HUD del Interceptor: hasta 4 ranuras de mina, cada una con un anillo circular que
+// muestra el tiempo de vida restante de la mina activa (o vacía si no hay).
+function drawMineTimers() {
+  const me = getMe();
+  if (!me || me.dead || me.shipType !== "interceptor" || me.pilotingFor) return;
+
+  const myMines = mines.filter(m => m.ownerId === myId);
+  const SLOTS = 4; // = CFG.MINE_MAX_ACTIVE en el servidor
+  const total = Math.max(SLOTS, myMines.length);
+  const r = 11, gap = 30;
+  const cx0 = canvas.width / 2 - ((total - 1) * gap) / 2;
+  const cy = canvas.height - 70;
+  const col = me.team === "green" ? "#00ff88" : "#ff3355";
+
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.font = "12px 'Courier New', monospace";
+  ctx.fillStyle = "#88aab0";
+  ctx.fillText("MINAS", canvas.width / 2, cy - r - 8);
+
+  for (let i = 0; i < total; i++) {
+    const x = cx0 + i * gap;
+    const mine = myMines[i];
+
+    // Pista de fondo
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#ffffff22";
+    ctx.beginPath(); ctx.arc(x, cy, r, 0, Math.PI * 2); ctx.stroke();
+
+    if (mine) {
+      const armed = (mine.arm ?? 0) <= 0;
+      const lifeFrac = Math.max(0, Math.min(1, (mine.life ?? 0) / (mine.maxLife || 1)));
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = lifeFrac < 0.25 ? "#ff4455" : lifeFrac < 0.5 ? "#ffaa00" : col;
+      ctx.beginPath();
+      ctx.arc(x, cy, r, -Math.PI / 2, -Math.PI / 2 + lifeFrac * Math.PI * 2);
+      ctx.stroke();
+      // Centro: parpadea naranja mientras se arma, color de equipo al estar armada
+      ctx.fillStyle = armed ? col : "#ffaa00";
+      ctx.beginPath(); ctx.arc(x, cy, 3.5, 0, Math.PI * 2); ctx.fill();
+      // Segundos restantes (FPS del servidor = 60)
+      ctx.fillStyle = "#cfd8e3";
+      ctx.fillText(String(Math.ceil((mine.life ?? 0) / 60)), x, cy + r + 13);
+    } else {
+      ctx.fillStyle = "#ffffff22";
+      ctx.beginPath(); ctx.arc(x, cy, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.restore();
+  ctx.textAlign = "left";
 }
 
 
@@ -2813,12 +3309,14 @@ function loop() {
 
   applyInterpolatedState();   // compute positions interpolated to now - INTERP_DELAY
 
-  // Auto-clear target lock si el objetivo se esconde bajo cobertura de asteroide
+  // Auto-clear target lock: si yo estoy muerto, si el objetivo muere o se esconde
+  // bajo cobertura de asteroide. Perder el lock al morir evita reaparecer con el
+  // objetivo que tenías antes.
   if (targetId) {
     const tgt = players[targetId];
     const mePl = players[myId];
-    if (!tgt || tgt.dead ||
-      (mePl && (isSheltered(tgt.x, tgt.y) || losBlocked(mePl.x, mePl.y, tgt.x, tgt.y)))) {
+    if (!mePl || mePl.dead || !tgt || tgt.dead ||
+      (isSheltered(tgt.x, tgt.y) || losBlocked(mePl.x, mePl.y, tgt.x, tgt.y))) {
       targetId = null;
     }
   }
@@ -2905,6 +3403,8 @@ function loop() {
   drawpingEffect(camX, camY);
 
   drawRadar();
+  drawMineTimers();
+  drawWaveHud();
 
   if (me) {
     updateHUD(me);
@@ -2912,12 +3412,17 @@ function loop() {
     setMissileWarning(!me.dead && !!(me.lockedByMissile || pilot?.lockedByMissile));
 
     if (me.dead) {
+      if (!deadPanel.classList.contains("hidden")) renderDeadTurretOptions();
+      const reservedPilot = me.pilotingFor ? players[me.pilotingFor] : null;
+      const inTurret = !!(reservedPilot && !reservedPilot.dead);
+
       ctx.fillStyle = "rgba(255,255,255,0.85)";
       ctx.font = "bold 40px 'Courier New', monospace";
       ctx.textAlign = "center";
       ctx.fillText("DESTRUIDO", canvas.width / 2, canvas.height / 2 - 30);
-      const respawnsLeft = me.respawnsLeft ?? 0;
-      if (respawnsLeft > 0) {
+      // Vidas: oleadas → pool de equipo; PVP/vuelo libre → infinito
+      const canRespawn = waveMode ? (teamLives ?? 0) > 0 : true;
+      if (canRespawn) {
         const elapsed = clientDeadAt ? Date.now() - clientDeadAt : 99999;
         const remaining = Math.max(0, Math.ceil((CFG_RESPAWN_DELAY * 1000 - elapsed) / 1000));
         ctx.font = "15px 'Courier New', monospace";
@@ -2926,12 +3431,22 @@ function loop() {
           ctx.fillText(`Reapareciendo en ${remaining}s...`, canvas.width / 2, canvas.height / 2 + 16);
         } else {
           ctx.fillStyle = "#00ff88";
-          ctx.fillText(`[R] Reaparecer · ${respawnsLeft} reapariciu(s)`, canvas.width / 2, canvas.height / 2 + 16);
+          const accion = inTurret
+            ? `Pulsa [R] para entrar en la torreta de ${reservedPilot.name || "tu aliado"}`
+            : "Pulsa [R] para reaparecer";
+          ctx.fillText(accion, canvas.width / 2, canvas.height / 2 + 16);
         }
+        ctx.font = "12px 'Courier New', monospace";
+        ctx.fillStyle = "#666";
+        const vidasTxt = waveMode
+          ? `Vidas de equipo: ${teamLives}`
+          : "Reapariciones: ∞";
+        ctx.fillText(`${vidasTxt}  ·  ${inTurret ? "o elige otra nave/torreta abajo" : "elige tu nave o torreta abajo"}`,
+          canvas.width / 2, canvas.height / 2 + 38);
       } else {
         ctx.font = "13px 'Courier New', monospace";
         ctx.fillStyle = "#666";
-        ctx.fillText("Sin vidas extra · Esperando resultado...", canvas.width / 2, canvas.height / 2 + 16);
+        ctx.fillText("Sin vidas de equipo · esperando el final de la partida", canvas.width / 2, canvas.height / 2 + 16);
       }
       ctx.textAlign = "left";
     }
@@ -2970,9 +3485,15 @@ function loop() {
 
     ctx.fillStyle = winner === "draw" ? "#ffcc00" : winner === "green" ? "#00ff88" : "#ff3355";
     ctx.font = "bold 52px 'Courier New', monospace";
-    const resultText = winner === "draw"
-      ? "⬡ EMPATE"
-      : "⬡ " + (winner === "green" ? "VICTORIA EQUIPO VERDE" : "VICTORIA EQUIPO ROJO");
+    let resultText;
+    if (waveMode) {
+      // Modo oleadas: resultado de práctica (sin equipos)
+      resultText = winner === "green" ? "✦ ¡OLEADAS SUPERADAS!" : "✖ HAS CAÍDO";
+    } else {
+      resultText = winner === "draw"
+        ? "⬡ EMPATE"
+        : "⬡ " + (winner === "green" ? "VICTORIA EQUIPO VERDE" : "VICTORIA EQUIPO ROJO");
+    }
     ctx.fillText(resultText, cx, cy - 90);
 
     const sorted = Object.values(players).sort((a, b) => {

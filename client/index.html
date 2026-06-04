@@ -14,29 +14,91 @@
 
     <h1>Ship Commander</h1>
 
-    <div id="lobby">      
+    <!-- ── MENÚ PRINCIPAL ── -->
+    <div id="mainMenu">
       <div id="nameSection">
         <span>Tag</span>
         <input id="nameInput" type="text" maxlength="16" placeholder="Escribe tu nombre..." autocomplete="off"
           spellcheck="false">
         <button id="setNameBtn">Guardar</button>
+        <span id="nameSavedMsg" class="hidden">✓ Guardado</span>
       </div>
+
+      <div id="mainMenuActions">
+        <button id="menuPlayOnline" class="menuBigBtn">📡 BUSCAR PARTIDAS</button>
+        <button id="menuSolo" class="menuBigBtn">🚀 VUELA SÓLO</button>
+        <button id="menuControls" class="menuBigBtn">🎮 VER CONTROLES</button>
+        <button id="menuSupport" class="menuBigBtn support" disabled>❤ APOYA EL PROYECTO</button>
+      </div>
+    </div>
+
+    <!-- ── BUSCAR PARTIDAS ── -->
+    <div id="lobby" class="hidden">
+      <button class="menuBackBtn" data-back>← Menú</button>
 
       <div id="lobbyActions">
         <button id="createRoom">Crear sala</button>
-        <button id="refreshRooms">↺</button> 
+        <button id="refreshRooms">↺ Actualizar lista</button>
       </div>
-      
-      
+
       <h2>Salas disponibles</h2>
       <div id="rooms"></div>
       <div id="lobbyHint">Crea una sala o únete a una existente para empezar.</div>
     </div>
 
+    <!-- ── PRÁCTICA EN SOLITARIO ── -->
+    <div id="soloSetup" class="hidden">
+      <button class="menuBackBtn" data-back>← Menú</button>
+      <h2>Vuela sólo</h2>
+
+      <div class="soloOpt">
+        <div class="soloOptLabel">MODO</div>
+        <div class="soloChoices" id="soloMode">
+          <button class="soloChoice selected" data-mode="waves">Oleadas</button>
+          <button class="soloChoice" data-mode="free">Vuelo libre</button>
+        </div>
+      </div>
+
+      <div class="soloOpt">
+        <div class="soloOptLabel">DURACIÓN</div>
+        <div class="soloChoices" id="soloDuration">
+          <button class="soloChoice" data-secs="180">3 min</button>
+          <button class="soloChoice selected" data-secs="300">5 min</button>
+          <button class="soloChoice" data-secs="600">10 min</button>
+          <button class="soloChoice" data-secs="0" disabled>Sin límite</button>
+        </div>
+      </div>
+
+      <div class="soloOpt">
+        <div class="soloOptLabel">TAMAÑO DEL ESCENARIO</div>
+        <div class="soloChoices" id="soloSize">
+          <button class="soloChoice" data-size="small">3K</button>
+          <button class="soloChoice selected" data-size="medium">6K</button>
+          <button class="soloChoice" data-size="large">10K</button>
+          <button class="soloChoice" data-size="huge">15K</button>
+        </div>
+      </div>
+
+      <div class="soloOpt">
+        <div class="soloOptLabel">NAVE</div>
+        <div id="soloShipCards"></div>
+      </div>
+
+      <button id="soloStart" class="menuBigBtn start">▶ EMPEZAR PRÁCTICA</button>
+      <div class="soloHint">Vuela libre para practicar controles y armas. Sal con [F1] → Salir al lobby.</div>
+    </div>
+
+    <!-- ── CONTROLES ── -->
+    <div id="controlsScreen" class="hidden">
+      <button class="menuBackBtn" data-back>← Menú</button>
+      <h2>Controles</h2>
+      <div id="menuControlsBody"></div>
+    </div>
+
     <div id="room" class="hidden">
       <div class="roomHeader">
         <h2>LOBBY</h2>
-        
+
       </div>
 
       <div id="players"></div>
@@ -52,7 +114,7 @@
       <div id="shipSelector">
         <div class="selectorLabel">NAVE DE COMBATE</div>
         <div id="shipCards"></div>
-      </div>           
+      </div>
 
     </div>
   </div>
@@ -69,7 +131,8 @@
       <div>MSL: <span id="mslCd">LISTO</span></div>
       <div>FLT: <span id="inertiaMode">CPLD</span></div>
       <div>CAÑÓN: <span id="weaponHeatEl">FRÍO</span></div>
-      <div id="abilityRow" style="display:none">[X] <span id="abilityName">ESP</span>: <span id="abilityCd">LISTO</span></div>
+      <div id="abilityRow" style="display:none">[X] <span id="abilityName">ESP</span>: <span id="abilityCd">LISTO</span>
+      </div>
     </div>
 
     <div id="topCenter">
@@ -88,10 +151,15 @@
     <div id="deadPanelInner">
       <div id="deadPanelTitle">SELECCIONAR NAVE</div>
       <div id="deadShipCards"></div>
+      <div id="deadTurretSection" class="hidden">
+        <div id="deadTurretLabel">O ENTRA DE ARTILLERO</div>
+        <div id="deadTurretOptions"></div>
+      </div>
       <div id="deadPanelActions">
         <button id="deadSwitchTeamBtn">⇄ Cambiar equipo</button>
+        <button id="deadLeaveBtn">↩ Salir al lobby</button>
       </div>
-      <div id="deadPanelHint">Pulsa [R] para reaparecer con la nave seleccionada</div>
+      <div id="deadPanelHint">Elige nave · pulsa <b>[R]</b> para reaparecer</div>
     </div>
   </div>
 
@@ -149,7 +217,7 @@
             <div class="mobiSettingsRow">
               <select id="musicTrackSel">
                 <option value="A">Pista A — Ambiental</option>
-                <option value="B">Pista B — Más presencia</option>
+                <option value="B">Pista B — Lo-Fi Chill</option>
               </select>
             </div>
           </div>
@@ -182,8 +250,10 @@
 
   <!-- ── GAME OVER ── -->
   <div id="gameOver" class="hidden">
-    <div id="gameOverHostHint" class="hidden gameOverHint">Como host puedes reiniciar para todos</div>
-    <div id="gameOverGuestHint" class="hidden gameOverHint">Esperando al host para reiniciar...</div>
+    <div id="gameOverHostHint" class="hidden gameOverHint">Eres el HOST · puedes reiniciar la partida para todos o
+      volver al lobby</div>
+    <div id="gameOverGuestHint" class="hidden gameOverHint">Esperando a que el HOST reinicie... · puedes volver al lobby
+      cuando quieras</div>
     <button id="restartBtn" class="hidden">↺ Reiniciar partida</button>
     <button id="backToLobby">↩ Volver al lobby</button>
   </div>
@@ -192,6 +262,17 @@
   <div id="chatContainer" class="hidden">
     <input id="chatInput" type="text" maxlength="60" placeholder="Mensaje... (Enter enviar · Esc cancelar)"
       autocomplete="off" spellcheck="false">
+  </div>
+
+  <!-- ── CONEXIÓN PERDIDA ── -->
+  <div id="connLost" class="hidden">
+    <div id="connLostInner">
+      <div id="connLostIcon">📡</div>
+      <div id="connLostTitle">30K</div>
+      <div id="connLostMsg">Esperando reconexión con el servidor<span id="connLostDots">...</span></div>
+      <div id="connLostHint">Se reconectará automáticamente en cuanto el servidor vuelva.</div>
+      <button id="connLostReload">↻ Reintentar ahora</button>
+    </div>
   </div>
 
   <!-- ── CANVAS ── -->

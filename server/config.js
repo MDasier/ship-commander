@@ -77,6 +77,12 @@ const DEFAULTS = {
   GUNNER_MISSILES: 20,
   GUNNER_MISSILE_COOLDOWN: 55,
 
+  // ── IA / Dificultad (bots del modo oleadas)
+  AI_SPEED_MULT: 0.55,          // multiplica el empuje del bot (menor = más lento, más fácil de acertar)
+  AI_TURN_MULT: 0.55,           // multiplica el giro del bot (menor = menos esquivo)
+  AI_AIM_JITTER: 0.22,          // error de puntería en radianes (mayor = falla más)
+  AI_FIRE_COOLDOWN_MULT: 1.6,   // multiplica el cooldown de disparo del bot (mayor = dispara menos)
+
   // ── Asteroides
   ASTEROID_IMPACT_MIN: 3,
   ASTEROID_DAMAGE_FACTOR: 4,
