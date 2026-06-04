@@ -14,6 +14,7 @@ const DEFAULT_BINDINGS = {
   respawn: "r",
   scan: "c",
   inertiaDamp: "z",
+  brake: " ",
 };
 
 const BINDING_LABELS = {
@@ -28,6 +29,7 @@ const BINDING_LABELS = {
   respawn: "Reaparecer",
   scan: "Escaneo radar",
   inertiaDamp: "Toggle inercia",
+  brake: "Brake",
 };
 
 // Teclas que no se pueden asignar (fijas)
@@ -123,7 +125,9 @@ function renderControlesPane(targetId = "pane-controles") {
     const btn = document.createElement("button");
     btn.className = "bindingChangeBtn";
     btn.textContent = "Cambiar";
-    btn.onclick = () => startRecording(action, tdKey);
+    btn.onclick = () => {
+      startRecording(action, tdKey);
+    };
     tdBtn.appendChild(btn);
 
     tr.appendChild(tdLabel);
@@ -546,6 +550,7 @@ let mobiOpen = false;
 let mobiActiveTab = "piloto";
 
 // Tab switching
+/*
 document.getElementById("mobiTabBar").addEventListener("click", e => {
   const btn = e.target.closest(".mobiTab");
   if (!btn) return;
@@ -556,6 +561,12 @@ document.getElementById("mobiTabBar").addEventListener("click", e => {
   document.getElementById("pane-" + pane).classList.remove("hidden");
   mobiActiveTab = pane;
   updateMobiPane(pane);
+});*/
+document.getElementById("mobiTabBar").addEventListener("click", e => {
+  const btn = e.target.closest(".mobiTab");
+  if (!btn) return;
+
+  setMobiTab(btn.dataset.pane);
 });
 
 // Close button
@@ -565,25 +576,78 @@ document.getElementById("mobiCloseBtn").onclick = closeMobiglass;
 mobiglassEl.addEventListener("click", e => {
   if (e.target === mobiglassEl) closeMobiglass();
 });
-
+/*
 function openMobiglass() {
   const me = getMe();
   if (!me) return;
   mobiOpen = true;
   mobiglassEl.classList.remove("hidden");
-  updateMobiglass();
+  //updateMobiglass();
+  renderPilotPane();
+  renderPartidaPane();
+  renderControlesPane();
+}*/
+
+function bindingText(action) {
+  return displayKey(bindings[action] || DEFAULT_BINDINGS[action]);
 }
 
+function openMobiglass() {
+  const me = getMe();
+  if (!me) return;
+
+  mobiOpen = true;
+  mobiglassEl.classList.remove("hidden");
+
+  renderPilotPane();
+  renderPartidaPane();
+
+  setMobiTab("piloto");
+}
+/*
 function closeMobiglass() {
   mobiOpen = false;
   mobiglassEl.classList.add("hidden");
-}
+}*/
+function closeMobiglass() {
+  cancelRecording();
 
+  mobiOpen = false;
+  mobiglassEl.classList.add("hidden");
+}
+function setMobiTab(tab) {
+  mobiActiveTab = tab;
+
+  document.querySelectorAll(".mobiTab")
+    .forEach(t => t.classList.remove("active"));
+
+  document.querySelector(`.mobiTab[data-pane="${tab}"]`)
+    ?.classList.add("active");
+
+  document.querySelectorAll(".mobiPane")
+    .forEach(p => p.classList.add("hidden"));
+
+  document.getElementById("pane-" + tab)
+    ?.classList.remove("hidden");
+
+  if (tab === "controles") {
+    renderControlesPane();
+  }
+
+  if (tab === "ajustes") {
+    initAjustesPane();
+  }
+}
+/*
 function updateMobiPane(tab) {
   if (tab === "piloto") updateMobiPiloto();
   if (tab === "partida") updateMobiPartida();
   if (tab === "ajustes") initAjustesPane();
   if (tab === "controles") renderControlesPane();
+}*/
+function updateMobiPane(tab) {
+  if (tab === "piloto") updateMobiPiloto();
+  if (tab === "partida") updateMobiPartida();
 }
 
 // ── AJUSTES pane ──────────────────────────────
@@ -658,6 +722,7 @@ function applyStoredVolumes() {
 }
 
 function updateMobiglass() {
+  console.count("updateMobiglass");
   const me = getMe();
   if (!me) return;
   mobiPilotBadge.textContent = me.name || "Pilot";
@@ -1783,6 +1848,13 @@ addEventListener("keydown", e => {
   const key = e.key.toLowerCase();
   keys[key] = true;
 
+  if (bindings.brake && key === bindings.brake) {
+    const me = getMe();
+    if (me && !me.dead) {
+      ws.send(JSON.stringify({ type: "brake" }));
+    }
+  }
+    
   if (bindings.scan && key === bindings.scan) {
     const me = getMe();
     if (me && !me.dead) {
@@ -3285,23 +3357,16 @@ function updateHUD(me) {
     "Vivos: " + alive;
 
   if (targetId) {
-
     const t = players[targetId];
-
     if (t) {
-
       ctx.fillStyle = "yellow";
-
       ctx.font = "20px Arial";
-
       ctx.fillText(
         "LOCK: " + (t.name || t.id.slice(0, 6)),
         40,
         220
       );
-
     }
-
   }
 }
 
@@ -3431,9 +3496,11 @@ function loop() {
           ctx.fillText(`Reapareciendo en ${remaining}s...`, canvas.width / 2, canvas.height / 2 + 16);
         } else {
           ctx.fillStyle = "#00ff88";
+          const respawnKey = bindingText("respawn");
+
           const accion = inTurret
-            ? `Pulsa [R] para entrar en la torreta de ${reservedPilot.name || "tu aliado"}`
-            : "Pulsa [R] para reaparecer";
+            ? `Pulsa [${respawnKey}] para entrar en la torreta de ${reservedPilot.name || "tu aliado"}`
+            : `Pulsa [${respawnKey}] para reaparecer`;
           ctx.fillText(accion, canvas.width / 2, canvas.height / 2 + 16);
         }
         ctx.font = "12px 'Courier New', monospace";

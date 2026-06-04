@@ -1285,7 +1285,7 @@ kbd.bindingError {
 }
 
 .bindingChangeBtn:hover {
-  border-color: #00ccff66;
+  border-color: #ffffff66;
   color: #00ccff;
   background: #00ccff0a;
 }

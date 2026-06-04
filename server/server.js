@@ -1017,6 +1017,14 @@ wss.on("connection", ws => {
       broadcastRoom(room, { type: "chat", name: player.name, team: player.team, text });
       return;
     }
+    
+    if (msg.type === "brake") {
+      const brakeFactor = 0.4; // ajusta 0.8–0.95
+      player.THRUST_VAL *= brakeFactor;
+      player.REVERSE_THRUST_VAL *= brakeFactor;
+      player.vx *= brakeFactor;
+      player.vy *= brakeFactor;
+    }
 
     if (msg.type === "shoot") {
       const room = rooms[player.roomId];
@@ -1571,7 +1579,7 @@ function update() {
 
       const thrustVal   = p.thrustVal        ?? CFG.THRUST;
       const reverseVal  = p.reverseThrustVal ?? CFG.REVERSE_THRUST;
-      const strafeVal   = thrustVal * 0.7;
+      const strafeVal   = thrustVal * 0.4;
 
       if (i.thrust && p.fuel > 0) {
         p.vx  += Math.cos(p.angle) * thrustVal;
@@ -1586,6 +1594,7 @@ function update() {
       }
 
       // Strafe lateral (A/D) — perpendicular izquierda/derecha en canvas (Y↓)
+      /*
       if (i.strafeLeft && p.fuel > 0) {
         p.vx += Math.sin(p.angle) * strafeVal;
         p.vy -= Math.cos(p.angle) * strafeVal;
@@ -1594,6 +1603,16 @@ function update() {
       if (i.strafeRight && p.fuel > 0) {
         p.vx -= Math.sin(p.angle) * strafeVal;
         p.vy += Math.cos(p.angle) * strafeVal;
+        p.fuel = Math.max(0, p.fuel - CFG.THRUST_FUEL * 0.5);
+      }*/
+      // Strafe lateral (A/D) → siempre en horizontal/pantalla
+      if (i.strafeLeft && p.fuel > 0) {
+        p.vx -= strafeVal;
+        p.fuel = Math.max(0, p.fuel - CFG.THRUST_FUEL * 0.5);
+      }
+      
+      if (i.strafeRight && p.fuel > 0) {
+        p.vx += strafeVal;
         p.fuel = Math.max(0, p.fuel - CFG.THRUST_FUEL * 0.5);
       }
 
