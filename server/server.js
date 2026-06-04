@@ -14,12 +14,23 @@ const WORLD_PRESETS = {
   huge:   { w: 15000, h: 15000, asteroids: 130, label: "Enorme"  },
 };
 
-function spawnPos(team, room) {
+function spawnPosOLD(team, room) {
   const W = room.worldW, H = room.worldH;
   if (team === "green") {
     return { x: W * 0.05 + Math.random() * W * 0.033, y: H * 0.167 + Math.random() * H * 0.083 };
   }
   return { x: W * 0.417 + Math.random() * W * 0.033, y: H * 0.167 + Math.random() * H * 0.083 };
+}
+function spawnPos(team, room) {
+  const W = room.worldW;
+  const H = room.worldH;
+
+  const margin = 0.08; // 8% de borde libre
+
+  return {
+    x: W * margin + Math.random() * W * (1 - margin * 2),
+    y: H * margin + Math.random() * H * (1 - margin * 2)
+  };
 }
 const PORT    = parseInt(process.env.PORT) || 8080;
 const ADMIN_PORT = PORT + 1;

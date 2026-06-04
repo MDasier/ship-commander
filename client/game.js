@@ -969,34 +969,83 @@ canvas.addEventListener("mousemove", e => {
 document.addEventListener("contextmenu", e => e.preventDefault());
 
 // ── Weapon heat system
-let weaponHeat = 0;          // 0..100
+let weaponHeat = 0;
 let mouseLeftHeld = false;
 let weaponFireTimer = null;
-const HEAT_PER_SHOT = 12;  // calor por disparo (click individual = 0 penalización acumulada)
-const HEAT_DECAY_MS = 30;  // ms por tick de enfriamiento
-const HEAT_DECAY_AMT = 2;   // calor que baja por tick
-const BASE_FIRE_MS = 130; // intervalo base (ms) al mantener pulsado
 
+const HEAT_PER_SHOT = 10;//calor por bala
+const HEAT_DECAY_MS = 46;//milisegundos de enfriamiento
+const HEAT_DECAY_AMT = 1;//calor que baja por tick
+const BASE_FIRE_MS = 100;//cadencia
+
+let weaponOverheated = false;
+const OVERHEAT_LIMIT = 99;//calor máximo (umbral de bloqueo)
+const RECOVER_LIMIT = 60;//calor mínimo (umbral de descongestión)
+
+// ── FIRE LOOP
 function fireWeapon() {
   const me = getMe();
+
   if (!me || me.dead || hud.classList.contains("hidden")) {
     stopAutoFire();
     return;
   }
+
+  if (weaponOverheated) {
+    stopAutoFire();
+    return;
+  }
+
   ws.send(JSON.stringify({ type: "shoot" }));
   playShootSound();
-  weaponHeat = Math.min(100, weaponHeat + HEAT_PER_SHOT);
-  // Programar el siguiente disparo con intervalo aumentado por calor
-  if (mouseLeftHeld) {
-    const interval = BASE_FIRE_MS * (1 + weaponHeat * 0.025);
-    weaponFireTimer = setTimeout(fireWeapon, interval);
-  }
-}
 
+  weaponHeat = Math.min(100, weaponHeat + HEAT_PER_SHOT);
+
+  if (weaponHeat >= OVERHEAT_LIMIT) {
+    weaponOverheated = true;
+    stopAutoFire();
+    return;
+  }
+
+  // 🔥 SOLO depende del input real
+  if (!mouseLeftHeld) {
+    clearTimeout(weaponFireTimer);
+    weaponFireTimer = null;
+    return;
+  }
+
+  const heatFactor = weaponHeat / 100;
+
+  const interval = BASE_FIRE_MS *
+    (1 + Math.pow(heatFactor, 2) * 4);
+
+  weaponFireTimer = setTimeout(fireWeapon, interval);
+}
+function startAutoFire() {
+  mouseLeftHeld = true;
+
+  // evita duplicar loops
+  if (weaponFireTimer) return;
+
+  fireWeapon();
+}
 function stopAutoFire() {
   mouseLeftHeld = false;
-  if (weaponFireTimer) { clearTimeout(weaponFireTimer); weaponFireTimer = null; }
+
+  clearTimeout(weaponFireTimer);
+  weaponFireTimer = null;
 }
+//enfriamiento de arma
+setInterval(() => {
+  if (weaponHeat > 0) {
+    weaponHeat = Math.max(0, weaponHeat - HEAT_DECAY_AMT);
+
+    if (weaponOverheated && weaponHeat <= RECOVER_LIMIT) {
+      weaponOverheated = false;
+    }
+  }
+}, HEAT_DECAY_MS);
+
 
 // ── Rayo de la Capital: mantener pulsado para cargar, soltar para disparar
 let beamHeld = false;
@@ -1022,9 +1071,9 @@ let beamWasReady = false;     // para sonar el aviso eléctrico al quedar listo 
 let abilityWasReady = true;   // idem para la habilidad [X] (arranca lista → sin aviso inicial)
 
 // Enfriamiento pasivo de arma
-setInterval(() => {
-  if (weaponHeat > 0) weaponHeat = Math.max(0, weaponHeat - HEAT_DECAY_AMT);
-}, HEAT_DECAY_MS);
+//setInterval(() => {
+//  if (weaponHeat > 0) weaponHeat = Math.max(0, weaponHeat - HEAT_DECAY_AMT);
+//}, HEAT_DECAY_MS);
 
 canvas.addEventListener("mousedown", e => {
   if (hud.classList.contains("hidden")) return;
