@@ -3727,7 +3727,7 @@ function loop() {
     ctx.fillStyle = "#00ccff";
 
     ctx.fillText(
-      "[T] Chat",
+      "[Enter] Chat",
       20,
       canvas.height - 30
     );

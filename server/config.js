@@ -11,7 +11,7 @@ const DEFAULTS = {
   THRUST_FUEL: 0.05,
   REVERSE_THRUST: 0.10,
   REVERSE_FUEL: 0.03,
-  FUEL_REGEN: 0.015,
+  FUEL_REGEN: 0.03,
   DRAG: 0.99,
 
   // ── Balas
@@ -100,7 +100,7 @@ const DEFAULTS = {
       thrustMult: 1.55,
       turnMult: 1.65,
       dragVal: 0.985,
-      fuelRegenMult: 1.7,
+      fuelRegenMult: 2.7,
       maxMissiles: 3,
       missileCooldown: 110,
       radarSignature: 700,
@@ -119,7 +119,7 @@ const DEFAULTS = {
       thrustMult: 1.0,
       turnMult: 1.0,
       dragVal: null,
-      fuelRegenMult: 1.0,
+      fuelRegenMult: 2.0,
       maxMissiles: 6,
       missileCooldown: 150,
       radarSignature: 1000,
@@ -153,7 +153,7 @@ const DEFAULTS = {
       thrustMult: 0.30,
       turnMult: 0.20,
       dragVal: 0.998,
-      fuelRegenMult: 0.35,
+      fuelRegenMult: 2.35,
       maxMissiles: 4 + 20,
       missileCooldown: 240,
       radarSignature: 5000,
@@ -171,7 +171,7 @@ const DEFAULTS = {
       thrustMult: 0.18,
       turnMult: 0.10,
       dragVal: 0.999,
-      fuelRegenMult: 0.20,
+      fuelRegenMult: 2.20,
       maxMissiles: 6,
       missileCooldown: 360,
       radarSignature: 9000,
@@ -190,7 +190,7 @@ const DEFAULTS = {
       thrustMult: 1.0,           // velocidad de L.Fighter
       turnMult: 1.0,
       dragVal: null,
-      fuelRegenMult: 1.0,
+      fuelRegenMult: 2.0,
       maxMissiles: 4,            // 4 torpedos (misil grande)
       missileCooldown: 200,
       radarSignature: 150,       // prácticamente indetectable

@@ -397,6 +397,113 @@ function playBeamFireSound() {
 
 function playExplosionSound() {
   if (!audioCtx) return;
+
+  const t = audioCtx.currentTime;
+  const sr = audioCtx.sampleRate;
+
+  // =========================
+  // 1. ULTRA SUB RUMBLE 
+  // =========================
+  const duration = 0.8;
+
+  const buffer = audioCtx.createBuffer(1, sr * duration, sr);
+  const data = buffer.getChannelData(0);
+
+  for (let i = 0; i < data.length; i++) {
+    let n = Math.random() * 2 - 1;
+
+    // suavizado extremo → energía en graves percibida
+    n = Math.sign(n) * Math.pow(Math.abs(n), 0.35);
+
+    // envelope largo (sensación de onda de choque)
+    const env = Math.pow(1 - i / data.length, 1.5);
+
+    data[i] = n * env;
+  }
+
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buffer;
+
+  // SOLO GRAVES profundos
+  const lp = audioCtx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.setValueAtTime(140, t);
+
+  const hp = audioCtx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.setValueAtTime(20, t);
+
+  const shaper = audioCtx.createWaveShaper();
+  const curve = new Float32Array(44100);
+
+  for (let i = 0; i < curve.length; i++) {
+    const x = (i * 2) / curve.length - 1;
+
+    // saturación suave tipo “terreno comprimido”
+    curve[i] = Math.tanh(2.0 * x);
+  }
+
+  shaper.curve = curve;
+  shaper.oversample = "2x";
+
+  const noiseGain = audioCtx.createGain();
+  noiseGain.gain.setValueAtTime(1.5, t);
+  noiseGain.gain.exponentialRampToValueAtTime(0.0005, t + duration);
+
+  noise.connect(hp);
+  hp.connect(lp);
+  lp.connect(shaper);
+  shaper.connect(noiseGain);
+  noiseGain.connect(sfxGain);
+
+  // =========================
+  // 2. SUB OSC 
+  // =========================
+  const boom = audioCtx.createOscillator();
+  boom.type = "sine";
+
+  boom.frequency.setValueAtTime(70, t);
+  boom.frequency.exponentialRampToValueAtTime(28, t + 0.4);
+
+  const boomGain = audioCtx.createGain();
+  boomGain.gain.setValueAtTime(2.0, t);
+  boomGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+
+  boom.connect(boomGain);
+  boomGain.connect(sfxGain);
+
+  // =========================
+  // 3. FAKE SIDECHAIN
+  // =========================
+  const duck = audioCtx.createGain();
+
+  // inicio fuerte → luego “aspira aire”
+  duck.gain.setValueAtTime(1.0, t);
+  duck.gain.exponentialRampToValueAtTime(0.35, t + 0.12);
+  duck.gain.exponentialRampToValueAtTime(1.0, t + 0.5);
+
+  // aplicamos sidechain a TODO el master
+  const master = audioCtx.createGain();
+  master.gain.setValueAtTime(1.0, t);
+
+  // routing final con “respiración”
+  noiseGain.connect(duck);
+  boomGain.connect(duck);
+
+  duck.connect(master);
+  master.connect(sfxGain);
+
+  // =========================
+  // START
+  // =========================
+  noise.start(t);
+  noise.stop(t + duration);
+
+  boom.start(t);
+  boom.stop(t + 0.6);
+}
+function playExplosionSoundOLD() {
+  if (!audioCtx) return;
   const sr = audioCtx.sampleRate;
   const dur = 0.55;
   const buf = audioCtx.createBuffer(1, sr * dur, sr);
