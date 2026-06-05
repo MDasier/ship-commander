@@ -460,7 +460,7 @@ function killPlayer(p, killer, weapon, room) {
   }
 
   // ─────────────────────────────────────────────
-  // BOT MATA HUMANO
+  // BOT MATA PLAYER
   // ─────────────────────────────────────────────
   if (killer?.isBot && killer.id !== p.id && !p.isBot) {
     const killLines = [
@@ -641,7 +641,7 @@ function startGame(room) {
     room.waveMode  = true;
     room.wave      = 0;
     room.waveState = "intermission";
-    room.waveTimer = 3 * FPS;     // primera oleada en ~3s
+    room.waveTimer = 5 * FPS;     // primera oleada en ~3s
     room.teamLives = TEAM_LIVES();  // pool de vidas compartido del equipo
     setWaveBanner(room, "PREPARAOS...", 3000);
   }
@@ -817,7 +817,7 @@ wss.on("connection", ws => {
         room.waveMode  = true;
         room.wave      = 0;
         room.waveState = "intermission";
-        room.waveTimer = 2 * FPS;     // primera oleada en ~2s
+        room.waveTimer = 5 * FPS;     // primera oleada en ~5s
         room.teamLives = TEAM_LIVES();  // pool de vidas compartido
         setWaveBanner(room, "PREPÁRATE...", 2000);
       }
@@ -1895,7 +1895,7 @@ function manageWaves(room) {
 
   if (livingBots === 0) {
     room.waveState = "intermission";
-    room.waveTimer = 3 * FPS;
+    room.waveTimer = 5 * FPS;
     setWaveBanner(room, "wave.cleared", room.wave);
   }
 }

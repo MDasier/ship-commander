@@ -654,8 +654,8 @@ const PING_COOLDOWN_MS = 3000;
 let inertiaDampActive = true;
 
 let world = {
-  width: 6000,
-  height: 6000
+  width: 10000,
+  height: 10000
 };
 
 let winner = null;
@@ -1563,7 +1563,7 @@ ws.onmessage = e => {
       hint.style.color = "#ffaa44";
       setTimeout(() => {
         if (hint) { hint.textContent = "Esperando jugadores..."; hint.style.color = ""; }
-      }, 6000);
+      }, 10000);
     }
   }
 
@@ -2314,14 +2314,14 @@ function drawWorldBounds(camX, camY) {
   const WARNING_DIST = 1000;
 
   const leftDist = me.x;
-  const rightDist = 6000 - me.x;
+  const rightDist = 10000 - me.x;
   const topDist = me.y;
-  const bottomDist = 6000 - me.y;
+  const bottomDist = 10000 - me.y;
 
   const leftX = worldToScreen(0, 0, camX, camY).x;
-  const rightX = worldToScreen(6000, 0, camX, camY).x;
+  const rightX = worldToScreen(10000, 0, camX, camY).x;
   const topY = worldToScreen(0, 0, camX, camY).y;
-  const bottomY = worldToScreen(0, 6000, camX, camY).y;
+  const bottomY = worldToScreen(0, 10000, camX, camY).y;
 
   ctx.lineWidth = 4;
 
@@ -3827,7 +3827,7 @@ function loop() {
     setMissileWarning(!me.dead && !!(me.lockedByMissile || pilot?.lockedByMissile));
 
     if (me.dead) {
-      if (!deadPanel.classList.contains("hidden")) renderDeadTurretOptions();
+      //if (!deadPanel.classList.contains("hidden")) renderDeadTurretOptions();
       const reservedPilot = me.pilotingFor ? players[me.pilotingFor] : null;
       const inTurret = !!(reservedPilot && !reservedPilot.dead);
 
@@ -3837,7 +3837,11 @@ function loop() {
       ctx.fillText(i18nt("game.destroyed"), canvas.width / 2, canvas.height / 2 - 30);
       // Vidas: oleadas → pool de equipo; PVP/vuelo libre → infinito
       const canRespawn = waveMode ? (teamLives ?? 0) > 0 : true;
+      deadPanel.classList.toggle("hidden", !canRespawn);
       if (canRespawn) {
+        deadPanel.classList.remove("hidden");
+        renderDeadTurretOptions();
+
         const elapsed = clientDeadAt ? Date.now() - clientDeadAt : 99999;
         const remaining = Math.max(0, Math.ceil((CFG_RESPAWN_DELAY * 1000 - elapsed) / 1000));
         ctx.font = "15px 'Courier New', monospace";
@@ -3866,6 +3870,8 @@ function loop() {
         ctx.fillText(i18nt("game.noTeamLives"), canvas.width / 2, canvas.height / 2 + 16);
       }
       ctx.textAlign = "left";
+    } else {
+      deadPanel.classList.add("hidden");
     }
 
     // Aviso de nave apagada por EMP

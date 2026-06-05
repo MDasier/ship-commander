@@ -693,7 +693,7 @@ function playPingSoundOLD() {
     osc.stop(t0 + 1.6);
   });
 }
-function playPingSound() {
+function playPingSoundSEMIOK() {
   if (!audioCtx) return;
 
   const t0 = audioCtx.currentTime;
@@ -768,7 +768,82 @@ function playPingSound() {
   lfo.start(t0);
   lfo.stop(t0 + 3.0);
 }
+function playPingSound() {
+  if (!audioCtx) return;
 
+  const t0 = audioCtx.currentTime;
+
+  // Volumen general
+  const master = audioCtx.createGain();
+  master.gain.setValueAtTime(0.0001, t0);
+  master.gain.exponentialRampToValueAtTime(0.7, t0 + 0.005);
+  master.gain.exponentialRampToValueAtTime(0.0001, t0 + 3.5);
+
+  // Resonancia metálica
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.value = 110;//110//140
+  filter.Q.value = 10;//10//8
+
+  master.connect(filter);
+  filter.connect(sfxGain);
+
+  // Eco profundo
+  const delay = audioCtx.createDelay(2.0);
+  delay.delayTime.value = 0.4;//0.4//0.55
+
+  const feedback = audioCtx.createGain();
+  feedback.gain.value = 0.30;
+
+  filter.connect(delay);
+  delay.connect(feedback);
+  feedback.connect(delay);
+
+  delay.connect(sfxGain);
+
+  // Armónicas principales
+  const partials = [
+    { f: 85,  g: 1.00 },
+    { f: 170, g: 0.35 },
+    { f: 255, g: 0.12 }
+  ];
+
+  partials.forEach(p => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = "sine";
+
+    // Pequeño golpe descendente inicial
+    osc.frequency.setValueAtTime(p.f * 1.08, t0);
+    osc.frequency.exponentialRampToValueAtTime(p.f, t0 + 0.08);
+
+    gain.gain.setValueAtTime(p.g, t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.8);
+
+    osc.connect(gain);
+    gain.connect(master);
+
+    osc.start(t0);
+    osc.stop(t0 + 3.0);
+  });
+
+  // SUBGRAVE CINEMATOGRÁFICO
+  const sub = audioCtx.createOscillator();
+  const subGain = audioCtx.createGain();
+
+  sub.type = "sine";
+  sub.frequency.setValueAtTime(35, t0);//35//42
+
+  subGain.gain.setValueAtTime(0.25, t0);
+  subGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.5);
+
+  sub.connect(subGain);
+  subGain.connect(master);
+
+  sub.start(t0);
+  sub.stop(t0 + 2.5);
+}
 function resetAudio() {
   victoryPlayed = false;
   warningActive = false;

@@ -1,11 +1,11 @@
 {
   "GAME_DURATION_S": 180,
-  "TURN_RATE": 0.10,
+  "TURN_RATE": 0.1,
   "THRUST": 0.25,
   "THRUST_FUEL": 0.05,
   "REVERSE_THRUST": 0.1,
   "REVERSE_FUEL": 0.03,
-  "FUEL_REGEN": 0.03,
+  "FUEL_REGEN": 0.04,
   "DRAG": 0.99,
   "BULLET_SPEED": 20,
   "BULLET_COOLDOWN": 5,
@@ -25,10 +25,53 @@
   "FLARE_RADIUS": 200,
   "FLARE_TURN": 0.2,
   "FLARE_THRUST": 0.6,
+  "FLARE_MAX_DEFAULT": 8,
+  "RESPAWN_DELAY": 5,
+  "RESPAWN_COUNT": 5,
+  "CAPITAL_BEAM_DAMAGE": 135,
+  "CAPITAL_BEAM_CHARGE_TIME": 110,
+  "CAPITAL_BEAM_RANGE": 850,
+  "CAPITAL_BEAM_HALFWIDTH": 10,
+  "CAPITAL_BEAM_LIFE": 8,
+  "EMP_DURATION": 66,
+  "EMP_PULSE_RADIUS": 440,
+  "EMP_PULSE_COOLDOWN": 240,
+  "EMP_DISABLE_MIN": 150,
+  "EMP_DISABLE_MAX": 340,
+  "EMP_PULSE_LIFE": 18,
+  "TORPEDO_DAMAGE": 90,
+  "TORPEDO_RADIUS": 26,
+  "MINE_COOLDOWN": 90,
+  "MINE_MAX_ACTIVE": 5,
+  "MINE_ARM_TIME": 25,
+  "MINE_LIFE": 2800,
+  "MINE_TRIGGER_RADIUS": 60,
+  "MINE_BLAST_RADIUS": 220,
+  "MINE_DAMAGE": 90,
+  "TURRET_DAMAGE": 25,
+  "TURRET_COOLDOWN": 6,
+  "TURRET_BULLET_SPEED": 14,
+  "GUNNER_MISSILES": 14,
+  "GUNNER_MISSILE_COOLDOWN": 95,
+  "AI_SPEED_MULT": 0.45,
+  "AI_TURN_MULT": 0.7,
+  "AI_AIM_JITTER": 0.1,
+  "AI_FIRE_COOLDOWN_MULT": 1.35,
+  "AI_LEAD_FACTOR": 1,
+  "AI_FIRE_CONE": 0.18,
+  "AI_BULLET_RANGE": 820,
+  "AI_MISSILE_CHANCE": 0.01,
+  "AI_BOMBER_MISSILE_MULT": 3,
+  "AI_FLARE_HEALTH_FRAC": 0.5,
+  "AI_REGROUP_HEALTH_FRAC": 0.3,
+  "AI_PASS_DISTANCE": 350,
+  "AI_ATTACK_RUN_TIME": 2600,
+  "AI_DETECT_RANGE": 1300,
+  "AI_FORMATION_SPACING": 250,
   "ASTEROID_IMPACT_MIN": 3,
   "ASTEROID_DAMAGE_FACTOR": 4,
-  "VOL_MASTER": 0.8,
-  "VOL_MUSIC": 0.2,
+  "VOL_MASTER": 0.6,
+  "VOL_MUSIC": 0.5,
   "SHIP_TYPES": {
     "interceptor": {
       "label": "Interceptor",
@@ -41,6 +84,7 @@
       "maxMissiles": 3,
       "missileCooldown": 110,
       "radarSignature": 100,
+      "maxFlares": 6,
       "maxShield": 35,
       "shieldRegenRate": 7,
       "shieldRegenDelay": 3.5,
@@ -54,13 +98,14 @@
       "label": "L.Fighter",
       "desc": "Equilibrado · Polivalente · Buen punto de partida",
       "maxHp": 100,
-      "thrustMult": 1.0,
-      "turnMult": 1.0,
+      "thrustMult": 1,
+      "turnMult": 1,
       "dragVal": null,
-      "fuelRegenMult": 1.0,
+      "fuelRegenMult": 1,
       "maxMissiles": 6,
       "missileCooldown": 150,
       "radarSignature": 1000,
+      "maxFlares": 8,
       "maxShield": 50,
       "shieldRegenRate": 6,
       "shieldRegenDelay": 4,
@@ -68,28 +113,6 @@
         "front": 8,
         "rear": -12,
         "radius": 18
-      }
-    },    
-    "emp": {
-      "label": "Disruptor",
-      "desc": "Sigilo extremo · Pulso EMP [X] apaga naves 2-4s · 4 torpedos · Cañón débil",
-      "maxHp": 50,
-      "thrustMult": 1.0,
-      "turnMult": 1.0,
-      "dragVal": null,
-      "fuelRegenMult": 1.0,
-      "maxMissiles": 4,
-      "missileCooldown": 200,
-      "radarSignature": 250,
-      "bulletDamage": 8,
-      "torpedo": true,
-      "maxShield": 30,
-      "shieldRegenRate": 7,
-      "shieldRegenDelay": 4,
-      "collider": {
-        "front": 14,
-        "rear": -12,
-        "radius": 34
       }
     },
     "bomber": {
@@ -103,6 +126,7 @@
       "maxMissiles": 12,
       "missileCooldown": 85,
       "radarSignature": 2000,
+      "maxFlares": 14,
       "maxShield": 120,
       "shieldRegenRate": 8,
       "shieldRegenDelay": 5,
@@ -124,6 +148,7 @@
       "missileCooldown": 240,
       "radarSignature": 5000,
       "crewCapacity": 2,
+      "maxFlares": 12,
       "maxShield": 250,
       "shieldRegenRate": 10,
       "shieldRegenDelay": 6,
@@ -145,6 +170,7 @@
       "missileCooldown": 360,
       "radarSignature": 9000,
       "crewCapacity": 4,
+      "maxFlares": 20,
       "maxShield": 500,
       "shieldRegenRate": 14,
       "shieldRegenDelay": 8,
@@ -152,7 +178,92 @@
         "front": 104,
         "rear": -96,
         "radius": 44
+      },
+      "turretHardpoints": [
+        [
+          -13.3,
+          -38.1
+        ],
+        [
+          -13.3,
+          38.1
+        ],
+        [
+          87.1,
+          -0.2
+        ]
+      ]
+    },
+    "emp": {
+      "label": "Disruptor",
+      "desc": "Sigilo extremo · Pulso EMP [X] apaga naves 2-4s · 4 torpedos · Cañón débil",
+      "maxHp": 50,
+      "thrustMult": 1,
+      "turnMult": 1,
+      "dragVal": null,
+      "fuelRegenMult": 1,
+      "maxMissiles": 4,
+      "missileCooldown": 200,
+      "radarSignature": 250,
+      "maxFlares": 8,
+      "bulletDamage": 8,
+      "torpedo": true,
+      "maxShield": 30,
+      "shieldRegenRate": 7,
+      "shieldRegenDelay": 4,
+      "collider": {
+        "front": 14,
+        "rear": -12,
+        "radius": 34
       }
     }
-  }
+  },
+  "CAPITAL_GUNNER_MISSILES": 25,
+  "CAPITAL_GUNNER_MISSILE_COOLDOWN": 70,
+  "TEAM_LIVES": 5,
+  "WAVES": [
+    {
+      "ships": [
+        "interceptor",
+        "fighter"
+      ],
+      "boss": false
+    },
+    {
+      "ships": [
+        "fighter",
+        "fighter",
+        "bomber"
+      ],
+      "boss": false
+    },
+    {
+      "ships": [
+        "fighter",
+        "bomber",
+        "gunship"
+      ],
+      "boss": false
+    },
+    {
+      "ships": [
+        "gunship",
+        "bomber",
+        "fighter",
+        "fighter"
+      ],
+      "boss": false
+    },
+    {
+      "ships": [
+        "capital",
+        "gunship",
+        "gunship",
+        "bomber",
+        "fighter",
+        "fighter"
+      ],
+      "boss": true
+    }
+  ]
 }
