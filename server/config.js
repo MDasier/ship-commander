@@ -108,7 +108,7 @@ const DEFAULTS = {
     interceptor: {
       label: "Interceptor",
       desc: "Muy rápido · Poco armado · Baja firma radar · Suelta minas [X]",
-      maxHp: 50,
+      maxHp: 80,
       thrustMult: 1.55,
       turnMult: 1.65,
       dragVal: 0.985,
@@ -211,7 +211,7 @@ const DEFAULTS = {
     emp: {
       label: "Disruptor",
       desc: "Sigilo extremo · Pulso EMP [X] apaga naves 2-4s · 4 torpedos · Cañón débil",
-      maxHp: 50,                 // resistencia de Interceptor
+      maxHp: 150,                 // resistencia de Interceptor
       thrustMult: 1.0,           // velocidad de L.Fighter
       turnMult: 1.0,
       dragVal: null,

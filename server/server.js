@@ -13,7 +13,45 @@ const WORLD_PRESETS = {
   large:  { w: 10000, h: 10000, asteroids: 80,  label: "Grande"  },
   huge:   { w: 15000, h: 15000, asteroids: 130, label: "Enorme"  },
 };
+function spawnSafePos(team, room) {
+  const W = room.worldW;
+  const H = room.worldH;
 
+  const margin = 0.08;
+  const minDist = CFG.SPAWN_MIN_DISTANCE ?? 800;
+  const maxAttempts = 12;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    const pos = {
+      x: W * margin + Math.random() * W * (1 - margin * 2),
+      y: H * margin + Math.random() * H * (1 - margin * 2)
+    };
+
+    let safe = true;
+
+    for (const id in room.players) {
+      const p = room.players[id];
+      if (!p || p.dead) continue;
+      if (p.team === team) continue;
+
+      const dx = p.x - pos.x;
+      const dy = p.y - pos.y;
+
+      if (dx * dx + dy * dy < minDist * minDist) {
+        safe = false;
+        break;
+      }
+    }
+
+    if (safe) return pos;
+  }
+
+  // fallback (evita soft-lock)
+  return {
+    x: W * margin + Math.random() * W * (1 - margin * 2),
+    y: H * margin + Math.random() * H * (1 - margin * 2)
+  };
+}
 function spawnPos(team, room) {
   const W = room.worldW;
   const H = room.worldH;
@@ -1117,7 +1155,9 @@ wss.on("connection", ws => {
         applyShipStats(player);
         player.vx = 0; player.vy = 0; player.angle = 0;
         player.missileCooldown = 0; player.bulletCooldown = 0;
-        const rsp = spawnPos(player.team, room);
+        player.fuel = 100;
+        //const rsp = spawnPos(player.team, room);
+        const rsp = spawnSafePos(player.team, room);
         player.x = rsp.x; player.y = rsp.y;
       }
       return;
@@ -1294,7 +1334,28 @@ function segToSegDist(ax, ay, bx, by, cx, cy, dx, dy) {
   const py = wy + sc * uy - tc * vy;
   return Math.hypot(px, py);
 }
+function segmentHitsAsteroid(x1, y1, x2, y2, asteroids) {
+  for (const ast of asteroids) {
+    //if (ast.z !== 0) continue;//Para los asteroides flotantes
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len2 = dx * dx + dy * dy;
+    let t =
+      ((ast.x - x1) * dx + (ast.y - y1) * dy) /
+      (len2 || 1);
 
+    t = Math.max(0, Math.min(1, t));
+    const px = x1 + dx * t;
+    const py = y1 + dy * t;
+    const dist2 =
+      (px - ast.x) * (px - ast.x) +
+      (py - ast.y) * (py - ast.y);
+    if (dist2 <= ast.r * ast.r) {
+      return ast;
+    }
+  }
+  return null;
+}
 // Cápsula de colisión de la nave en coords de mundo (segmento de proa a popa + radio).
 function shipCapsule(p) {
   const ship = CFG.SHIP_TYPES[p.shipType] || CFG.SHIP_TYPES.fighter;
@@ -2049,7 +2110,7 @@ function update() {
         }
       }
     });
-
+/*
     // ── Bullets
     room.bullets.forEach(b => { b.x += b.vx; b.y += b.vy; });
     room.bullets = room.bullets.filter(b =>
@@ -2079,7 +2140,101 @@ function update() {
         }
       }
     }
+*/
+// ── Bullets
+room.bullets.forEach(b => {
+  b.x += b.vx;
+  b.y += b.vy;
+});
 
+room.bullets = room.bullets.filter(b =>
+  b.x > -100 && b.x < room.worldW + 100 &&
+  b.y > -100 && b.y < room.worldH + 100
+);
+
+for (let i = room.bullets.length - 1; i >= 0; i--) {
+
+  const b = room.bullets[i];
+
+  const bPrevX = b.x - b.vx;
+  const bPrevY = b.y - b.vy;
+
+  // Asteroide intercepta la bala
+  if (
+    segmentHitsAsteroid(
+      bPrevX,
+      bPrevY,
+      b.x,
+      b.y,
+      room.asteroids
+    )
+  ) {
+    room.bullets.splice(i, 1);
+    continue;
+  }
+
+  for (const p of Object.values(room.players)) {
+
+    if (p.dead || p.team === b.team || p.pilotingFor) continue;
+
+    const cap = shipCapsule(p);
+
+    if (
+      segToSegDist(
+        bPrevX,
+        bPrevY,
+        b.x,
+        b.y,
+        cap.rx,
+        cap.ry,
+        cap.fx,
+        cap.fy
+      ) < cap.r + CFG.BULLET_RADIUS
+    ) {
+
+      // Compatibilidad con tu sistema actual
+      if (isSheltered(p.x, p.y, room.asteroids)) {
+        room.bullets.splice(i, 1);
+        break;
+      }
+
+      const dmg = b.damage ?? CFG.BULLET_DAMAGE;
+      const attacker = room.players[b.ownerId];
+      const bulletAngle = Math.atan2(
+        b.y - p.y,
+        b.x - p.x
+      );
+
+      applyDamage(
+        room,
+        p,
+        dmg,
+        attacker,
+        bulletAngle
+      );
+
+      if (attacker) {
+        registerCrewDamage(
+          p,
+          attacker,
+          room
+        );
+      }
+
+      if (p.hp <= 0) {
+        killPlayer(
+          p,
+          attacker || null,
+          "bullet",
+          room
+        );
+      }
+
+      room.bullets.splice(i, 1);
+      break;
+    }
+  }
+}
     // ── Missiles
     room.missiles.forEach(m => {
       const flares = room.flare || [];
@@ -2143,7 +2298,7 @@ function update() {
     });
 
     room.missiles = room.missiles.filter(m => m.life > 0);
-
+/*
     for (let i = room.missiles.length - 1; i >= 0; i--) {
       const m = room.missiles[i];
       for (const p of Object.values(room.players)) {
@@ -2167,6 +2322,98 @@ function update() {
         }
       }
     }
+*/
+for (let i = room.missiles.length - 1; i >= 0; i--) {
+
+  const m = room.missiles[i];
+
+  const mPrevX = m.prevX ?? m.x;
+  const mPrevY = m.prevY ?? m.y;
+
+  // Asteroide intercepta el misil
+  if (
+    segmentHitsAsteroid(
+      mPrevX,
+      mPrevY,
+      m.x,
+      m.y,
+      room.asteroids
+    )
+  ) {
+    room.missiles.splice(i, 1);
+    continue;
+  }
+
+  for (const p of Object.values(room.players)) {
+
+    if (p.dead || p.team === m.team || p.pilotingFor) continue;
+
+    const cap = shipCapsule(p);
+
+    const hitR = m.torpedo
+      ? CFG.TORPEDO_RADIUS
+      : CFG.MISSILE_RADIUS;
+
+    if (
+      segToSegDist(
+        mPrevX,
+        mPrevY,
+        m.x,
+        m.y,
+        cap.rx,
+        cap.ry,
+        cap.fx,
+        cap.fy
+      ) < cap.r + hitR
+    ) {
+
+      // Compatibilidad con tu sistema actual
+      if (isSheltered(p.x, p.y, room.asteroids)) {
+        room.missiles.splice(i, 1);
+        break;
+      }
+
+      const attacker = room.players[m.ownerId];
+
+      const missileAngle = Math.atan2(
+        m.y - p.y,
+        m.x - p.x
+      );
+
+      const dmg = m.torpedo
+        ? CFG.TORPEDO_DAMAGE
+        : CFG.MISSILE_DAMAGE;
+
+      applyDamage(
+        room,
+        p,
+        dmg,
+        attacker,
+        missileAngle
+      );
+
+      if (attacker) {
+        registerCrewDamage(
+          p,
+          attacker,
+          room
+        );
+      }
+
+      if (p.hp <= 0) {
+        killPlayer(
+          p,
+          attacker || null,
+          m.torpedo ? "torpedo" : "missile",
+          room
+        );
+      }
+
+      room.missiles.splice(i, 1);
+      break;
+    }
+  }
+}
 
     // ── Beams (rayo de la Capital): solo efecto visual, el daño ya se aplicó al disparar
     room.beams = (room.beams || []).filter(b => { b.life--; return b.life > 0; });
