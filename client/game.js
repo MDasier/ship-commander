@@ -1,3 +1,17 @@
+// ── Módulos del cliente (ES modules · empaquetados por Vite) ──
+import { i18nt, applyI18n, onLangChange, setLang, getLang } from "./i18n.js";
+import {
+  spawnExplosion, spawnBeamImpact, spawnThrustParticle, spawnSmokeParticle,
+  updateParticles, drawStars, drawParticles,
+} from "./particles.js";
+import {
+  initAudio, startMusic, stopMusic, setMusicTrack, setMusicVolume, setEffectsVolume,
+  setMuted, setMissileWarning, resetAudio,
+  playShootSound, playBeamReadySound, playAbilityReadySound, playEmpSound,
+  playBeamFireSound, playExplosionSound, playMissileSound, playVictorySound,
+  playSelfDestructBeep, playAlertSound, playVoiceAlert, playPingSound,
+} from "./sounds.js";
+
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
@@ -541,7 +555,9 @@ addEventListener("resize", () => {
 
 const _wsProto = location.protocol === "https:" ? "wss:" : "ws:";
 const _wsHost = location.hostname ? location.host : "localhost:8080";
-const _wsURL = _wsProto + "//" + _wsHost;
+// El juego usa el path "/ws" para no colisionar con el WebSocket de HMR del dev
+// server de Vite (que también usa la raíz). El servidor escucha en ese mismo path.
+const _wsURL = _wsProto + "//" + _wsHost + "/ws";
 const ws = new WebSocket(_wsURL);
 
 // ── Feedback de pérdida de conexión + reconexión automática ──

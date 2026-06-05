@@ -1,14 +1,22 @@
 {
   "name": "ship-commander",
-  "version": "1.0.0",
+  "version": "0.5.0",
   "description": "Multiplayer browser space dogfighting game",
   "scripts": {
+    "dev:client": "vite",
+    "dev:server": "node server/server.js",
+    "build": "vite build",
+    "preview": "vite preview",
     "start": "node server/server.js"
   },
   "dependencies": {
     "ws": "^8.18.0"
   },
+  "devDependencies": {
+    "vite": "^8.0.0"
+  },
   "engines": {
-    "node": ">=18"
-  }
+    "node": ">=24.16.0"
+  },
+  "packageManager": "pnpm@10.30.3"
 }
