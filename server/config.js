@@ -141,7 +141,7 @@ const DEFAULTS = {
       maxShield: 50,
       shieldRegenRate: 6,
       shieldRegenDelay: 4,
-      collider: { front: 8, rear: -12, radius: 18 },
+      collider: { front: 21, rear: -20.5, radius: 22 },
     },
     bomber: {
       label: "Bomber",
@@ -178,7 +178,7 @@ const DEFAULTS = {
       maxShield: 250,
       shieldRegenRate: 10,
       shieldRegenDelay: 6,
-      collider: { front: 14, rear: -16, radius: 30 },
+      collider: { front: 20, rear: -22, radius: 18 },
     },
     capital: {
       label: "Capital",
@@ -227,7 +227,7 @@ const DEFAULTS = {
       shieldRegenRate: 7,
       shieldRegenDelay: 4,
       // Casco triangular ancho y corto (pico en la proa)
-      collider: { front: 14, rear: -12, radius: 34 },
+      collider: { front: 24, rear: -30.4, radius: 50 },
     },
   },
 
