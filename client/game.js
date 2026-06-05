@@ -637,6 +637,8 @@ let missiles = [];
 let flares = [];
 let scanUntil = 0;
 let pingEnemiesUntil = 0;
+let nextPingAt = 0;          // cooldown del ping de radar (1 cada 3 s)
+const PING_COOLDOWN_MS = 3000;
 let inertiaDampActive = true;
 
 let world = {
@@ -2140,9 +2142,11 @@ addEventListener("keydown", e => {
 
   if (bindings.scan && key === bindings.scan) {
     const me = getMe();
-    if (me && !me.dead) {
-      scanUntil = performance.now() + 8000;
-      pingEnemiesUntil = performance.now() + 2000;
+    const now = performance.now();
+    if (me && !me.dead && now >= nextPingAt) {
+      nextPingAt = now + PING_COOLDOWN_MS;   // 1 ping cada 3 s
+      scanUntil = now + 8000;
+      pingEnemiesUntil = now + 2000;
       triggerPingEffect(me.x, me.y);
       initAudio();         // asegura el contexto de audio en este gesto de tecla
       playPingSound();     // sonar tipo Star Citizen

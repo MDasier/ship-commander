@@ -684,8 +684,8 @@ function playPingSound() {
 
   const filter = audioCtx.createBiquadFilter();
   filter.type = "bandpass";
-  filter.frequency.setValueAtTime(1500, t0);
-  filter.frequency.exponentialRampToValueAtTime(2200, t0 + 0.4);
+  filter.frequency.setValueAtTime(720, t0);
+  filter.frequency.exponentialRampToValueAtTime(1050, t0 + 0.4);
   filter.Q.value = 1.1;
   out.connect(filter);
 
@@ -702,9 +702,9 @@ function playPingSound() {
   // Parciales: fundamental + armónicos para el brillo; cada uno hace un chirp
   // ascendente y luego se asienta (resonancia).
   const partials = [
-    { f: 1320, g: 0.55 },
-    { f: 1980, g: 0.30 },   // quinta
-    { f: 2640, g: 0.16 },   // octava
+    { f: 620, g: 0.55 },
+    { f: 930, g: 0.30 },    // quinta
+    { f: 1240, g: 0.16 },   // octava
   ];
   partials.forEach(p => {
     const osc = audioCtx.createOscillator();
