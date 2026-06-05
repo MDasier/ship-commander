@@ -123,7 +123,7 @@ const DEFAULTS = {
       shieldRegenDelay: 3.5,   // segundos sin daño antes de empezar a recargar
       // Cápsula de colisión (eje longitudinal +x = proa). front/rear: extremos del
       // segmento en coords locales; radius: semianchura del casco.
-      collider: { front: 8, rear: -12, radius: 16 },
+      collider: { front: 8, rear: -12, radius: 14 },
     },
     fighter: {
       label: "L.Fighter",
@@ -156,10 +156,10 @@ const DEFAULTS = {
       radarSignature: 2000,
       maxFlares: 14,
       // Escudos — tanque: escudo grande, recarga moderada y largo cooldown
-      maxShield: 120,
-      shieldRegenRate: 8,
+      maxShield: 150,
+      shieldRegenRate: 15,
       shieldRegenDelay: 5,
-      collider: { front: 12, rear: -14, radius: 20 },
+      collider: { front: 19.2, rear: -21.5, radius: 17 },
     },
     gunship: {
       label: "Gunship",
