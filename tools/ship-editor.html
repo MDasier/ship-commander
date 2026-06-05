@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Ship Shape Editor — Space Sim</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: #0a0f1a; color: #c8d8f0;
+    font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px;
+    display: flex; overflow: hidden;
+  }
+  #main { flex: 1; position: relative; }
+  canvas#c { display: block; width: 100%; height: 100%; background: #060a12; cursor: crosshair; }
+  #side {
+    width: 340px; background: #0d1424; border-left: 1px solid #1a2540;
+    display: flex; flex-direction: column; overflow-y: auto; padding: 12px;
+  }
+  h1 { font-size: 15px; color: #00d4ff; letter-spacing: 1px; margin-bottom: 4px; }
+  .sub { color: #56688a; font-size: 12px; margin-bottom: 12px; }
+  .group { border: 1px solid #1a2540; border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+  .group h2 { font-size: 11px; letter-spacing: 2px; color: #00d4ffaa; text-transform: uppercase; margin-bottom: 8px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
+  button {
+    background: #11203a; border: 1px solid #25406a; color: #aaccf0;
+    padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit;
+  }
+  button:hover { background: #1a2f55; border-color: #3a6aa0; }
+  button.active { background: #00d4ff22; border-color: #00d4ff; color: #00d4ff; }
+  button.danger { border-color: #6a2535; color: #d88; }
+  button.danger:hover { background: #3a1520; }
+  label.chk { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+  input[type=number], input[type=text] {
+    background: #0a1120; border: 1px solid #25406a; color: #c8d8f0;
+    padding: 4px 6px; border-radius: 4px; width: 70px; font-family: inherit; font-size: 12px;
+  }
+  input[type=text].name { width: 120px; }
+  input[type=range] { flex: 1; }
+  textarea {
+    width: 100%; height: 220px; background: #060a12; border: 1px solid #25406a;
+    color: #9fd4b0; font-family: 'Consolas', monospace; font-size: 11px; padding: 8px; border-radius: 4px;
+    resize: vertical;
+  }
+  .hint { font-size: 11px; color: #56688a; line-height: 1.5; }
+  .kbd { background: #18243c; border: 1px solid #2a3f60; border-radius: 3px; padding: 0 5px; font-size: 11px; }
+  #preview { background: #060a12; border: 1px solid #1a2540; border-radius: 6px; display: block; }
+  #status { font-size: 11px; color: #00ff99; height: 14px; }
+</style>
+</head>
+<body>
+
+<div id="main">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="side">
+  <h1>◈ SHIP SHAPE EDITOR</h1>
+  <div class="sub">Editor autónomo · no toca el juego. Exporta en formato <b>SHIP_SHAPES</b>.</div>
+
+  <div class="group">
+    <h2>Modo de edición</h2>
+    <div class="row" id="modes">
+      <button data-mode="body" class="active">Cuerpo</button>
+      <button data-mode="lines">Líneas</button>
+      <button data-mode="cockpit">Cabina</button>
+      <button data-mode="turrets">Torretas</button>
+      <button data-mode="pan">Mover vista</button>
+    </div>
+    <div class="hint" id="modeHint"></div>
+  </div>
+
+  <div class="group">
+    <h2>Opciones</h2>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="symChk" checked> Simetría (espejo en X)</label>
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="snapChk" checked> Ajustar a rejilla</label>
+      <span>paso</span><input type="number" id="gridStep" value="4" min="1" max="20" style="width:50px">
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="gridChk" checked> Mostrar rejilla</label>
+      <label class="chk"><input type="checkbox" id="cockpitRectChk" checked> Cabina rectangular</label>
+    </div>
+    <div class="row">
+      <button id="mirrorBtn">Forzar lado superior</button>
+      <button id="clearBtn" class="danger">Vaciar cuerpo</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>Imagen de referencia (trazar)</h2>
+    <div class="row">
+      <input type="file" id="imgInput" accept="image/*" style="font-size:11px;color:#8aa">
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="imgEditChk"> Mover/escalar imagen</label>
+    </div>
+    <div class="row">
+      <span>Opacidad</span><input type="range" id="imgOpacity" min="0" max="1" step="0.05" value="0.5">
+    </div>
+    <div class="hint">Con “Mover/escalar imagen”: arrastra para moverla y rueda del ratón para escalar.</div>
+  </div>
+
+  <div class="group">
+    <h2>Metadatos</h2>
+    <div class="row">
+      <span>clave</span><input type="text" class="name" id="metaName" value="capital">
+    </div>
+    <div class="row">
+      <span>shieldR</span><input type="number" id="metaShieldR" value="108">
+      <span>hpBarW</span><input type="number" id="metaHpBarW" value="190">
+    </div>
+    <div class="row">
+      <span>uiOffY</span><input type="number" id="metaUiOffY" value="-70">
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>Previsualización</h2>
+    <canvas id="preview" width="316" height="150"></canvas>
+  </div>
+
+  <div class="group">
+    <h2>Exportar / Importar</h2>
+    <div class="row">
+      <button id="copyBtn">Copiar</button>
+      <button id="importBtn">Importar (pegar y cargar)</button>
+      <span id="status"></span>
+    </div>
+    <textarea id="exportArea" spellcheck="false"></textarea>
+  </div>
+
+  <div class="group">
+    <h2>Atajos</h2>
+    <div class="hint">
+      <b>Cuerpo:</b> clic = añadir vértice · arrastrar = mover · <span class="kbd">Shift</span>+clic o clic dcho = borrar · doble clic en una arista = insertar.<br>
+      <b>Líneas:</b> clic en 2 puntos = una línea · clic dcho sobre una = borrar.<br>
+      <b>Torretas:</b> clic = añadir · arrastrar = mover · clic dcho = borrar.<br>
+      Rueda = zoom · arrastrar en “Mover vista” o botón central = desplazar.
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const pv = document.getElementById('preview');
+const pctx = pv.getContext('2d');
+
+// ── Estado ──────────────────────────────────────────────
+let mode = 'body';
+let sym = true;
+let snap = true, grid = 4, showGrid = true;
+let zoom = 2.4, panX = 0, panY = 0;
+
+// Cuerpo: lista de vértices que el usuario edita. En simetría representa la mitad
+// (un solo lado), trazada de proa (+x) a popa.
+let body = [
+  {x:110,y:0},{x:96,y:-14},{x:60,y:-26},{x:10,y:-30},
+  {x:-50,y:-32},{x:-90,y:-38},{x:-104,y:-24},{x:-104,y:-6},{x:-96,y:0}
+];
+let lines = [];                 // [{a:{x,y}, b:{x,y}}]
+let turrets = [];               // [{x,y}]
+let cockpit = { x:34, y:0, rx:16, ry:12, rect:true };
+let meta = { name:'capital', shieldR:108, hpBarW:190, uiOffY:-70 };
+
+let img = null, imgOpacity = 0.5, imgScale = 1, imgX = 0, imgY = 0, imgEdit = false;
+
+let drag = null;                // {kind, ...}
+let lineDraft = null;
+let selected = -1;
+let spaceHeld = false;
+
+// ── Transformaciones ────────────────────────────────────
+function OX(){ return canvas.width/2 + panX; }
+function OY(){ return canvas.height/2 + panY; }
+function w2s(p){ return { x: OX()+p.x*zoom, y: OY()+p.y*zoom }; }
+function s2w(x,y){ return { x:(x-OX())/zoom, y:(y-OY())/zoom }; }
+function snapV(v){ return snap ? Math.round(v/grid)*grid : Math.round(v*10)/10; }
+function snapPt(p){ return { x: snapV(p.x), y: snapV(p.y) }; }
+
+// ── Simetría: construye la forma completa a partir de la mitad ──
+function fullBody(){
+  if (!sym) return body;
+  const out = body.map(p=>({x:p.x,y:p.y}));
+  for (let i=body.length-1;i>=0;i--){
+    if (Math.abs(body[i].y) > 0.5) out.push({ x:body[i].x, y:-body[i].y });
+  }
+  return out;
+}
+function fullLines(){
+  if (!sym) return lines;
+  const out = [];
+  for (const L of lines){
+    out.push(L);
+    const onAxis = Math.abs(L.a.y)<0.5 && Math.abs(L.b.y)<0.5;
+    if (!onAxis) out.push({ a:{x:L.a.x,y:-L.a.y}, b:{x:L.b.x,y:-L.b.y} });
+  }
+  return out;
+}
+function fullTurrets(){
+  if (!sym) return turrets;
+  const out = [];
+  for (const t of turrets){
+    out.push(t);
+    if (Math.abs(t.y)>0.5) out.push({ x:t.x, y:-t.y });
+  }
+  return out;
+}
+
+// ── Resize ──────────────────────────────────────────────
+function resize(){
+  canvas.width = canvas.parentElement.clientWidth;
+  canvas.height = canvas.parentElement.clientHeight;
+}
+addEventListener('resize', resize);
+
+// ── Render principal ────────────────────────────────────
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // imagen de referencia
+  if (img){
+    ctx.save();
+    ctx.globalAlpha = imgOpacity;
+    const w = img.width*imgScale, h = img.height*imgScale;
+    const c = w2s({x:imgX,y:imgY});
+    ctx.drawImage(img, c.x - w/2, c.y - h/2, w, h);
+    ctx.restore();
+  }
+
+  if (showGrid) drawGrid();
+  drawAxes();
+
+  const fb = fullBody();
+  // casco
+  if (fb.length >= 2){
+    ctx.beginPath();
+    const p0 = w2s(fb[0]); ctx.moveTo(p0.x,p0.y);
+    for (let i=1;i<fb.length;i++){ const p=w2s(fb[i]); ctx.lineTo(p.x,p.y); }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0,150,120,0.18)';
+    ctx.fill();
+    ctx.strokeStyle = '#27e6b0';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // líneas de chasis
+  ctx.strokeStyle = 'rgba(180,210,255,0.55)';
+  ctx.lineWidth = 1;
+  for (const L of fullLines()){
+    const a=w2s(L.a), b=w2s(L.b);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+  if (lineDraft){
+    const a=w2s(lineDraft);
+    ctx.fillStyle='#ffcc44'; ctx.beginPath(); ctx.arc(a.x,a.y,4,0,7); ctx.fill();
+  }
+
+  // cabina
+  drawCockpit(ctx, w2s, true);
+
+  // torretas
+  for (const t of fullTurrets()){
+    const s=w2s(t);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.strokeStyle='#ffaa55'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(s.x,s.y,7,0,7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#ffaa55'; ctx.fillRect(s.x-1, s.y-9, 2, 9);
+  }
+
+  // handles del cuerpo (solo los puntos editables)
+  if (mode==='body'){
+    for (let i=0;i<body.length;i++){
+      const s=w2s(body[i]);
+      ctx.beginPath(); ctx.arc(s.x,s.y, i===selected?6:4, 0, 7);
+      ctx.fillStyle = i===selected ? '#ffee66' : '#00d4ff';
+      ctx.fill();
+      ctx.strokeStyle='#021018'; ctx.lineWidth=1; ctx.stroke();
+    }
+  }
+  // handles de cabina
+  if (mode==='cockpit'){
+    const cc=w2s({x:cockpit.x,y:cockpit.y});
+    ctx.fillStyle='#ffee66'; ctx.beginPath(); ctx.arc(cc.x,cc.y,5,0,7); ctx.fill();
+    const ch=w2s({x:cockpit.x+cockpit.rx,y:cockpit.y+cockpit.ry});
+    ctx.fillStyle='#ff8855'; ctx.fillRect(ch.x-4,ch.y-4,8,8);
+  }
+  // handles de torretas
+  if (mode==='turrets'){
+    for (const t of turrets){ const s=w2s(t); ctx.strokeStyle='#ffee66'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(s.x,s.y,9,0,7); ctx.stroke(); }
+  }
+
+  drawCursorCoords();
+  drawPreview();
+  requestAnimationFrame(draw);
+}
+
+function drawCockpit(c, t, withHandles){
+  if (!cockpit) return;
+  const center = t({x:cockpit.x,y:cockpit.y});
+  const rx = cockpit.rx*zoomFor(c), ry = cockpit.ry*zoomFor(c);
+  c.save();
+  c.translate(center.x, center.y);
+  c.fillStyle = 'rgba(120,230,255,0.5)';
+  c.strokeStyle = 'rgba(0,0,0,0.5)';
+  c.lineWidth = 1;
+  if (cockpit.rect){
+    const r = Math.min(rx,ry)*0.35;
+    roundRect(c,-rx,-ry,rx*2,ry*2,r); c.fill(); c.stroke();
+  } else {
+    c.beginPath(); c.ellipse(0,0,rx,ry,0,0,7); c.fill(); c.stroke();
+  }
+  c.restore();
+}
+function zoomFor(c){ return c===pctx ? pvZoom : zoom; }
+
+function roundRect(c,x,y,w,h,r){
+  c.beginPath();
+  c.moveTo(x+r,y);
+  c.arcTo(x+w,y,x+w,y+h,r);
+  c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r);
+  c.arcTo(x,y,x+w,y,r);
+  c.closePath();
+}
+
+function drawGrid(){
+  const step = grid*zoom;
+  if (step < 6) return;
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  const x0 = OX()%step, y0 = OY()%step;
+  for (let x=x0; x<canvas.width; x+=step){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
+  for (let y=y0; y<canvas.height; y+=step){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
+}
+function drawAxes(){
+  ctx.strokeStyle = 'rgba(0,212,255,0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0,OY()); ctx.lineTo(canvas.width,OY()); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(OX(),0); ctx.lineTo(OX(),canvas.height); ctx.stroke();
+  ctx.fillStyle='#3a6a8a'; ctx.font='11px monospace';
+  ctx.fillText('+x (proa) →', canvas.width-90, OY()-6);
+  ctx.fillText('+y', OX()+5, canvas.height-8);
+  // marcas cada 20 u
+  ctx.fillStyle='#2a4a66';
+  for (let u=-200; u<=200; u+=20){
+    if (u===0) continue;
+    const sx=OX()+u*zoom; if (sx>0&&sx<canvas.width) ctx.fillText(u, sx-6, OY()+12);
+    const sy=OY()+u*zoom; if (sy>0&&sy<canvas.height) ctx.fillText(u, OX()+4, sy+3);
+  }
+}
+function drawCursorCoords(){
+  ctx.fillStyle='#56688a'; ctx.font='12px monospace';
+  ctx.fillText(`modo: ${mode}  ·  vértices: ${body.length}${sym?' (mitad)':''}  ·  zoom: ${zoom.toFixed(1)}x`, 10, 18);
+  if (lastW){ ctx.fillText(`x:${Math.round(lastW.x)}  y:${Math.round(lastW.y)}`, 10, 34); }
+}
+
+// ── Previsualización (nave rellena, proa a la derecha) ──
+let pvZoom = 0.7;
+function drawPreview(){
+  pctx.clearRect(0,0,pv.width,pv.height);
+  const fb = fullBody();
+  if (fb.length<2) return;
+  // ajustar zoom para encajar
+  let maxR = 1;
+  for (const p of fb) maxR = Math.max(maxR, Math.hypot(p.x,p.y));
+  pvZoom = Math.min(pv.width, pv.height)*0.42 / maxR;
+  const cx = pv.width/2, cy = pv.height/2;
+  const t = (p)=>({ x: cx + p.x*pvZoom, y: cy + p.y*pvZoom });
+  pctx.beginPath();
+  const p0=t(fb[0]); pctx.moveTo(p0.x,p0.y);
+  for (let i=1;i<fb.length;i++){ const p=t(fb[i]); pctx.lineTo(p.x,p.y); }
+  pctx.closePath();
+  const g = pctx.createRadialGradient(cx-maxR*pvZoom*0.3, cy-maxR*pvZoom*0.3, 2, cx,cy, maxR*pvZoom);
+  g.addColorStop(0,'#3fae7e'); g.addColorStop(0.5,'#0b7a47'); g.addColorStop(1,'#01140c');
+  pctx.fillStyle=g; pctx.fill();
+  pctx.strokeStyle='rgba(0,0,0,0.55)'; pctx.lineWidth=1.4; pctx.stroke();
+  // líneas
+  pctx.strokeStyle='rgba(0,0,0,0.5)'; pctx.lineWidth=1;
+  for (const L of fullLines()){ const a=t(L.a),b=t(L.b); pctx.beginPath(); pctx.moveTo(a.x,a.y); pctx.lineTo(b.x,b.y); pctx.stroke(); }
+  // cabina
+  drawCockpit(pctx, t, false);
+}
+
+// ── Picking ─────────────────────────────────────────────
+function nearVertex(sx,sy,arr,getXY){
+  for (let i=0;i<arr.length;i++){
+    const p=w2s(getXY(arr[i]));
+    if (Math.hypot(p.x-sx,p.y-sy) < 9) return i;
+  }
+  return -1;
+}
+function nearestEdge(wx,wy){
+  // devuelve índice donde insertar (en body)
+  let best=-1, bestD=12/zoom;
+  for (let i=0;i<body.length;i++){
+    const a=body[i], b=body[(i+1)%body.length];
+    const d=ptSeg(wx,wy,a.x,a.y,b.x,b.y);
+    if (d<bestD){ bestD=d; best=i+1; }
+  }
+  return best;
+}
+function ptSeg(px,py,ax,ay,bx,by){
+  const dx=bx-ax, dy=by-ay, l=dx*dx+dy*dy;
+  let t = l? ((px-ax)*dx+(py-ay)*dy)/l : 0; t=Math.max(0,Math.min(1,t));
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+}
+
+// ── Ratón ───────────────────────────────────────────────
+let lastW = null;
+function evPos(e){ const r=canvas.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; }
+
+canvas.addEventListener('mousedown', e=>{
+  const m = evPos(e); const w = s2w(m.x,m.y);
+  if (e.button===1 || mode==='pan' || spaceHeld){ drag={kind:'pan', sx:m.x, sy:m.y, px:panX, py:panY}; return; }
+  if (imgEdit && img){ drag={kind:'img', sx:m.x, sy:m.y, ix:imgX, iy:imgY}; return; }
+
+  if (mode==='body'){
+    const i = nearVertex(m.x,m.y,body,p=>p);
+    if (i>=0){
+      if (e.shiftKey){ body.splice(i,1); selected=-1; syncExport(); return; }
+      selected=i; drag={kind:'vertex', i}; return;
+    }
+    const sp = snapPt(w);
+    body.push(sp); selected=body.length-1; drag={kind:'vertex', i:selected}; syncExport();
+  }
+  else if (mode==='turrets'){
+    const i = nearVertex(m.x,m.y,turrets,p=>p);
+    if (i>=0){ if (e.shiftKey){ turrets.splice(i,1); syncExport(); return; } drag={kind:'turret', i}; return; }
+    turrets.push(snapPt(w)); drag={kind:'turret', i:turrets.length-1}; syncExport();
+  }
+  else if (mode==='cockpit'){
+    const cc=w2s({x:cockpit.x,y:cockpit.y});
+    const ch=w2s({x:cockpit.x+cockpit.rx,y:cockpit.y+cockpit.ry});
+    if (Math.hypot(ch.x-m.x,ch.y-m.y)<10){ drag={kind:'cockpitSize'}; return; }
+    if (Math.hypot(cc.x-m.x,cc.y-m.y)<12){ drag={kind:'cockpitMove'}; return; }
+    cockpit.x=snapV(w.x); cockpit.y=snapV(w.y); drag={kind:'cockpitMove'}; syncExport();
+  }
+  else if (mode==='lines'){
+    const sp = snapPt(w);
+    if (!lineDraft){ lineDraft = sp; }
+    else { lines.push({ a:lineDraft, b:sp }); lineDraft=null; syncExport(); }
+  }
+});
+
+canvas.addEventListener('mousemove', e=>{
+  const m = evPos(e); lastW = s2w(m.x,m.y);
+  if (!drag) return;
+  const w = s2w(m.x,m.y); const sp = snapPt(w);
+  if (drag.kind==='pan'){ panX = drag.px + (m.x-drag.sx); panY = drag.py + (m.y-drag.sy); }
+  else if (drag.kind==='img'){ const d=s2w(m.x,m.y), d0=s2w(drag.sx,drag.sy); imgX=drag.ix+(d.x-d0.x); imgY=drag.iy+(d.y-d0.y); }
+  else if (drag.kind==='vertex'){ body[drag.i]=sp; syncExport(); }
+  else if (drag.kind==='turret'){ turrets[drag.i]=sp; syncExport(); }
+  else if (drag.kind==='cockpitMove'){ cockpit.x=snapV(w.x); cockpit.y=snapV(w.y); syncExport(); }
+  else if (drag.kind==='cockpitSize'){ cockpit.rx=Math.max(2,Math.abs(snapV(w.x-cockpit.x))); cockpit.ry=Math.max(2,Math.abs(snapV(w.y-cockpit.y))); syncExport(); }
+});
+
+addEventListener('mouseup', ()=> drag=null);
+
+canvas.addEventListener('dblclick', e=>{
+  if (mode!=='body') return;
+  const m=evPos(e); const w=s2w(m.x,m.y);
+  const idx = nearestEdge(w.x,w.y);
+  if (idx>=0){ body.splice(idx,0,snapPt(w)); selected=idx; syncExport(); }
+});
+
+canvas.addEventListener('contextmenu', e=>{
+  e.preventDefault();
+  const m=evPos(e);
+  if (mode==='body'){ const i=nearVertex(m.x,m.y,body,p=>p); if(i>=0){ body.splice(i,1); selected=-1; syncExport(); } }
+  else if (mode==='turrets'){ const i=nearVertex(m.x,m.y,turrets,p=>p); if(i>=0){ turrets.splice(i,1); syncExport(); } }
+  else if (mode==='lines'){
+    // borra la línea más cercana
+    const w=s2w(m.x,m.y); let best=-1,bd=10/zoom;
+    for (let i=0;i<lines.length;i++){ const d=ptSeg(w.x,w.y,lines[i].a.x,lines[i].a.y,lines[i].b.x,lines[i].b.y); if(d<bd){bd=d;best=i;} }
+    if (best>=0){ lines.splice(best,1); syncExport(); }
+    lineDraft=null;
+  }
+});
+
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  if (imgEdit && img){ imgScale *= (e.deltaY<0?1.08:0.93); return; }
+  const m=evPos(e); const before=s2w(m.x,m.y);
+  zoom *= (e.deltaY<0?1.1:0.9); zoom=Math.max(0.4,Math.min(12,zoom));
+  const after=s2w(m.x,m.y);
+  panX += (after.x-before.x)*zoom; panY += (after.y-before.y)*zoom;
+}, {passive:false});
+
+addEventListener('keydown', e=>{
+  if (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  if (e.code==='Space'){ spaceHeld=true; }
+  if ((e.key==='Delete'||e.key==='Backspace') && mode==='body' && selected>=0){ body.splice(selected,1); selected=-1; syncExport(); }
+});
+addEventListener('keyup', e=>{ if (e.code==='Space') spaceHeld=false; });
+
+// ── Controles UI ────────────────────────────────────────
+document.querySelectorAll('#modes button').forEach(b=>{
+  b.onclick=()=>{ mode=b.dataset.mode; lineDraft=null;
+    document.querySelectorAll('#modes button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); updateHint(); };
+});
+function updateHint(){
+  const h={
+    body:'Clic para añadir vértices (de proa a popa por un lado). Arrastra para mover. Doble clic en una arista inserta un punto.',
+    lines:'Clic en dos puntos para crear una línea de chasis. Clic derecho borra la más cercana.',
+    cockpit:'Arrastra el punto central para mover el puente; el cuadrado naranja ajusta el tamaño.',
+    turrets:'Clic para colocar torretas. Arrastra para mover, clic derecho para borrar.',
+    pan:'Arrastra para desplazar la vista. (También con botón central o Espacio en cualquier modo.)'
+  };
+  document.getElementById('modeHint').textContent = h[mode]||'';
+}
+updateHint();
+
+const $ = id=>document.getElementById(id);
+$('symChk').onchange = e=>{ sym=e.target.checked; syncExport(); };
+$('snapChk').onchange = e=> snap=e.target.checked;
+$('gridChk').onchange = e=> showGrid=e.target.checked;
+$('gridStep').onchange = e=> grid=Math.max(1,+e.target.value||4);
+$('cockpitRectChk').onchange = e=>{ cockpit.rect=e.target.checked; syncExport(); };
+$('mirrorBtn').onclick = ()=>{ body=body.map(p=>({x:p.x,y:-Math.abs(p.y)})); syncExport(); };
+$('clearBtn').onclick = ()=>{ if(confirm('¿Vaciar el cuerpo?')){ body=[]; selected=-1; syncExport(); } };
+
+$('metaName').oninput = e=>{ meta.name=e.target.value||'nave'; syncExport(); };
+$('metaShieldR').oninput = e=>{ meta.shieldR=+e.target.value; syncExport(); };
+$('metaHpBarW').oninput = e=>{ meta.hpBarW=+e.target.value; syncExport(); };
+$('metaUiOffY').oninput = e=>{ meta.uiOffY=+e.target.value; syncExport(); };
+
+$('imgInput').onchange = e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const im=new Image(); im.onload=()=>{ img=im; imgScale = 160/Math.max(im.width,im.height); imgX=0; imgY=0; }; im.src=URL.createObjectURL(f);
+};
+$('imgEditChk').onchange = e=> imgEdit=e.target.checked;
+$('imgOpacity').oninput = e=> imgOpacity=+e.target.value;
+
+$('copyBtn').onclick = ()=>{ navigator.clipboard.writeText($('exportArea').value).then(()=>status('Copiado al portapapeles ✓')); };
+$('importBtn').onclick = ()=>{
+  try {
+    const obj = (new Function('return ('+$('exportArea').value.replace(/^\s*\w+\s*:/,'')+')'))();
+    if (obj.body){ sym=false; $('symChk').checked=false; body=obj.body.map(p=>({x:p[0],y:p[1]})); }
+    lines = (obj.lines||[]).map(L=>({a:{x:L[0][0],y:L[0][1]}, b:{x:L[1][0],y:L[1][1]}}));
+    turrets = (obj.turretHardpoints||[]).map(p=>({x:p[0],y:p[1]}));
+    if (obj.cockpit){ cockpit={x:obj.cockpit[0],y:obj.cockpit[1],rx:obj.cockpit[2],ry:obj.cockpit[3],rect:!!obj.cockpitRect}; $('cockpitRectChk').checked=!!obj.cockpitRect; }
+    if (obj.shieldR!=null){ meta.shieldR=obj.shieldR; $('metaShieldR').value=obj.shieldR; }
+    if (obj.hpBarW!=null){ meta.hpBarW=obj.hpBarW; $('metaHpBarW').value=obj.hpBarW; }
+    if (obj.uiOffY!=null){ meta.uiOffY=obj.uiOffY; $('metaUiOffY').value=obj.uiOffY; }
+    syncExport(); status('Importado ✓');
+  } catch(err){ status('Error al importar: '+err.message); }
+};
+function status(s){ $('status').textContent=s; setTimeout(()=>$('status').textContent='',2500); }
+
+// ── Exportar en formato SHIP_SHAPES ─────────────────────
+function r(v){ return Math.round(v*10)/10; }
+function fmtPts(arr){ return arr.map(p=>`[${r(p.x)}, ${r(p.y)}]`).join(', '); }
+function fmtBodyMultiline(arr){
+  const out=[]; for (let i=0;i<arr.length;i+=5){ out.push('      '+arr.slice(i,i+5).map(p=>`[${r(p.x)}, ${r(p.y)}]`).join(', ')+','); }
+  return out.join('\n');
+}
+function syncExport(){
+  const fb = fullBody();
+  // motor: triángulo automático tras la popa (punto de menor x)
+  let stern = fb.reduce((a,p)=> p.x<a.x?p:a, fb[0]||{x:0,y:0});
+  const eh = 24;
+  const engine = `[[${r(stern.x)}, ${-eh}], [${r(stern.x-18)}, 0], [${r(stern.x)}, ${eh}]]`;
+
+  let s = `  ${meta.name}: {\n`;
+  s += `    body: [\n${fmtBodyMultiline(fb)}\n    ],\n`;
+  s += `    engine: ${engine},\n`;
+  s += `    hpBarW: ${meta.hpBarW},\n`;
+  s += `    uiOffY: ${meta.uiOffY},\n`;
+  s += `    shieldR: ${meta.shieldR},\n`;
+  if (cockpit){
+    s += `    cockpit: [${r(cockpit.x)}, ${r(cockpit.y)}, ${r(cockpit.rx)}, ${r(cockpit.ry)}],\n`;
+    if (cockpit.rect) s += `    cockpitRect: true,\n`;
+  }
+  const fl = fullLines();
+  if (fl.length){
+    s += `    lines: [\n`;
+    for (const L of fl) s += `      [[${r(L.a.x)}, ${r(L.a.y)}], [${r(L.b.x)}, ${r(L.b.y)}]],\n`;
+    s += `    ],\n`;
+  }
+  const ft = fullTurrets();
+  if (ft.length){
+    s += `    turretHardpoints: [\n      ${fmtPts(ft)}\n    ],\n`;
+  }
+  s += `  },`;
+  $('exportArea').value = s;
+}
+
+// ── Init ────────────────────────────────────────────────
+resize();
+syncExport();
+draw();
+</script>
+</body>
+</html>

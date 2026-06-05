@@ -2144,6 +2144,8 @@ addEventListener("keydown", e => {
       scanUntil = performance.now() + 8000;
       pingEnemiesUntil = performance.now() + 2000;
       triggerPingEffect(me.x, me.y);
+      initAudio();         // asegura el contexto de audio en este gesto de tecla
+      playPingSound();     // sonar tipo Star Citizen
     }
   }
 

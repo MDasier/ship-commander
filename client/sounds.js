@@ -669,6 +669,57 @@ if (typeof window !== "undefined" && "speechSynthesis" in window) {
   try { window.speechSynthesis.getVoices(); } catch (e) {}
 }
 
+// ── PING del escáner (sonar tipo Star Citizen) ────────────────
+// Chirp tonal brillante que sube rápido y resuena, con cola de ecos (delay con
+// realimentación) → sensación de "pwiiing" de radar.
+function playPingSound() {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+
+  // Bus del ping → filtro pasa-banda (timbre limpio/metálico)
+  const out = audioCtx.createGain();
+  out.gain.setValueAtTime(0.0001, t0);
+  out.gain.exponentialRampToValueAtTime(0.24, t0 + 0.012);   // ataque rápido
+  out.gain.exponentialRampToValueAtTime(0.0008, t0 + 1.5);   // cola larga
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(1500, t0);
+  filter.frequency.exponentialRampToValueAtTime(2200, t0 + 0.4);
+  filter.Q.value = 1.1;
+  out.connect(filter);
+
+  // Cola de ecos (sonar): delay con realimentación
+  const delay = audioCtx.createDelay(0.6);
+  delay.delayTime.value = 0.17;
+  const fb = audioCtx.createGain();
+  fb.gain.value = 0.34;
+  filter.connect(sfxGain);          // señal seca
+  filter.connect(delay);
+  delay.connect(fb); fb.connect(delay);
+  delay.connect(sfxGain);           // ecos
+
+  // Parciales: fundamental + armónicos para el brillo; cada uno hace un chirp
+  // ascendente y luego se asienta (resonancia).
+  const partials = [
+    { f: 1320, g: 0.55 },
+    { f: 1980, g: 0.30 },   // quinta
+    { f: 2640, g: 0.16 },   // octava
+  ];
+  partials.forEach(p => {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(p.f * 0.92, t0);
+    osc.frequency.exponentialRampToValueAtTime(p.f * 1.06, t0 + 0.07); // chirp rápido
+    osc.frequency.exponentialRampToValueAtTime(p.f, t0 + 0.9);         // se asienta
+    g.gain.value = p.g;
+    osc.connect(g); g.connect(out);
+    osc.start(t0);
+    osc.stop(t0 + 1.6);
+  });
+}
+
 function resetAudio() {
   victoryPlayed = false;
   warningActive = false;
