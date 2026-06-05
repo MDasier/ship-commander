@@ -62,9 +62,8 @@ const adminServer = http.createServer((req, res) => {
         try {
           const updates = JSON.parse(body);
           if (updates.__reset) {
-            // Reload defaults
-            const DEFAULTS = require("./config");
-            Object.assign(CFG, DEFAULTS);
+            // Restaurar los defaults originales (copia profunda pristina)
+            Object.assign(CFG, CFG.getDefaults());
           } else {
             Object.assign(CFG, updates);
           }
@@ -176,6 +175,9 @@ function applyShipStats(p) {
   p.radarSignature      = ship.radarSignature;
   p.bulletDamage        = ship.bulletDamage ?? CFG.BULLET_DAMAGE;
   p.firesTorpedoes      = !!ship.torpedo;
+  // Bengalas — pool por vida (se repone al reaparecer, no se regenera en vuelo)
+  p.maxFlares           = ship.maxFlares ?? CFG.FLARE_MAX_DEFAULT ?? 8;
+  p.flaresLeft          = p.maxFlares;
   // Escudos
   p.maxShield             = ship.maxShield      ?? 0;
   p.shield                = p.maxShield;
@@ -609,7 +611,7 @@ function startGame(room) {
     room.wave      = 0;
     room.waveState = "intermission";
     room.waveTimer = 3 * FPS;     // primera oleada en ~3s
-    room.teamLives = TEAM_LIVES;  // pool de vidas compartido del equipo
+    room.teamLives = TEAM_LIVES();  // pool de vidas compartido del equipo
     setWaveBanner(room, "PREPARAOS...", 3000);
   }
 
@@ -785,7 +787,7 @@ wss.on("connection", ws => {
         room.wave      = 0;
         room.waveState = "intermission";
         room.waveTimer = 2 * FPS;     // primera oleada en ~2s
-        room.teamLives = TEAM_LIVES;  // pool de vidas compartido
+        room.teamLives = TEAM_LIVES();  // pool de vidas compartido
         setWaveBanner(room, "PREPÁRATE...", 2000);
       }
 
@@ -1019,6 +1021,7 @@ wss.on("connection", ws => {
     if (msg.type === "flare") {
       const room = rooms[player.roomId];
       if (!room || player.flaredCooldown > 0 || player.empDisabled) return;
+      if ((player.flaresLeft ?? 0) <= 0) return;   // pool de bengalas agotado
       room.flare = room.flare || [];
       room.flare.push({
         id: Date.now() + Math.random(),
@@ -1026,8 +1029,9 @@ wss.on("connection", ws => {
         y: player.y,
         life: CFG.FLARE_LIFE,
         team: player.team
-      });    
+      });
       player.flaredCooldown = CFG.FLARE_COOLDOWN;
+      player.flaresLeft     = Math.max(0, (player.flaresLeft ?? 0) - 1);
     }
 
     if (msg.type === "missile") {
@@ -1424,15 +1428,9 @@ const BOT_NAMES = {
 };
 
 // Oleadas escaladas: cada vez más naves/dureza hasta el jefe (Capital).
-const WAVES = [
-  { ships: ["interceptor", "fighter"] },
-  { ships: ["fighter"," fighter", "bomber"] },
-  { ships: ["fighter","bomber", "gunship"] },
-  { ships: ["gunship", "bomber", "fighter", "fighter"] },
-  { ships: ["capital", "gunship", "gunship", "bomber", "fighter", "fighter"], boss: true },
-];
-
-const TEAM_LIVES = 5;   // vidas compartidas del equipo en modo oleadas (co-op / solo)
+// Oleadas y vidas de equipo viven en config (editables desde el panel admin).
+const WAVES = () => CFG.WAVES;
+const TEAM_LIVES = () => CFG.TEAM_LIVES;
 
 let botCounter = 0;
 
@@ -1475,18 +1473,20 @@ function makeBot(room, shipType) {
   bot.angle = Math.random() * Math.PI * 2;
   bot.fuel = 100;
 
-  // memoria de comportamiento orbital
+  // memoria de comportamiento (pasadas de ataque)
   bot.orbitDir = Math.random() < 0.5 ? -1 : 1;
-  bot.orbitSwitchAt = Date.now() + 2000 + Math.random() * 4000;
-  bot.wanderOffset = Math.random() * Math.PI * 2;
-  bot.distTarget = 700 + Math.random() * 1100;
+  bot.attackPhase = "approach";              // "approach" | "break"
+  bot.phaseUntil = Date.now() + (CFG.AI_ATTACK_RUN_TIME ?? 2600);
+  // distancia de combate preferida según el rol de la nave
+  const standoff = (shipType === "bomber" || shipType === "gunship" || shipType === "capital");
+  bot.distTarget = standoff ? (900 + Math.random() * 500) : (520 + Math.random() * 320);
 
   room.players[bot.id] = bot;
   return bot;
 }
 
 function spawnWave(room, n) {
-  const wave = WAVES[n - 1];
+  const wave = WAVES()[n - 1];
   if (!wave) return;
 
   const ships = [...wave.ships];
@@ -1523,155 +1523,254 @@ function applyWorldBoundaryAvoidance(bot, room) {
   bot.vy += ay;
 }
 
-// IA de un bot: persigue al humano más cercano, orbita a distancia y dispara.
-function computeBotAI(bot, room) {
-  // ─────────────────────────────
-  // 1. TARGET PERSISTENTE
-  // ─────────────────────────────
-  if (!bot.currentTargetId || Math.random() < 0.01) {
-    let target = null, best = Infinity;
+// ── Helpers de IA ────────────────────────────────────────────
+function botHealthFrac(bot) {
+  const maxTotal = (bot.maxHp || 1) + (bot.maxShield || 0);
+  return ((bot.hp || 0) + Math.max(0, bot.shield || 0)) / maxTotal;
+}
 
+// Misil hostil más cercano que amenaza al bot (lo persigue o pasa muy cerca).
+function incomingMissileNear(bot, room, radius) {
+  let nearest = null, best = radius;
+  for (const m of room.missiles || []) {
+    if (m.team === bot.team) continue;
+    const d = Math.hypot(m.x - bot.x, m.y - bot.y);
+    const threatens = m.targetId === bot.id || d < radius * 0.55;
+    if (threatens && d < best) { best = d; nearest = m; }
+  }
+  return nearest;
+}
+
+// Aliado vivo más cercano (otro bot del mismo equipo) para reagruparse.
+function nearestAlly(bot, room) {
+  let ally = null, best = Infinity;
+  for (const q of Object.values(room.players)) {
+    if (q.id === bot.id || q.dead || q.team !== bot.team || q.pilotingFor) continue;
+    const d = Math.hypot(q.x - bot.x, q.y - bot.y);
+    if (d < best) { best = d; ally = q; }
+  }
+  return ally;
+}
+
+// El bot suelta una bengala si tiene pool y cooldown disponibles.
+function botDeployFlare(bot, room) {
+  if ((bot.flaresLeft ?? 0) <= 0 || (bot.flaredCooldown ?? 0) > 0 || bot.empDisabled) return;
+  room.flare = room.flare || [];
+  room.flare.push({ id: Date.now() + Math.random(), x: bot.x, y: bot.y, life: CFG.FLARE_LIFE, team: bot.team });
+  bot.flaredCooldown = CFG.FLARE_COOLDOWN;
+  bot.flaresLeft = Math.max(0, bot.flaresLeft - 1);
+}
+
+// Ajusta un ángulo de rumbo deseado para esquivar asteroides sólidos (z===0).
+// Suma una repulsión de los asteroides cercanos al vector de rumbo y lo renormaliza,
+// mirando más lejos cuanto más rápido va el bot.
+function steerAroundAsteroids(bot, room, ang) {
+  const asts = room.asteroids || [];
+  if (!asts.length) return ang;
+
+  const myR = (CFG.SHIP_TYPES[bot.shipType]?.collider?.radius) || 20;
+  const speed = Math.hypot(bot.vx, bot.vy);
+  const look = 200 + speed * 16;        // distancia de anticipación
+
+  let rx = 0, ry = 0;
+  for (const a of asts) {
+    if (a.z !== 0) continue;            // solo los sólidos chocan
+    const ox = bot.x - a.x, oy = bot.y - a.y;
+    const d = Math.hypot(ox, oy) || 0.01;
+    const safe = (a.r || 40) + myR + 60;
+    if (d < safe + look) {
+      const w = Math.max(0, (safe + look - d)) / (safe + look);
+      rx += (ox / d) * w * w;          // peso cuadrático → reacciona fuerte de cerca
+      ry += (oy / d) * w * w;
+    }
+  }
+  if (rx === 0 && ry === 0) return ang;
+
+  const mx = Math.cos(ang) + rx * 2.2;
+  const my = Math.sin(ang) + ry * 2.2;
+  return Math.atan2(my, mx);
+}
+
+// Patrulla en formación: cuando no hay jugadores cerca, los bots avanzan juntos
+// hacia el objetivo en línea (frente abierto), manteniendo separación lateral.
+function botPatrolFormation(bot, room, objective) {
+  const squad = Object.values(room.players)
+    .filter(p => p.isBot && !p.dead && !p.pilotingFor)
+    .sort((a, b) => (a.id < b.id ? -1 : 1));   // orden estable → slots consistentes
+  const n = squad.length || 1;
+  const idx = Math.max(0, squad.findIndex(p => p.id === bot.id));
+
+  // Centroide del escuadrón y rumbo común hacia el objetivo
+  const cx = squad.reduce((s, p) => s + p.x, 0) / n;
+  const cy = squad.reduce((s, p) => s + p.y, 0) / n;
+  const heading = Math.atan2(objective.y - cy, objective.x - cx);
+
+  // Slot lateral perpendicular al rumbo (formación en línea / frente)
+  const spacing = CFG.AI_FORMATION_SPACING ?? 150;
+  const off = (idx - (n - 1) / 2) * spacing;
+  const advance = 300;   // el grupo avanza un poco por delante del centroide
+  const slotX = cx + Math.cos(heading) * advance + Math.cos(heading + Math.PI / 2) * off;
+  const slotY = cy + Math.sin(heading) * advance + Math.sin(heading + Math.PI / 2) * off;
+
+  const d = Math.hypot(slotX - bot.x, slotY - bot.y);
+  const ang = Math.atan2(slotY - bot.y, slotX - bot.x);
+  // Si ya está en su slot, encara el rumbo del grupo (formación alineada) sin acelerar
+  bot.input = {
+    targetAngle: d > 80 ? ang : heading,
+    thrust: d > 80,
+    inertiaDamp: true,
+  };
+  bot.beamCharging = false;
+}
+
+// IA de un bot: busca al humano más cercano, hace pasadas de ataque con puntería
+// predictiva, dispara con mesura, suelta bengalas defensivas y se reagrupa si está herido.
+function computeBotAI(bot, room) {
+  // 1. Target persistente (re-evalúa de vez en cuando o si el objetivo murió)
+  const cur = room.players[bot.currentTargetId];
+  if (!cur || cur.dead || Math.random() < 0.008) {
+    let target = null, best = Infinity;
     for (const q of Object.values(room.players)) {
       if (q.dead || q.team === bot.team || q.pilotingFor || q.isBot) continue;
-
       const d = Math.hypot(q.x - bot.x, q.y - bot.y);
       if (d < best) { best = d; target = q; }
     }
-
     bot.currentTargetId = target ? target.id : null;
   }
 
   const target = room.players[bot.currentTargetId];
   if (!target || target.dead) {
+    bot.input = { inertiaDamp: true };   // sin objetivo: deriva suavemente
+    bot.beamCharging = false;
+    return;
+  }
+  if (bot.empDisabled) {
     bot.input = { inertiaDamp: true };
     bot.beamCharging = false;
     return;
   }
 
-  const dx = target.x - bot.x;
-  const dy = target.y - bot.y;
-  const dist = Math.hypot(dx, dy) || 1;
+  const dist = Math.hypot(target.x - bot.x, target.y - bot.y) || 1;
 
-  const baseAngle = Math.atan2(dy, dx);
-
-  // ─────────────────────────────
-  // 2. ORBIT ESTABLE (sin ruido global)
-  // ─────────────────────────────
-  if (Date.now() > bot.orbitSwitchAt) {
-    bot.orbitDir *= -1;
-    bot.orbitSwitchAt = Date.now() + 2500 + Math.random() * 3000;
-    bot.distTarget = 800 + Math.random() * 800;
-  }
-
-  const orbitAngle = baseAngle + bot.orbitDir * (Math.PI / 2);
-
-  // ─────────────────────────────
-  // 3. CONTROL DE MEZCLA CORRECTO (NO ANGLES DIRECTLY)
-  // ─────────────────────────────
-  const chaseWeight = Math.min(1, dist / 1000);
-  const orbitWeight = 1 - chaseWeight;
-
-  // vector blending (CORRECTO)
-  const tx =
-    Math.cos(baseAngle) * chaseWeight +
-    Math.cos(orbitAngle) * orbitWeight;
-
-  const ty =
-    Math.sin(baseAngle) * chaseWeight +
-    Math.sin(orbitAngle) * orbitWeight;
-
-  const aim = Math.atan2(ty, tx);
-
-  const input = { targetAngle: aim, inertiaDamp: true };
-
-  // ─────────────────────────────
-  // 4. MOVIMIENTO INTELIGENTE
-  // ─────────────────────────────
-  const minD = bot.distTarget - 150;
-  const maxD = bot.distTarget + 150;
-
-  if (dist > maxD) {
-    input.thrust = true;
-  } else if (dist < minD) {
-    input.reverse = true;
-  } else {
-    const side = bot.orbitDir > 0 ? "right" : "left";
-    input[side === "right" ? "strafeRight" : "strafeLeft"] = true;
-  }
-
-  bot.input = input;
-
-  // ─────────────────────────────
-  // 5. COMBATE
-  // ─────────────────────────────
-  const diff = aim - bot.angle;
-  const norm =
-    Math.atan2(Math.sin(diff), Math.cos(diff)); // wrap correcto
-
-  const aligned = Math.abs(norm) < 0.18;
-
-  if (bot.empDisabled) {
-    bot.beamCharging = false;
+  // ── Sin jugadores cerca → patrullar en formación avanzando hacia el objetivo
+  if (dist > (CFG.AI_DETECT_RANGE ?? 1600)) {
+    botPatrolFormation(bot, room, target);
     return;
   }
+
+  // ── Defensa: bengala si hay un misil hostil encima
+  if (incomingMissileNear(bot, room, (CFG.FLARE_RADIUS ?? 200) * 2.2)) botDeployFlare(bot, room);
+
+  // ── Puntería PREDICTIVA: adelanta según velocidad del objetivo y de la bala
+  const projSpeed = bot.shipType === "capital" ? 1e9 : (CFG.BULLET_SPEED || 10);
+  const lead = CFG.AI_LEAD_FACTOR ?? 1;
+  const t = Math.min(dist / projSpeed, 60);                 // ticks estimados de vuelo
+  const aimX = target.x + (target.vx || 0) * t * lead;
+  const aimY = target.y + (target.vy || 0) * t * lead;
+  const leadAngle = Math.atan2(aimY - bot.y, aimX - bot.x) + (bot.aimJitter ?? 0);
+
+  const standoff = (bot.shipType === "bomber" || bot.shipType === "gunship" || bot.shipType === "capital");
+  const lowHealth = botHealthFrac(bot) < (CFG.AI_REGROUP_HEALTH_FRAC ?? 0.35);
+
+  // ── MOVIMIENTO ──────────────────────────────────────────
+  if (lowHealth) {
+    // Herido: huir hacia un aliado (o alejarse del enemigo si está solo) — reagruparse
+    const ally = nearestAlly(bot, room);
+    const fleeAng = (ally && Math.hypot(ally.x - bot.x, ally.y - bot.y) > 240)
+      ? Math.atan2(ally.y - bot.y, ally.x - bot.x)
+      : Math.atan2(bot.y - target.y, bot.x - target.x);
+    bot.input = { targetAngle: fleeAng, thrust: true, inertiaDamp: true };
+  } else if (standoff) {
+    // Naves pesadas: mantener distancia preferida encarando al objetivo (kiting)
+    const band = 170;
+    const input = { targetAngle: leadAngle, inertiaDamp: true };
+    if (dist > bot.distTarget + band) input.thrust = true;
+    else if (dist < bot.distTarget - band) input.reverse = true;
+    // dentro de la banda: deja de empujar y dispara desde posición estable
+    bot.input = input;
+  } else {
+    // Strikers (interceptor/fighter/disruptor): pasadas de ataque approach → break
+    if (Date.now() > bot.phaseUntil) {
+      if (bot.attackPhase === "approach") {
+        bot.attackPhase = "break";
+        if (Math.random() < 0.5) bot.orbitDir *= -1;
+        bot.phaseUntil = Date.now() + 800 + Math.random() * 700;
+      } else {
+        bot.attackPhase = "approach";
+        bot.phaseUntil = Date.now() + (CFG.AI_ATTACK_RUN_TIME ?? 2600);
+      }
+    }
+    // Romper la pasada si nos hemos acercado demasiado
+    if (bot.attackPhase === "approach" && dist < (CFG.AI_PASS_DISTANCE ?? 260)) {
+      bot.attackPhase = "break";
+      bot.phaseUntil = Date.now() + 800 + Math.random() * 700;
+    }
+    if (bot.attackPhase === "approach") {
+      bot.input = { targetAngle: leadAngle, thrust: true, inertiaDamp: true };
+    } else {
+      // Break: vira alejándose en diagonal y sigue acelerando (nunca se queda parado)
+      const away = Math.atan2(bot.y - target.y, bot.x - target.x);
+      bot.input = { targetAngle: away + bot.orbitDir * 0.6, thrust: true, inertiaDamp: true };
+    }
+  }
+
+  // ── COMBATE ─────────────────────────────────────────────
+  const diff = Math.atan2(Math.sin(leadAngle - bot.angle), Math.cos(leadAngle - bot.angle));
+  const cone = CFG.AI_FIRE_CONE ?? 0.16;
+  const aligned = Math.abs(diff) < cone;
 
   if (bot.shipType === "capital") {
     if (aligned && dist < CFG.CAPITAL_BEAM_RANGE) {
       bot.beamCharging = true;
-
       if ((bot.beamChargeTicks ?? 0) >= CFG.CAPITAL_BEAM_CHARGE_TIME) {
         fireCapitalBeam(bot, room);
         bot.beamCharging = false;
         bot.beamChargeTicks = 0;
       }
-    } else {
-      bot.beamCharging = false;
-    }
+    } else bot.beamCharging = false;
     return;
   }
 
-  if (aligned && dist < 720 && (bot.bulletCooldown ?? 0) <= 0) {
-    bot.bulletCooldown =
-      Math.round(CFG.BULLET_COOLDOWN * (CFG.AI_FIRE_COOLDOWN_MULT ?? 1.6));
-
+  // Cañón: alineado, en rango y no huyendo
+  if (aligned && !lowHealth && dist < (CFG.AI_BULLET_RANGE ?? 820) && (bot.bulletCooldown ?? 0) <= 0) {
+    bot.bulletCooldown = Math.round(CFG.BULLET_COOLDOWN * (CFG.AI_FIRE_COOLDOWN_MULT ?? 1.5));
     room.bullets.push({
-      x: bot.x,
-      y: bot.y,
+      x: bot.x, y: bot.y,
       vx: Math.cos(bot.angle) * CFG.BULLET_SPEED,
       vy: Math.sin(bot.angle) * CFG.BULLET_SPEED,
-      team: bot.team,
-      ownerId: bot.id,
+      team: bot.team, ownerId: bot.id,
       damage: bot.bulletDamage ?? CFG.BULLET_DAMAGE,
     });
   }
 
+  // Misiles: muchos menos salvo el bomber (es su rol de misilero)
+  const missileChance = (CFG.AI_MISSILE_CHANCE ?? 0.012) *
+    (bot.shipType === "bomber" ? (CFG.AI_BOMBER_MISSILE_MULT ?? 4) : 1);
   if (
-    aligned &&
+    !lowHealth &&
+    Math.abs(diff) < cone * 2.5 &&
     dist < 1300 &&
     (bot.missileCooldown ?? 0) <= 0 &&
     (bot.maxMissiles ?? 0) > 0 &&
-    Math.random() < 0.02
+    Math.random() < missileChance
   ) {
     bot.missileCooldown = bot.missileCooldownBase ?? CFG.MISSILE_COOLDOWN;
-
     room.missiles.push({
       id: Date.now() + Math.random(),
-      x: bot.x,
-      y: bot.y,
+      x: bot.x, y: bot.y,
       vx: Math.cos(bot.angle) * CFG.MISSILE_SPEED_INIT,
       vy: Math.sin(bot.angle) * CFG.MISSILE_SPEED_INIT,
-      team: bot.team,
-      targetId: target.id,
-      ownerId: bot.id,
-      life: CFG.MISSILE_LIFE,
-      torpedo: !!bot.firesTorpedoes,
+      team: bot.team, targetId: target.id, ownerId: bot.id,
+      life: CFG.MISSILE_LIFE, torpedo: !!bot.firesTorpedoes,
     });
   }
 }
 
 // Gestiona la progresión de oleadas de una sala solo.
-function setWaveBanner(room, text, ms = 3000) {
-  room.waveBanner = text;
+// El banner se envía como clave i18n + número; el cliente lo traduce al idioma local.
+function setWaveBanner(room, key, n = 0, ms = 3000) {
+  room.waveBannerKey = key;
+  room.waveBannerN   = n;
   room.waveBannerUntil = Date.now() + ms;
 }
 
@@ -1682,7 +1781,7 @@ function manageWaves(room) {
 
   if (humans.length && (room.teamLives ?? 0) <= 0 && humans.every(p => p.dead)) {
     room.winner = "red";
-    setWaveBanner(room, "DERROTA", 6000);
+    setWaveBanner(room, "wave.defeat", 0, 6000);
     return;
   }
 
@@ -1698,9 +1797,9 @@ function manageWaves(room) {
     if (--room.waveTimer <= 0) {
       room.wave++;
 
-      if (room.wave > WAVES.length) {
+      if (room.wave > WAVES().length) {
         room.winner = "green";
-        setWaveBanner(room, "¡PRÁCTICA COMPLETADA!", 6000);
+        setWaveBanner(room, "wave.complete", 0, 6000);
         return;
       }
 
@@ -1709,9 +1808,8 @@ function manageWaves(room) {
 
       setWaveBanner(
         room,
-        WAVES[room.wave - 1].boss
-          ? `OLEADA ${room.wave} — ¡CAPITAL!`
-          : `OLEADA ${room.wave}`
+        WAVES()[room.wave - 1].boss ? "wave.boss" : "wave.start",
+        room.wave
       );
     }
     return;
@@ -1720,13 +1818,7 @@ function manageWaves(room) {
   if (livingBots === 0) {
     room.waveState = "intermission";
     room.waveTimer = 3 * FPS;
-
-    setWaveBanner(
-      room,
-      room.wave >= WAVES.length
-        ? "¡ÚLTIMA OLEADA SUPERADA!"
-        : `OLEADA ${room.wave} SUPERADA`
-    );
+    setWaveBanner(room, "wave.cleared", room.wave);
   }
 }
 
@@ -1766,7 +1858,13 @@ function update() {
       }
 
       // IA: fija el input del bot (y dispara) antes de aplicar el movimiento
-      if (p.isBot) computeBotAI(p, room);
+      if (p.isBot) {
+        computeBotAI(p, room);
+        // Esquiva de asteroides: ajusta el rumbo deseado del bot
+        if (p.input && p.input.targetAngle != null) {
+          p.input.targetAngle = steerAroundAsteroids(p, room, p.input.targetAngle);
+        }
+      }
 
       p.lockedByMissile = false;
       p.lockedOnMe      = 0;
@@ -2156,9 +2254,10 @@ function update() {
       waveMode:  !!room.waveMode,
       teamLives: room.waveMode ? (room.teamLives ?? 0) : null,
       wave:      room.wave || 0,
-      waveTotal: WAVES.length,
+      waveTotal: WAVES().length,
       enemiesLeft: room.waveMode ? Object.values(room.players).filter(p => p.isBot && !p.dead).length : 0,
-      waveBanner: (room.waveMode && room.waveBannerUntil > Date.now()) ? room.waveBanner : null,
+      waveBanner: (room.waveMode && room.waveBannerUntil > Date.now())
+        ? { key: room.waveBannerKey, n: room.waveBannerN } : null,
     });
   });
 }

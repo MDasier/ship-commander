@@ -585,6 +585,90 @@ function playSelfDestructBeep(n) {
   osc.stop(audioCtx.currentTime + 0.23);
 }
 
+// ── Alertas cortas (beeps procedurales) ───────────────────────
+// type: "weaponLocked" | "noMissile" | "noFlare" | "denied"
+const _alertThrottle = {};
+function playAlertSound(type) {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  // anti-spam: mismo tipo como mucho cada 0.4 s
+  if (_alertThrottle[type] && now - _alertThrottle[type] < 0.4) return;
+  _alertThrottle[type] = now;
+
+  const blip = (freq, start, dur, type2 = "square", vol = 0.12) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type2;
+    osc.frequency.setValueAtTime(freq, now + start);
+    gain.gain.setValueAtTime(vol, now + start);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+    osc.connect(gain);
+    gain.connect(sfxGain);
+    osc.start(now + start);
+    osc.stop(now + start + dur + 0.02);
+  };
+
+  if (type === "weaponLocked") {
+    // Zumbido grave y descendente → arma sobrecalentada/bloqueada
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(300, now);
+    osc.frequency.exponentialRampToValueAtTime(90, now + 0.25);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+    osc.connect(gain); gain.connect(sfxGain);
+    osc.start(now); osc.stop(now + 0.3);
+  } else if (type === "noMissile") {
+    // Doble blip grave "denegado"
+    blip(240, 0, 0.07, "square", 0.11);
+    blip(180, 0.1, 0.09, "square", 0.11);
+  } else if (type === "noFlare") {
+    blip(300, 0, 0.08, "square", 0.10);
+  } else {
+    blip(220, 0, 0.08, "square", 0.10);
+  }
+}
+
+// ── Voz robótica femenina (estilo Star Citizen) para avisos del sistema ──
+// Usa Web Speech API; pitch grave para timbre robótico. Localizada (es/en).
+const _voiceThrottle = {};
+function playVoiceAlert(text, lang) {
+  if (muted) return;
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  // Red de seguridad: si llega una clave i18n sin traducir (p.ej. "voice.lowFuel"),
+  // la convertimos a texto legible ("low fuel") en vez de leer el namespace.
+  if (typeof text === "string" && /^[a-z]+\.[a-zA-Z]/.test(text)) {
+    text = text.split(".").pop().replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  }
+  const key = text;
+  const now = Date.now();
+  // mismo aviso como mucho cada 6 s
+  if (_voiceThrottle[key] && now - _voiceThrottle[key] < 6000) return;
+  _voiceThrottle[key] = now;
+
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang === "en" ? "en-US" : "es-ES";
+    u.pitch = 0.6;     // grave → sensación robótica
+    u.rate = 0.98;
+    u.volume = 0.9;
+    const voices = window.speechSynthesis.getVoices() || [];
+    // intenta una voz femenina del idioma
+    const want = u.lang.slice(0, 2);
+    const fem = voices.find(v => v.lang && v.lang.toLowerCase().startsWith(want) &&
+      /female|mujer|mónica|monica|sabina|helena|paulina|zira|google/i.test(v.name));
+    const any = voices.find(v => v.lang && v.lang.toLowerCase().startsWith(want));
+    if (fem) u.voice = fem; else if (any) u.voice = any;
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+// Precarga la lista de voces (en algunos navegadores llega de forma asíncrona)
+if (typeof window !== "undefined" && "speechSynthesis" in window) {
+  try { window.speechSynthesis.getVoices(); } catch (e) {}
+}
+
 function resetAudio() {
   victoryPlayed = false;
   warningActive = false;

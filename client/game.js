@@ -114,7 +114,8 @@ function renderControlesPane(targetId = "pane-controles") {
     const tr = document.createElement("tr");
 
     const tdLabel = document.createElement("td");
-    tdLabel.textContent = label;
+    tdLabel.textContent = i18nt("controls." + action) !== ("controls." + action)
+      ? i18nt("controls." + action) : label;
 
     const tdKey = document.createElement("td");
     tdKey.className = "bindingKeyCell";
@@ -124,7 +125,7 @@ function renderControlesPane(targetId = "pane-controles") {
     const tdBtn = document.createElement("td");
     const btn = document.createElement("button");
     btn.className = "bindingChangeBtn";
-    btn.textContent = "Cambiar";
+    btn.textContent = i18nt("controls.change");
     btn.onclick = () => {
       startRecording(action, tdKey);
     };
@@ -139,7 +140,7 @@ function renderControlesPane(targetId = "pane-controles") {
   const resetBtn = document.createElement("button");
   resetBtn.className = "bindingChangeBtn";
   resetBtn.style.marginTop = "14px";
-  resetBtn.textContent = "↺ Restaurar por defecto";
+  resetBtn.textContent = i18nt("controls.reset");
   resetBtn.onclick = () => {
     bindings = { ...DEFAULT_BINDINGS };
     saveBindings();
@@ -148,14 +149,14 @@ function renderControlesPane(targetId = "pane-controles") {
 
   const fixedDiv = document.createElement("div");
   fixedDiv.innerHTML = `
-    <div class="bindingFixedTitle">FIJOS</div>
+    <div class="bindingFixedTitle">${i18nt("controls.fixed")}</div>
     <table class="mobiControls" style="color:#3a5060">
-      <tr><td><kbd>Mouse</kbd></td><td>Apuntar / girar</td></tr>
-      <tr><td><kbd>Clic Izq.</kbd></td><td>Disparar</td></tr>
-      <tr><td><kbd>Clic Der.</kbd></td><td>Lockear / Misil</td></tr>
-      <tr><td><kbd>Tab ⟨mantener⟩</kbd></td><td>Marcador</td></tr>
-      <tr><td><kbd>F1</kbd></td><td>MobiGlass</td></tr>
-      <tr><td><kbd>Del</kbd></td><td>Autodestrucción</td></tr>
+      <tr><td><kbd>${i18nt("controls.kbMouse")}</kbd></td><td>${i18nt("controls.fxAim")}</td></tr>
+      <tr><td><kbd>${i18nt("controls.kbLClick")}</kbd></td><td>${i18nt("controls.fxFire")}</td></tr>
+      <tr><td><kbd>${i18nt("controls.kbRClick")}</kbd></td><td>${i18nt("controls.fxLock")}</td></tr>
+      <tr><td><kbd>${i18nt("controls.kbTab")}</kbd></td><td>${i18nt("controls.fxScore")}</td></tr>
+      <tr><td><kbd>F1</kbd></td><td>${i18nt("controls.fxMobi")}</td></tr>
+      <tr><td><kbd>Del</kbd></td><td>${i18nt("controls.fxSelfDestruct")}</td></tr>
     </table>
   `;
 
@@ -181,6 +182,13 @@ const SHIP_SHAPES = {
     hpBarW: 34,
     uiOffY: -30,
     shieldR: 34,
+    cockpit: [8, 0, 5, 3.4],
+    lines: [
+      [[16, 0], [-20, 0]],
+      [[2, -7], [-16, -18]],
+      [[2, 7], [-16, 18]],
+      [[-6, -5], [-6, 5]],
+    ],
   },
 
   fighter: {
@@ -197,6 +205,13 @@ const SHIP_SHAPES = {
     hpBarW: 44,
     uiOffY: -30,
     shieldR: 40,
+    cockpit: [9, 0, 6, 4],
+    lines: [
+      [[16, 0], [-22, 0]],
+      [[4, -10], [-12, -20]],
+      [[4, 10], [-12, 20]],
+      [[-4, -7], [-4, 7]],
+    ],
   },
 
 
@@ -213,6 +228,14 @@ const SHIP_SHAPES = {
     hpBarW: 62,
     uiOffY: -32,
     shieldR: 48,
+    cockpit: [14, 0, 7, 5],
+    lines: [
+      [[24, 0], [-22, 0]],
+      [[-10, -9], [-16, -20]],
+      [[-10, 9], [-16, 20]],
+      [[0, -9], [0, 9]],
+      [[-14, -8], [-14, 8]],
+    ],
   },
 
 
@@ -232,6 +255,14 @@ const SHIP_SHAPES = {
     hpBarW: 90,
     uiOffY: -46,
     shieldR: 58,
+    cockpit: [15, 0, 6, 5],
+    lines: [
+      [[20, 0], [-24, 0]],
+      [[4, -28], [-16, -30]],
+      [[4, 28], [-16, 30]],
+      [[-16, -14], [-16, 14]],
+      [[2, -10], [2, 10]],
+    ],
   },
 
   emp: {
@@ -246,32 +277,66 @@ const SHIP_SHAPES = {
     hpBarW: 70,
     uiOffY: -50,
     shieldR: 46,
+    cockpit: [7, 0, 5, 4],
+    lines: [
+      [[20, 0], [-8, 0]],
+      [[16, 0], [-13, -36]],
+      [[16, 0], [-13, 36]],
+    ],
   },
 
   capital: {
-    // Silueta tipo Idris: proa estrecha y puntiaguda (+x) que se ensancha
-    // progresivamente hacia la popa, donde está el ancho bloque de motores.
+    // Fragata pesada tipo Idris-M (Star Citizen): casco largo, proa que se estrecha
+    // hasta una punta ROMA (no afilada), costados casi paralelos en el centro y popa
+    // ancha con bahía de hangar central entre los bloques de motor.
     body: [
-      [85, 0],                                   // proa (punta estrecha)
-      [73, -7], [60, -13], [44, -19],            // morro afilado
-      [26, -27], [6, -35], [-16, -43],           // casco ensanchándose
-      [-38, -46], [-56, -43],                    // sección más ancha (popa)
-      [-67, -35], [-73, -37],                    // góndola de motor (estribor)
-      [-78, -20], [-78, 0], [-78, 20],           // bloque trasero
-      [-73, 37], [-67, 35],                      // góndola de motor (babor)
-      [-56, 43], [-38, 46],                      // sección más ancha (popa)
-      [-16, 43], [6, 35], [26, 27],              // casco estrechándose
-      [44, 19], [60, 13], [73, 7],               // morro afilado
+      [112, 0],                                  // proa (punta corta y roma — cañón de riel)
+      [106, -7], [96, -14],                      // morro estrechándose
+      [78, -22], [52, -27],
+      [20, -30],                                 // entra en el cuerpo central (lados casi paralelos)
+      [-18, -31], [-52, -33],
+      [-74, -37],                                // ensancha hacia popa
+      [-88, -42], [-98, -36],                    // góndola de motor
+      [-102, -22], [-102, -8],                   // popa (lado de la bahía)
+      [-94, 0],                                  // muesca central del hangar
+      [-102, 8], [-102, 22],
+      [-98, 36], [-88, 42],                      // góndola de motor
+      [-74, 37],
+      [-52, 33], [-18, 31],
+      [20, 30],                                  // cuerpo central
+      [52, 27], [78, 22],
+      [96, 14], [106, 7],                        // morro
     ],
-    engine: [[-78, -24], [-98, 0], [-78, 24]],
-    hpBarW: 170,
-    uiOffY: -60,
-    shieldR: 90,
+    engine: [[-100, -26], [-120, 0], [-100, 26]],
+    hpBarW: 190,
+    uiOffY: -70,
+    shieldR: 108,
+    // Torre de mando (puente): bloque rectangular elevado en el tercio de proa
+    cockpit: [34, 0, 16, 12],
+    cockpitRect: true,
+    lines: [
+      [[104, 0], [-92, 0]],          // espina dorsal
+      // costados internos (paralelos) → silueta de fragata, no de triángulo
+      [[78, -22], [-74, -37]],
+      [[78, 22], [-74, 37]],
+      // mamparos transversales
+      [[52, -27], [52, 27]],
+      [[-18, -31], [-18, 31]],
+      [[-52, -33], [-52, 33]],
+      // contorno de la superestructura / torre de mando
+      [[18, -16], [50, -16]],
+      [[18, 16], [50, 16]],
+      [[18, -16], [18, 16]],
+      [[50, -16], [50, 16]],
+      // bahía de hangar a popa (uve hacia la muesca central)
+      [[-74, -14], [-94, 0]],
+      [[-74, 14], [-94, 0]],
+    ],
     // Posiciones de las 3 torretas en coordenadas locales de nave
     turretHardpoints: [
-      [20, -24],   // torreta de proa izquierda
-      [20, 24],   // torreta de proa derecha
-      [-48, 0],   // torreta trasera
+      [70, -18],   // torreta de proa izquierda
+      [70, 18],   // torreta de proa derecha
+      [-40, 0],   // torreta dorsal trasera
     ],
   },
 };
@@ -298,6 +363,89 @@ function buildShipPath(c, type) {
   c.closePath();
 }
 
+// Dibuja el detalle interior de una nave (líneas de chasis + cabina/puente).
+// Asume que el contexto ya está trasladado/rotado a la nave. Recorta al casco
+// para que ningún trazo se salga de la silueta.
+function drawShipDetail(c, type, player) {
+  const shape = getShapeDef(type);
+  const isGreen = player.team === "green";
+
+  // ── Paneles / líneas de chasis (recortados al casco) ──
+  if (shape.lines && shape.lines.length) {
+    c.save();
+    c.beginPath();
+    buildShipPath(c, type);
+    c.clip();
+
+    // surco oscuro
+    c.lineCap = "round";
+    c.strokeStyle = "rgba(0,0,0,0.5)";
+    c.lineWidth = 1.3;
+    c.beginPath();
+    for (const [a, b] of shape.lines) { c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
+    c.stroke();
+
+    // realce tenue desplazado (relieve)
+    c.strokeStyle = "rgba(255,255,255,0.10)";
+    c.lineWidth = 0.8;
+    c.beginPath();
+    for (const [a, b] of shape.lines) { c.moveTo(a[0], a[1] + 0.9); c.lineTo(b[0], b[1] + 0.9); }
+    c.stroke();
+    c.restore();
+  }
+
+  // ── Cabina / puente de mando (cristal, con tinte de equipo) ──
+  if (shape.cockpit && !player.dead) {
+    const [cx, cy, rx, ry] = shape.cockpit;
+    const rect = !!shape.cockpitRect;
+    c.save();
+    c.translate(cx, cy);
+    const g = c.createRadialGradient(-rx * 0.3, -ry * 0.35, 0.5, 0, 0, Math.max(rx, ry));
+    g.addColorStop(0, "#eaffff");
+    g.addColorStop(0.5, isGreen ? "#1fd6a0" : "#ff7088");
+    g.addColorStop(1, "#03101a");
+    c.fillStyle = g;
+    if (rect) {
+      // Puente rectangular (superestructura militar) con esquinas redondeadas
+      const r = Math.min(rx, ry) * 0.35;
+      roundRectPath(c, -rx, -ry, rx * 2, ry * 2, r);
+    } else {
+      c.beginPath();
+      c.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    }
+    c.fill();
+    c.strokeStyle = "rgba(0,0,0,0.55)";
+    c.lineWidth = 1.2;
+    c.stroke();
+    if (rect) {
+      // Ventanales: línea de mirada del puente
+      c.strokeStyle = "rgba(255,255,255,0.22)";
+      c.lineWidth = 0.8;
+      c.beginPath();
+      c.moveTo(-rx * 0.75, -ry * 0.2); c.lineTo(rx * 0.75, -ry * 0.2);
+      c.moveTo(-rx * 0.75, ry * 0.2); c.lineTo(rx * 0.75, ry * 0.2);
+      c.stroke();
+    }
+    // brillo especular
+    c.fillStyle = "rgba(255,255,255,0.5)";
+    c.beginPath();
+    c.ellipse(-rx * 0.32, -ry * 0.35, rx * 0.22, ry * 0.22, 0, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+  }
+}
+
+// Traza un rectángulo de esquinas redondeadas (no rellena ni dibuja).
+function roundRectPath(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+
 // Draw preview silhouettes into the selector canvases
 function drawShipPreviewInto(el, type, shape) {
   const pc = el.getContext("2d");
@@ -320,6 +468,26 @@ function drawShipPreviewInto(el, type, shape) {
   pc.lineWidth = 1.5 / sc;
   pc.fill();
   pc.stroke();
+  // Líneas de chasis
+  if (shape.lines && shape.lines.length) {
+    pc.strokeStyle = "#00aaff66";
+    pc.lineWidth = 1 / sc;
+    pc.beginPath();
+    for (const [a, b] of shape.lines) { pc.moveTo(a[0], a[1]); pc.lineTo(b[0], b[1]); }
+    pc.stroke();
+  }
+  // Cabina / puente
+  if (shape.cockpit) {
+    const [cx, cy, rx, ry] = shape.cockpit;
+    pc.fillStyle = "#bff4ffcc";
+    if (shape.cockpitRect) {
+      roundRectPath(pc, cx - rx, cy - ry, rx * 2, ry * 2, Math.min(rx, ry) * 0.35);
+    } else {
+      pc.beginPath();
+      pc.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    }
+    pc.fill();
+  }
   const eng = shape.engine;
   pc.beginPath();
   pc.moveTo(eng[0][0], eng[0][1]);
@@ -362,7 +530,34 @@ let _connLost = false;
 let _reconnectTimer = null;
 let _reconnectProbe = null;
 
+// ── Arranque en frío del servidor (anti-standby) ──
+// Mientras no se haya conectado nunca, mostramos la pantalla de "despertando";
+// si tarda, escalamos al mensaje de reposo. Tras la primera conexión, una caída
+// pasa a usar el overlay normal de "conexión perdida".
+let _everConnected = false;
+function hideBoot() {
+  const b = document.getElementById("serverBoot");
+  if (b) b.classList.add("hidden");
+}
+function showBoot(cold) {
+  const b = document.getElementById("serverBoot");
+  if (b) b.classList.remove("hidden");
+  if (cold) {
+    const c = document.getElementById("serverBootCold");
+    if (c) c.classList.remove("hidden");
+  }
+}
+// Si en 4 s no hemos conectado, probablemente el servidor estaba dormido
+setTimeout(() => { if (!_everConnected) showBoot(true); }, 4000);
+ws.addEventListener("open", () => { _everConnected = true; hideBoot(); });
+
 function showConnLost() {
+  // Aún no habíamos conectado nunca → es un arranque en frío, no una caída
+  if (!_everConnected) {
+    showBoot(true);
+    scheduleReconnect(1500);
+    return;
+  }
   if (_connLost) return;
   _connLost = true;
   const el = document.getElementById("connLost");
@@ -377,7 +572,7 @@ function scheduleReconnect(delay) {
 
 function tryReconnect() {
   // Cierra cualquier sonda previa
-  if (_reconnectProbe) { try { _reconnectProbe.onopen = _reconnectProbe.onerror = null; _reconnectProbe.close(); } catch (e) {} }
+  if (_reconnectProbe) { try { _reconnectProbe.onopen = _reconnectProbe.onerror = null; _reconnectProbe.close(); } catch (e) { } }
   try {
     _reconnectProbe = new WebSocket(_wsURL);
   } catch (e) {
@@ -386,11 +581,11 @@ function tryReconnect() {
   }
   _reconnectProbe.onopen = () => {
     // Servidor disponible de nuevo → recargar para reiniciar la sesión limpiamente
-    try { _reconnectProbe.close(); } catch (e) {}
+    try { _reconnectProbe.close(); } catch (e) { }
     location.reload();
   };
   _reconnectProbe.onerror = () => {
-    try { _reconnectProbe.close(); } catch (e) {}
+    try { _reconnectProbe.close(); } catch (e) { }
     scheduleReconnect(2000); // reintenta cada 2 s mientras el servidor no responda
   };
 }
@@ -432,7 +627,8 @@ let teamLives = null;   // vidas compartidas del equipo en modo oleadas (null = 
 let waveNum = 0;
 let waveTotal = 0;
 let enemiesLeft = 0;
-let waveBanner = null;
+let waveBanner = null;       // { key, n } enviado por el servidor
+let waveBannerSig = null;
 let waveBannerShownAt = 0;
 let asteroids = [];
 
@@ -532,6 +728,15 @@ let mouseY = 0;
 
 const keys = {};
 
+// Suelta todas las teclas a la vez (evita inputs "atascados" al perder el foco,
+// alt-tab, abrir el chat o un panel). El movimiento se lee de este estado.
+function clearKeys() {
+  for (const k in keys) keys[k] = false;
+}
+// Si la ventana pierde el foco o se oculta la pestaña, soltamos todo.
+addEventListener("blur", clearKeys);
+document.addEventListener("visibilitychange", () => { if (document.hidden) clearKeys(); });
+
 const menu = document.getElementById("menu");
 const lobbyDiv = document.getElementById("lobby");
 const roomDiv = document.getElementById("room");
@@ -591,6 +796,20 @@ function openMobiglass() {
 function bindingText(action) {
   return displayKey(bindings[action] || DEFAULT_BINDINGS[action]);
 }
+
+// ── i18n: aplica el idioma guardado al cargar y cablea los selectores ──
+(function initI18n() {
+  if (typeof applyI18n !== "function") return;   // i18n.js no cargado
+  applyI18n();
+  document.querySelectorAll("[data-lang]").forEach(b =>
+    b.addEventListener("click", () => setLang(b.getAttribute("data-lang"))));
+  onLangChange(() => {
+    // Re-render de la UI dinámica que no usa data-i18n
+    try { renderControlesPane(); } catch (e) { }
+    try { renderControlesPane("menuControlsBody"); } catch (e) { }
+    try { if (typeof buildShipCards === "function") buildShipCards(); } catch (e) { }
+  });
+})();
 
 function openMobiglass() {
   const me = getMe();
@@ -940,6 +1159,7 @@ let chatInputOpen = false;
 
 function openChat() {
   chatInputOpen = true;
+  clearKeys();   // suelta el movimiento al empezar a escribir
   chatContainer.classList.remove("hidden");
   chatInput.value = "";
   chatInput.focus();
@@ -973,6 +1193,10 @@ let weaponHeat = 0;
 let mouseLeftHeld = false;
 let weaponFireTimer = null;
 
+// Estados para avisos de voz por flanco (se disparan una vez al cruzar el umbral)
+let _voiceFuelLow = false;
+let _voiceShieldDown = false;
+
 const HEAT_PER_SHOT = 10;//calor por bala
 const HEAT_DECAY_MS = 46;//milisegundos de enfriamiento
 const HEAT_DECAY_AMT = 1;//calor que baja por tick
@@ -992,6 +1216,7 @@ function fireWeapon() {
   }
 
   if (weaponOverheated) {
+    playAlertSound("weaponLocked");   // intento de disparo con el arma bloqueada
     stopAutoFire();
     return;
   }
@@ -1003,11 +1228,12 @@ function fireWeapon() {
 
   if (weaponHeat >= OVERHEAT_LIMIT) {
     weaponOverheated = true;
+    playAlertSound("weaponLocked");   // el arma acaba de sobrecalentarse
     stopAutoFire();
     return;
   }
 
-  // 🔥 SOLO depende del input real
+  // SOLO depende del input real
   if (!mouseLeftHeld) {
     clearTimeout(weaponFireTimer);
     weaponFireTimer = null;
@@ -1280,7 +1506,7 @@ document.getElementById("soloStart").onclick = () => {
   initAudio();
   applyStoredVolumes();
   const modeBtn = document.querySelector("#soloMode .soloChoice.selected");
-  const durBtn  = document.querySelector("#soloDuration .soloChoice.selected");
+  const durBtn = document.querySelector("#soloDuration .soloChoice.selected");
   const sizeBtn = document.querySelector("#soloSize .soloChoice.selected");
   const mode = modeBtn ? modeBtn.dataset.mode : "waves";
   const durationS = durBtn ? Number(durBtn.dataset.secs) : 300;
@@ -1342,7 +1568,7 @@ ws.onmessage = e => {
   }
 
   if (data.type === "roomRestarted") {
-    
+
     clearTimeout(gameOverTimer);
     gameOverTimer = null;
     winner = null;
@@ -1448,11 +1674,16 @@ ws.onmessage = e => {
     waveNum = data.wave || 0;
     waveTotal = data.waveTotal || 0;
     enemiesLeft = data.enemiesLeft || 0;
-    if (data.waveBanner && data.waveBanner !== waveBanner) {
-      waveBanner = data.waveBanner;
-      waveBannerShownAt = Date.now();
-    } else if (!data.waveBanner) {
+    if (data.waveBanner) {
+      const sig = data.waveBanner.key + "|" + data.waveBanner.n;
+      if (sig !== waveBannerSig) {
+        waveBanner = data.waveBanner;       // { key, n }
+        waveBannerSig = sig;
+        waveBannerShownAt = Date.now();
+      }
+    } else {
       waveBanner = null;
+      waveBannerSig = null;
     }
   }
 
@@ -1897,13 +2128,16 @@ addEventListener("keydown", e => {
   const key = e.key.toLowerCase();
   keys[key] = true;
 
+  // Evita que teclas de juego desplacen la página (espacio y flechas hacen scroll)
+  if (key === " " || key === "spacebar" || key.startsWith("arrow")) e.preventDefault();
+
   if (bindings.brake && key === bindings.brake) {
     const me = getMe();
     if (me && !me.dead) {
       ws.send(JSON.stringify({ type: "brake" }));
     }
   }
-    
+
   if (bindings.scan && key === bindings.scan) {
     const me = getMe();
     if (me && !me.dead) {
@@ -1928,8 +2162,15 @@ addEventListener("keydown", e => {
     }
   }
   if (bindings.missile && key === bindings.missile && targetId) {
-    ws.send(JSON.stringify({ type: "missile", targetId }));
-    playMissileSound();
+    const meM = getMe();
+    const ready = meM && (meM.missileCooldown ?? 0) <= 0 &&
+      (meM.missilesActive ?? 0) < (meM.maxMissiles ?? 0);
+    if (ready) {
+      ws.send(JSON.stringify({ type: "missile", targetId }));
+      playMissileSound();
+    } else {
+      playAlertSound("noMissile");   // sin misiles disponibles / en recarga
+    }
   }
 
   // Tab: scoreboard (mantener) — en modo espectador cicla cámaras
@@ -1962,7 +2203,12 @@ addEventListener("keydown", e => {
   }
 
   if (bindings.flare && key === bindings.flare) {
-    ws.send(JSON.stringify({ type: "flare" }));
+    const meF = getMe();
+    if (meF && !meF.pilotingFor && (meF.flaresLeft ?? 1) <= 0) {
+      playAlertSound("noFlare");     // sin bengalas en el pool de esta vida
+    } else {
+      ws.send(JSON.stringify({ type: "flare" }));
+    }
   }
 
   // Habilidad especial (EMP del Disruptor / mina del Interceptor)
@@ -1992,9 +2238,12 @@ addEventListener("keydown", e => {
 });
 
 addEventListener("keyup", e => {
+  // El estado de tecla SIEMPRE se limpia, aunque el foco esté en un input;
+  // de lo contrario una tecla soltada mientras se escribe se quedaría "pegada".
+  keys[e.key.toLowerCase()] = false;
+
   const tag = document.activeElement?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return;
-  keys[e.key.toLowerCase()] = false;
 
   if (e.key === "Tab") showScoreboard = false;
   if (e.key === "Delete" && sdState === "charging") cancelSd();
@@ -2332,12 +2581,12 @@ function drawShip(player, camX, camY) {
   if (player.dead) {
     ctx.fillStyle = "#333";
   } else {
-    // Gradiente radial descentrado → sensación de volumen (como asteroides)
+    // Gradiente radial descentrado → sensación de volumen (tonos oscuros)
     const sR = shape.shieldR ?? 42;
     const isGreen = player.team === "green";
-    const hiColor = isGreen ? "#99ffcc" : "#ff99aa";
-    const midColor = isGreen ? "#00ff88" : "#ff3355";
-    const loColor = isGreen ? "#003820" : "#220010";
+    const hiColor = isGreen ? "#3fae7e" : "#c45e6e";   // realce apagado
+    const midColor = isGreen ? "#0b7a47" : "#8e2233";  // metal de equipo más oscuro
+    const loColor = isGreen ? "#01140c" : "#140006";   // sombra profunda
     const grad = ctx.createRadialGradient(-sR * 0.28, -sR * 0.32, sR * 0.04,
       0, 0, sR * 0.9);
     grad.addColorStop(0, hiColor);
@@ -2346,7 +2595,14 @@ function drawShip(player, camX, camY) {
     ctx.fillStyle = grad;
   }
   ctx.fill();
+  // Contorno oscuro del casco → silueta definida
+  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = player.dead ? "#222" : "rgba(0,0,0,0.55)";
+  ctx.stroke();
   ctx.globalAlpha = 1;
+
+  // Detalle interior: paneles de chasis + cabina/puente
+  drawShipDetail(ctx, player.shipType, player);
 
   // Overlay de calor progresivo según daño recibido
   if (!player.dead && hpFrac < 0.55) {
@@ -2416,9 +2672,9 @@ function drawShip(player, camX, camY) {
     // Resplandor rojo
     ctx.globalAlpha = 0.10 + 0.25 * emp;
     const g = ctx.createRadialGradient(0, 0, R * 0.45, 0, 0, R * 1.3);
-    g.addColorStop(0,   "#ffffff00");
+    g.addColorStop(0, "#ffffff00");
     g.addColorStop(0.7, "#ff222266");
-    g.addColorStop(1,   "#ffffff00");
+    g.addColorStop(1, "#ffffff00");
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, R * 1.3, 0, Math.PI * 2); ctx.fill();
 
@@ -2464,9 +2720,9 @@ function drawShip(player, camX, camY) {
     // Resplandor azul-blanco
     ctx.globalAlpha = 0.15 + 0.4 * beamHit;
     const g = ctx.createRadialGradient(0, 0, R * 0.3, 0, 0, R * 1.25);
-    g.addColorStop(0,   "#ffffffaa");
+    g.addColorStop(0, "#ffffffaa");
     g.addColorStop(0.6, "#66ccffaa");
-    g.addColorStop(1,   "#ffffff00");
+    g.addColorStop(1, "#ffffff00");
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, R * 1.25, 0, Math.PI * 2); ctx.fill();
 
@@ -2496,7 +2752,7 @@ function drawShip(player, camX, camY) {
     const nose = shape.body[0];            // vértice frontal del casco
     const isGreen = player.team === "green";
     const col = isGreen ? "#00ff88" : "#ff3355";
-    const hi  = isGreen ? "#aaffdd" : "#ffd0dd";
+    const hi = isGreen ? "#aaffdd" : "#ffd0dd";
     const full = charge >= 0.99;
     const now = performance.now();
     const baseR = 6 + charge * 9;          // orbe pequeño que crece con la carga
@@ -2508,9 +2764,9 @@ function drawShip(player, camX, camY) {
     const pulse = full ? 0.7 + 0.3 * Math.sin(now / 45) : 1;
     const orbR = baseR * pulse;
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, orbR);
-    g.addColorStop(0,   "#ffffff");
+    g.addColorStop(0, "#ffffff");
     g.addColorStop(0.5, col);
-    g.addColorStop(1,   "#ffffff00");
+    g.addColorStop(1, "#ffffff00");
     ctx.globalAlpha = 0.55 + 0.45 * charge;
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, orbR, 0, Math.PI * 2); ctx.fill();
@@ -2928,9 +3184,9 @@ function drawWaveHud() {
   ctx.textAlign = "center";
   ctx.font = "14px 'Courier New', monospace";
   ctx.fillStyle = "#ff8899";
-  const label = waveNum > 0 ? `OLEADA ${waveNum}/${waveTotal}` : "PREPARANDO...";
-  const vidas = teamLives != null ? `  ·  VIDAS EQUIPO: ${"♥".repeat(Math.max(0, teamLives)) || "0"}` : "";
-  ctx.fillText(`${label}  ·  ENEMIGOS: ${enemiesLeft}${vidas}`, canvas.width / 2, 70);
+  const label = waveNum > 0 ? i18nt("hud.waveLabel", { n: waveNum, total: waveTotal }) : i18nt("hud.preparing");
+  const vidas = teamLives != null ? `  ·  ${i18nt("game.teamLives")}: ${"♥".repeat(Math.max(0, teamLives)) || "0"}` : "";
+  ctx.fillText(`${label}  ·  ${i18nt("hud.enemiesShort")}: ${enemiesLeft}${vidas}`, canvas.width / 2, 70);
   ctx.restore();
 
   if (waveBanner) {
@@ -2938,7 +3194,7 @@ function drawWaveHud() {
     const dur = 2600;
     if (t < dur) {
       const a = t < 300 ? t / 300 : (t > dur - 600 ? Math.max(0, (dur - t) / 600) : 1);
-      const boss = /CAPITAL/.test(waveBanner);
+      const boss = waveBanner.key === "wave.boss";
       ctx.save();
       ctx.textAlign = "center";
       ctx.globalAlpha = a;
@@ -2946,7 +3202,7 @@ function drawWaveHud() {
       ctx.font = "bold 44px 'Courier New', monospace";
       ctx.shadowColor = boss ? "#ff335588" : "#ffcc4488";
       ctx.shadowBlur = 24;
-      ctx.fillText(waveBanner, canvas.width / 2, canvas.height * 0.28);
+      ctx.fillText(i18nt(waveBanner.key, { n: waveBanner.n }), canvas.width / 2, canvas.height * 0.28);
       ctx.restore();
       ctx.textAlign = "left";
     }
@@ -3320,6 +3576,21 @@ function updateHUD(me) {
   // Artillero: muestra stats del casco del piloto
   const ship = me.pilotingFor ? (players[me.pilotingFor] || me) : me;
 
+  // ── Avisos de voz (voz robótica femenina), disparados por flanco ──
+  if (typeof playVoiceAlert === "function" && !me.dead) {
+    const lang = (typeof getLang === "function") ? getLang() : "es";
+    // Combustible bajo (< 25 %) con histéresis para no repetir
+    if (ship.fuel < 25) {
+      if (!_voiceFuelLow) { _voiceFuelLow = true; playVoiceAlert(i18nt("voice.lowFuel"), lang); }
+    } else if (ship.fuel > 32) { _voiceFuelLow = false; }
+    // Escudos caídos (solo naves con escudo)
+    if ((ship.maxShield ?? 0) > 0 && (ship.shield ?? 0) <= 0) {
+      if (!_voiceShieldDown) { _voiceShieldDown = true; playVoiceAlert(i18nt("voice.shieldsDown"), lang); }
+    } else if ((ship.shield ?? 0) > 0) { _voiceShieldDown = false; }
+  } else {
+    _voiceFuelLow = false; _voiceShieldDown = false;
+  }
+
   document.getElementById("hp").textContent =
     Math.floor(ship.hp);
 
@@ -3354,11 +3625,24 @@ function updateHUD(me) {
   document.getElementById("mslCd").textContent =
     me.missileCooldown > 0
       ? Math.ceil(me.missileCooldown / 30) + "s"
-      : "LISTO";
+      : i18nt("common.ready");
+
+  // Bengalas restantes (pool por vida). El artillero no gestiona bengalas.
+  const flaresEl = document.getElementById("flaresEl");
+  if (flaresEl) {
+    if (me.pilotingFor || me.maxFlares == null) {
+      flaresEl.textContent = "—";
+      flaresEl.style.color = "";
+    } else {
+      const left = me.flaresLeft ?? 0;
+      flaresEl.textContent = left + "/" + me.maxFlares;
+      flaresEl.style.color = left === 0 ? "#ff4455" : left <= 2 ? "#ffaa00" : "#aaddff";
+    }
+  }
 
   const inertiaEl = document.getElementById("inertiaMode");
   if (inertiaEl) {
-    inertiaEl.textContent = inertiaDampActive ? "CPLD " : "DECOUPLED";
+    inertiaEl.textContent = inertiaDampActive ? i18nt("hud.coupled") : i18nt("hud.decoupled");
     inertiaEl.style.color = inertiaDampActive ? "#555" : "#8aa8b8";
   }
 
@@ -3366,7 +3650,7 @@ function updateHUD(me) {
   if (heatEl) {
     const heatPct = Math.round(weaponHeat);
     if (heatPct === 0) {
-      heatEl.textContent = "FRÍO";
+      heatEl.textContent = i18nt("hud.cold");
       heatEl.style.color = "#555";
     } else if (heatPct < 50) {
       heatEl.textContent = heatPct + "%";
@@ -3391,7 +3675,7 @@ function updateHUD(me) {
         cdEl.textContent = Math.ceil(cd / 60) + "s";
         cdEl.style.color = "#777";
       } else {
-        cdEl.textContent = "LISTO";
+        cdEl.textContent = i18nt("common.ready");
         cdEl.style.color = me.team === "green" ? "#00ff88" : "#ff5577";
       }
     }
@@ -3402,8 +3686,7 @@ function updateHUD(me) {
       .filter(p => !p.dead)
       .length;
 
-  document.getElementById("alive").textContent =
-    "Vivos: " + alive;
+  document.getElementById("alive").textContent = i18nt("hud.alive", { n: alive });
 
   if (targetId) {
     const t = players[targetId];
@@ -3533,7 +3816,7 @@ function loop() {
       ctx.fillStyle = "rgba(255,255,255,0.85)";
       ctx.font = "bold 40px 'Courier New', monospace";
       ctx.textAlign = "center";
-      ctx.fillText("DESTRUIDO", canvas.width / 2, canvas.height / 2 - 30);
+      ctx.fillText(i18nt("game.destroyed"), canvas.width / 2, canvas.height / 2 - 30);
       // Vidas: oleadas → pool de equipo; PVP/vuelo libre → infinito
       const canRespawn = waveMode ? (teamLives ?? 0) > 0 : true;
       if (canRespawn) {
@@ -3542,27 +3825,27 @@ function loop() {
         ctx.font = "15px 'Courier New', monospace";
         if (remaining > 0) {
           ctx.fillStyle = "#aaa";
-          ctx.fillText(`Reapareciendo en ${remaining}s...`, canvas.width / 2, canvas.height / 2 + 16);
+          ctx.fillText(i18nt("game.respawnIn", { n: remaining }), canvas.width / 2, canvas.height / 2 + 16);
         } else {
           ctx.fillStyle = "#00ff88";
           const respawnKey = bindingText("respawn");
 
           const accion = inTurret
-            ? `Pulsa [${respawnKey}] para entrar en la torreta de ${reservedPilot.name || "tu aliado"}`
-            : `Pulsa [${respawnKey}] para reaparecer`;
+            ? i18nt("game.respawnTurret", { key: respawnKey, name: reservedPilot.name || i18nt("game.ally") })
+            : i18nt("game.pressRespawn", { key: respawnKey });
           ctx.fillText(accion, canvas.width / 2, canvas.height / 2 + 16);
         }
         ctx.font = "12px 'Courier New', monospace";
         ctx.fillStyle = "#666";
         const vidasTxt = waveMode
-          ? `Vidas de equipo: ${teamLives}`
-          : "Reapariciones: ∞";
-        ctx.fillText(`${vidasTxt}  ·  ${inTurret ? "o elige otra nave/torreta abajo" : "elige tu nave o torreta abajo"}`,
+          ? i18nt("game.teamLivesN", { n: teamLives })
+          : i18nt("game.respawnsInf");
+        ctx.fillText(`${vidasTxt}  ·  ${inTurret ? i18nt("game.chooseShipTurret") : i18nt("game.chooseShip")}`,
           canvas.width / 2, canvas.height / 2 + 38);
       } else {
         ctx.font = "13px 'Courier New', monospace";
         ctx.fillStyle = "#666";
-        ctx.fillText("Sin vidas de equipo · esperando el final de la partida", canvas.width / 2, canvas.height / 2 + 16);
+        ctx.fillText(i18nt("game.noTeamLives"), canvas.width / 2, canvas.height / 2 + 16);
       }
       ctx.textAlign = "left";
     }
@@ -3573,7 +3856,7 @@ function loop() {
       ctx.textAlign = "center";
       ctx.font = "bold 26px 'Courier New', monospace";
       ctx.fillStyle = `rgba(255,70,90,${0.6 + 0.4 * Math.sin(performance.now() / 90)})`;
-      ctx.fillText("⚡ SISTEMAS APAGADOS", canvas.width / 2, canvas.height / 2 - 70);
+      ctx.fillText(i18nt("game.systemsDown"), canvas.width / 2, canvas.height / 2 - 70);
       ctx.restore();
       ctx.textAlign = "left";
     }
@@ -3604,11 +3887,11 @@ function loop() {
     let resultText;
     if (waveMode) {
       // Modo oleadas: resultado de práctica (sin equipos)
-      resultText = winner === "green" ? "✦ ¡OLEADAS SUPERADAS!" : "✖ HAS CAÍDO";
+      resultText = winner === "green" ? i18nt("result.wavesWon") : i18nt("result.wavesLost");
     } else {
       resultText = winner === "draw"
-        ? "⬡ EMPATE"
-        : "⬡ " + (winner === "green" ? "VICTORIA EQUIPO VERDE" : "VICTORIA EQUIPO ROJO");
+        ? i18nt("result.draw")
+        : (winner === "green" ? i18nt("result.greenWins") : i18nt("result.redWins"));
     }
     ctx.fillText(resultText, cx, cy - 90);
 
@@ -3648,7 +3931,7 @@ function loop() {
     ctx.fillRect(cx - 160, cy - 36, 320, 44);
     ctx.font = "12px 'Courier New', monospace";
     ctx.fillStyle = "#ff6666";
-    ctx.fillText("Mantén [DEL] para autodestruir...", cx, cy - 16);
+    ctx.fillText(i18nt("game.selfDestructHold", { key: "DEL" }), cx, cy - 16);
     ctx.fillStyle = "#222";
     ctx.fillRect(cx - 130, cy - 4, 260, 8);
     ctx.fillStyle = "#ff4444";
@@ -3673,13 +3956,13 @@ function loop() {
     ctx.textAlign = "center";
     ctx.fillStyle = "#ff4444";
     ctx.font = "bold 13px 'Courier New', monospace";
-    ctx.fillText("⚠  AUTODESTRUCCIÓN  ⚠", cx, cy - 62);
+    ctx.fillText(i18nt("game.selfDestructWarn"), cx, cy - 62);
     ctx.fillStyle = "#ff2222";
     ctx.font = `bold ${70 + (5 - sdCountdown) * 4}px 'Courier New', monospace`;
     ctx.fillText(sdCountdown, cx, cy + 12);
     ctx.fillStyle = "#555";
     ctx.font = "11px 'Courier New', monospace";
-    ctx.fillText("[DEL] para cancelar", cx, cy + 36);
+    ctx.fillText(i18nt("game.selfDestructCancel", { key: "DEL" }), cx, cy + 36);
     ctx.restore();
   }
 
@@ -3794,7 +4077,7 @@ function loop() {
       ctx.fillStyle = "rgba(0,0,0,0.5)";
       ctx.fillRect(canvas.width / 2 - 180, canvas.height - 44, 360, 24);
       ctx.fillStyle = "#aaa";
-      ctx.fillText("ESPECTADOR · " + (spec.name || "Pilot") + " · [TAB] cambiar", canvas.width / 2, canvas.height - 27);
+      ctx.fillText(i18nt("game.spectator", { name: spec.name || "Pilot" }), canvas.width / 2, canvas.height - 27);
       ctx.restore();
     }
   }
@@ -3804,46 +4087,46 @@ function loop() {
   // ── Scoreboard (Tab mantenido)  
   if (showScoreboard) {
     const rem = 18; // 1rem base
-  
+
     const green = Object.values(players)
       .filter(p => p.team === "green")
       .sort((a, b) => (b.kills || 0) - (a.kills || 0));
-  
+
     const red = Object.values(players)
       .filter(p => p.team === "red")
       .sort((a, b) => (b.kills || 0) - (a.kills || 0));
-  
+
     const maxRows = Math.max(green.length, red.length, 1);
-  
+
     // ── ESCALADO MÁS GRANDE ──
-    const rowH   = rem * 1.8;
+    const rowH = rem * 1.8;
     const titleH = rem * 3;
-    const teamH  = rem * 1.6;
-    const colH   = rem * 1.4;
-  
+    const teamH = rem * 1.6;
+    const colH = rem * 1.4;
+
     const bh = titleH + teamH + colH + maxRows * rowH + rem;
     const bw = Math.min(canvas.width * 0.95, 1100); // más ancho
     const bx = (canvas.width - bw) / 2;
     const by = Math.max(20, (canvas.height - bh) / 2);
     const colW = bw / 2;
-  
+
     ctx.save();
-  
+
     // Panel
     ctx.fillStyle = "rgba(0,2,8,0.94)";
     ctx.fillRect(bx, by, bw, bh);
-  
+
     ctx.strokeStyle = "#00ccff22";
     ctx.lineWidth = 1;
     ctx.strokeRect(bx, by, bw, bh);
-  
+
     // Divisor central
     ctx.beginPath();
     ctx.moveTo(bx + colW, by + titleH);
     ctx.lineTo(bx + colW, by + bh);
     ctx.strokeStyle = "#ffffff10";
     ctx.stroke();
-  
+
     // ── TÍTULO ──
     ctx.textAlign = "center";
     ctx.font = `bold ${rem}px 'Courier New', monospace`;
@@ -3853,15 +4136,15 @@ function loop() {
       canvas.width / 2,
       by + rem * 1.4
     );
-  
+
     // ── TOTALES ──
     const sum = (arr, key) => arr.reduce((s, p) => s + (p[key] || 0), 0);
-  
+
     const gAlive = green.filter(p => !p.dead).length;
     const rAlive = red.filter(p => !p.dead).length;
-  
+
     ctx.font = `bold ${rem}px 'Courier New', monospace`;
-  
+
     ctx.textAlign = "left";
     ctx.fillStyle = "#00ff88";
     ctx.fillText(
@@ -3869,7 +4152,7 @@ function loop() {
       bx + rem,
       by + rem * 2.4
     );
-  
+
     ctx.textAlign = "right";
     ctx.fillStyle = "#ff3355";
     ctx.fillText(
@@ -3877,43 +4160,43 @@ function loop() {
       bx + bw - rem,
       by + rem * 2.4
     );
-  
+
     // ── CABECERAS ──
     const hy = by + titleH + teamH + colH - rem * 0.2;
-  
+
     ctx.font = `${rem * 0.9}px 'Courier New', monospace`;
     ctx.fillStyle = "#2b5a6b";
-  
+
     ctx.textAlign = "left";
     ctx.fillText("PILOTO", bx + rem * 1.4, hy);
-  
+
     ctx.textAlign = "right";
     ctx.fillText("K   D   A    DMG", bx + colW - rem, hy);
-  
+
     ctx.textAlign = "left";
     ctx.fillText("PILOTO", bx + colW + rem * 1.4, hy);
-  
+
     ctx.textAlign = "right";
     ctx.fillText("K   D   A    DMG", bx + bw - rem, hy);
-  
+
     // Separador
     ctx.beginPath();
     ctx.moveTo(bx, hy + rem * 0.3);
     ctx.lineTo(bx + bw, hy + rem * 0.3);
     ctx.strokeStyle = "#ffffff10";
     ctx.stroke();
-  
+
     const rowStart = by + titleH + teamH + colH;
-  
+
     [green, red].forEach((team, ti) => {
       const lx = ti === 0 ? bx + rem : bx + colW + rem;
       const rx = ti === 0 ? bx + colW - rem : bx + bw - rem;
       const tColor = ti === 0 ? "#00ff88" : "#ff3355";
-  
+
       team.forEach((p, i) => {
         const ry = rowStart + i * rowH + rowH * 0.75;
         const isMe = p.id === myId;
-  
+
         // highlight jugador
         if (isMe) {
           ctx.fillStyle = "rgba(0,204,255,0.08)";
@@ -3924,36 +4207,36 @@ function loop() {
             rowH
           );
         }
-  
+
         ctx.globalAlpha = p.dead ? 0.35 : 1;
-  
+
         // indicador
         ctx.textAlign = "left";
         ctx.font = `${rem}px 'Courier New', monospace`;
         ctx.fillStyle = p.dead ? "#444" : tColor;
         ctx.fillText(p.dead ? "✕" : "●", lx, ry);
-  
+
         // nombre
         ctx.font = `${isMe ? "bold " : ""}${rem}px 'Courier New', monospace`;
         ctx.fillStyle = isMe ? "#00ccff" : (p.dead ? "#444" : "#ddd");
         ctx.fillText((p.name || "Pilot").slice(0, 12), lx + rem * 0.9, ry);
-  
+
         // stats
         ctx.textAlign = "right";
         ctx.font = `${rem}px 'Courier New', monospace`;
         ctx.fillStyle = p.dead ? "#444" : "#9ab";
-  
+
         const k = String(p.kills || 0).padStart(2);
         const d = String(p.deaths || 0).padStart(2);
         const a = String(p.assists || 0).padStart(2);
         const dmg = String(Math.round(p.damageDealt || 0)).padStart(5);
-  
+
         ctx.fillText(`${k}  ${d}  ${a}  ${dmg}`, rx, ry);
-  
+
         ctx.globalAlpha = 1;
       });
     });
-  
+
     ctx.restore();
   }
 

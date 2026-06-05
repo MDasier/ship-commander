@@ -1877,3 +1877,81 @@ kbd.bindingError {
   flex-direction: column;
   align-items: center;
 }
+
+/* ── Selector de idioma (ES / EN) ─────────────────────────── */
+#langSwitch {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  gap: 0.4rem;
+}
+#langSwitch button,
+#mobiLangSwitch button {
+  background: rgba(0, 20, 40, 0.6);
+  border: 1px solid #1e3a5a;
+  color: #6a8cb0;
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 0.2rem;
+  cursor: pointer;
+  letter-spacing: 0.1rem;
+  transition: 0.15s;
+}
+#langSwitch button:hover,
+#mobiLangSwitch button:hover {
+  border-color: #00d4ff66;
+  color: #acd4f0;
+}
+#langSwitch button.active,
+#mobiLangSwitch button.active {
+  background: #00d4ff22;
+  border-color: #00d4ff;
+  color: #00d4ff;
+}
+#mobiLangSwitch {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ── Pantalla de arranque / despertar del servidor ────────── */
+#serverBoot {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: radial-gradient(circle at 50% 40%, #0a1828 0%, #04060d 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+#serverBoot.hidden { display: none; }
+#serverBootInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+  max-width: 32rem;
+  padding: 0 1.5rem;
+}
+.bootSpinner {
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 0.28rem solid #11304a;
+  border-top-color: #00d4ff;
+  border-radius: 50%;
+  animation: bootspin 0.9s linear infinite;
+}
+@keyframes bootspin { to { transform: rotate(360deg); } }
+#serverBootTitle {
+  color: #9fd4f0;
+  font-size: 1.25rem;
+  letter-spacing: 0.1rem;
+}
+#serverBootCold {
+  color: #5f87a8;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+#serverBootCold.hidden { display: none; }

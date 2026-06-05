@@ -37,6 +37,7 @@ const DEFAULTS = {
   FLARE_RADIUS: 200,
   FLARE_TURN: 0.20,
   FLARE_THRUST: 0.6,
+  FLARE_MAX_DEFAULT: 8,   // bengalas por vida si la nave no define maxFlares (se reponen al reaparecer)
 
   // ── Reaparición
   RESPAWN_DELAY: 5,
@@ -45,7 +46,7 @@ const DEFAULTS = {
   // ── Rayo principal (nave Capital) — disparo primario del piloto
   CAPITAL_BEAM_DAMAGE: 150,    // muy potente
   CAPITAL_BEAM_CHARGE_TIME: 75, // ticks (~1.25s) manteniendo pulsado para cargar
-  CAPITAL_BEAM_RANGE: 1400,    // alcance del rayo
+  CAPITAL_BEAM_RANGE: 850,     // alcance del rayo (editable en admin → "Rayo Capital")
   CAPITAL_BEAM_HALFWIDTH: 14,  // semianchura para detección de impacto
   CAPITAL_BEAM_LIFE: 8,        // ticks que dura el efecto visual
   EMP_DURATION: 90,            // ticks (~1.5s) de chispas rojas del rayo de la Capital (solo visual)
@@ -78,10 +79,21 @@ const DEFAULTS = {
   GUNNER_MISSILE_COOLDOWN: 55,
 
   // ── IA / Dificultad (bots del modo oleadas)
-  AI_SPEED_MULT: 0.55,          // multiplica el empuje del bot (menor = más lento, más fácil de acertar)
-  AI_TURN_MULT: 0.55,           // multiplica el giro del bot (menor = menos esquivo)
-  AI_AIM_JITTER: 0.22,          // error de puntería en radianes (mayor = falla más)
-  AI_FIRE_COOLDOWN_MULT: 1.6,   // multiplica el cooldown de disparo del bot (mayor = dispara menos)
+  AI_SPEED_MULT: 0.62,          // multiplica el empuje del bot (menor = más lento, más fácil de acertar)
+  AI_TURN_MULT: 0.7,            // multiplica el giro del bot (menor = menos esquivo)
+  AI_AIM_JITTER: 0.10,          // error de puntería en radianes (mayor = falla más). Ahora apuntan con adelanto (lead)
+  AI_FIRE_COOLDOWN_MULT: 1.35,  // multiplica el cooldown de disparo del bot (mayor = dispara menos)
+  AI_LEAD_FACTOR: 1.0,          // 0 = apunta a la posición actual; 1 = adelanto completo (predicción) — sube la puntería
+  AI_FIRE_CONE: 0.16,           // semiángulo (rad) dentro del cual el bot dispara cañón (menor = más preciso, dispara menos)
+  AI_BULLET_RANGE: 820,         // alcance al que el bot abre fuego con cañón (px)
+  AI_MISSILE_CHANCE: 0.012,     // probabilidad por tick de lanzar misil cuando está alineado (bomber lo multiplica)
+  AI_BOMBER_MISSILE_MULT: 4,    // el bomber lanza misiles con esta probabilidad extra (su rol es misilero)
+  AI_FLARE_HEALTH_FRAC: 0.5,    // si su HP+escudo cae por debajo de esto y hay misil enemigo cerca, suelta bengala
+  AI_REGROUP_HEALTH_FRAC: 0.35, // por debajo de esta vida el bot huye hacia un aliado en vez de atacar
+  AI_PASS_DISTANCE: 260,        // distancia a la que el bot rompe la pasada (deja de acercarse y vira) px
+  AI_ATTACK_RUN_TIME: 2600,     // duración (ms) de una pasada de ataque antes de virar y reposicionar
+  AI_DETECT_RANGE: 1600,        // si no hay jugador dentro de este radio, los bots patrullan en formación
+  AI_FORMATION_SPACING: 150,    // separación lateral entre bots en formación de patrulla (px)
 
   // ── Asteroides
   ASTEROID_IMPACT_MIN: 3,
@@ -104,6 +116,7 @@ const DEFAULTS = {
       maxMissiles: 3,
       missileCooldown: 110,
       radarSignature: 700,
+      maxFlares: 6,
       // Escudos — ágil: escudo pequeño pero recarga rápida (estilo hit-and-run)
       maxShield: 35,
       shieldRegenRate: 7,      // unidades/segundo
@@ -123,6 +136,7 @@ const DEFAULTS = {
       maxMissiles: 6,
       missileCooldown: 150,
       radarSignature: 1000,
+      maxFlares: 8,
       // Escudos — equilibrado
       maxShield: 50,
       shieldRegenRate: 6,
@@ -140,6 +154,7 @@ const DEFAULTS = {
       maxMissiles: 12,
       missileCooldown: 85,
       radarSignature: 2000,
+      maxFlares: 14,
       // Escudos — tanque: escudo grande, recarga moderada y largo cooldown
       maxShield: 120,
       shieldRegenRate: 8,
@@ -158,6 +173,7 @@ const DEFAULTS = {
       missileCooldown: 240,
       radarSignature: 5000,
       crewCapacity: 2,
+      maxFlares: 12,
       // Escudos — fortaleza: escudo enorme, recarga más lenta por su tamaño
       maxShield: 250,
       shieldRegenRate: 10,
@@ -176,12 +192,13 @@ const DEFAULTS = {
       missileCooldown: 360,
       radarSignature: 9000,
       crewCapacity: 4,
+      maxFlares: 20,
       // Escudos — dreadnought
       maxShield: 500,
       shieldRegenRate: 14,
       shieldRegenDelay: 8,
-      // Casco alargado tipo Idris: cápsula larga y ancha que cubre proa→popa.
-      collider: { front: 60, rear: -54, radius: 40 },
+      // Casco alargado tipo Idris-M: cápsula larga que cubre proa→popa.
+      collider: { front: 104, rear: -96, radius: 44 },
     },
     emp: {
       label: "Disruptor",
@@ -194,6 +211,7 @@ const DEFAULTS = {
       maxMissiles: 4,            // 4 torpedos (misil grande)
       missileCooldown: 200,
       radarSignature: 150,       // prácticamente indetectable
+      maxFlares: 8,
       bulletDamage: 8,           // cañón normal, más débil que el Interceptor
       torpedo: true,             // sus misiles son torpedos
       // Escudos — ligeros
@@ -208,14 +226,43 @@ const DEFAULTS = {
   // ── Artilleros de Capital (3 torretas)
   CAPITAL_GUNNER_MISSILES:       15,
   CAPITAL_GUNNER_MISSILE_COOLDOWN: 70,
+
+  // ── Oleadas (modo solo / co-op vs IA). Editable desde el panel admin.
+  //    Cada oleada: lista de tipos de nave enemiga + si es jefe (boss).
+  TEAM_LIVES: 5,   // vidas compartidas del equipo en modo oleadas
+  WAVES: [
+    { ships: ["interceptor", "fighter"], boss: false },
+    { ships: ["fighter", "fighter", "bomber"], boss: false },
+    { ships: ["fighter", "bomber", "gunship"], boss: false },
+    { ships: ["gunship", "bomber", "fighter", "fighter"], boss: false },
+    { ships: ["capital", "gunship", "gunship", "bomber", "fighter", "fighter"], boss: true },
+  ],
 };
 
 const cfgPath = path.join(__dirname, "config.json");
-const cfg = { ...DEFAULTS };
+
+const isPlainObject = (v) => v && typeof v === "object" && !Array.isArray(v);
+
+// Fusión profunda: las claves guardadas en config.json se aplican sobre los
+// defaults SIN borrar claves nuevas de objetos anidados (p.ej. maxFlares por
+// nave o turretHardpoints que el config.json antiguo no tenía). Los arrays
+// (WAVES) se reemplazan enteros.
+function deepMerge(target, source) {
+  for (const key of Object.keys(source)) {
+    if (isPlainObject(target[key]) && isPlainObject(source[key])) {
+      deepMerge(target[key], source[key]);
+    } else {
+      target[key] = source[key];
+    }
+  }
+  return target;
+}
+
+const cfg = JSON.parse(JSON.stringify(DEFAULTS));
 
 try {
   if (fs.existsSync(cfgPath)) {
-    Object.assign(cfg, JSON.parse(fs.readFileSync(cfgPath, "utf8")));
+    deepMerge(cfg, JSON.parse(fs.readFileSync(cfgPath, "utf8")));
   }
 } catch (e) { console.warn("config.json inválido, usando defaults"); }
 
@@ -224,5 +271,12 @@ cfg.save = function () {
   delete data.save;
   fs.writeFileSync(cfgPath, JSON.stringify(data, null, 2));
 };
+
+// Devuelve una copia profunda de los defaults originales (para "Resetear defaults").
+// No enumerable → no se serializa en GET /config ni en save().
+Object.defineProperty(cfg, "getDefaults", {
+  value: () => JSON.parse(JSON.stringify(DEFAULTS)),
+  enumerable: false,
+});
 
 module.exports = cfg;

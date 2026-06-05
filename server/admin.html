@@ -5,135 +5,348 @@
 <title>Ship Commander · Admin</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#080c18;color:#c8d8f0;font-family:'Courier New',monospace;padding:28px 36px;max-width:780px}
-h1{color:#00d4ff;font-size:1.25em;letter-spacing:3px;margin-bottom:24px;border-bottom:1px solid #00d4ff33;padding-bottom:10px}
+body{background:#080c18;color:#c8d8f0;font-family:'Courier New',monospace;padding:28px 36px;max-width:1100px}
+h1{color:#00d4ff;font-size:1.25em;letter-spacing:3px;margin-bottom:18px;border-bottom:1px solid #00d4ff33;padding-bottom:10px}
 h1 span{color:#334;font-size:.7em;margin-left:8px}
-.group{margin-bottom:28px}
-.group h2{color:#00d4ffaa;font-size:.7em;letter-spacing:4px;text-transform:uppercase;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid #1a2540}
-.field{display:flex;align-items:center;gap:10px;margin-bottom:7px}
-.field label{width:240px;font-size:.8em;color:#7a8cb0}
-.field input{background:#0d1526;border:1px solid #1e2d4a;color:#c8d8f0;padding:4px 10px;width:110px;font-family:inherit;font-size:.85em;border-radius:2px}
+.tabbar{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
+.tabbar button{background:#0d1526;border:1px solid #1e2d4a;color:#7a8cb0;padding:8px 18px;font-size:.8em}
+.tabbar button.active{background:#00d4ff15;border-color:#00d4ff;color:#00d4ff}
+.tab{display:none}
+.tab.active{display:block}
+.group{margin-bottom:24px}
+.group h2{color:#00d4ffaa;font-size:.72em;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid #1a2540}
+.field{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.field label{width:230px;font-size:.8em;color:#7a8cb0}
+.field input[type=number],.field input[type=text]{background:#0d1526;border:1px solid #1e2d4a;color:#c8d8f0;padding:4px 10px;width:120px;font-family:inherit;font-size:.85em;border-radius:2px}
+.field input[type=text].wide{width:340px}
 .field input:focus{outline:none;border-color:#00d4ff55;background:#0f1a30}
-.field .unit{color:#3a4a6a;font-size:.72em;width:90px}
-.actions{margin-top:20px;display:flex;gap:12px;align-items:center}
+.field .unit{color:#3a4a6a;font-size:.72em;width:140px}
+.shipcard{border:1px solid #1a2540;border-radius:4px;padding:14px 18px;margin-bottom:18px;background:#0a1020}
+.shipcard h3{color:#00ffaa;font-size:.9em;letter-spacing:2px;margin-bottom:10px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:0 36px}
+.wave{display:flex;align-items:center;gap:12px;margin-bottom:10px;border:1px solid #1a2540;padding:8px 12px;border-radius:3px;background:#0a1020}
+.wave .wlabel{color:#00d4ffaa;width:90px;font-size:.8em}
+.wave input[type=text]{flex:1;background:#0d1526;border:1px solid #1e2d4a;color:#c8d8f0;padding:5px 10px;font-family:inherit;font-size:.85em}
+.wave label.boss{font-size:.78em;color:#ffaa44;display:flex;align-items:center;gap:5px}
+.wave button.del{background:transparent;border:1px solid #553;color:#a55;padding:4px 10px;font-size:.78em}
+.note{color:#566;font-size:.74em;margin:6px 0 12px}
+.actions{position:sticky;bottom:0;background:#080c18ee;padding:16px 0;margin-top:20px;display:flex;gap:12px;align-items:center;border-top:1px solid #1a2540}
 button{background:#00d4ff15;border:1px solid #00d4ff55;color:#00d4ff;padding:9px 24px;cursor:pointer;font-family:inherit;font-size:.85em;letter-spacing:1px;border-radius:2px;transition:.15s}
 button:hover{background:#00d4ff30;border-color:#00d4ff}
-button.secondary{border-color:#334;color:#556;background:transparent}
+button.secondary{border-color:#334;color:#778;background:transparent}
 button.secondary:hover{color:#c8d8f0;border-color:#556}
 #status{font-size:.82em;height:1.2em;transition:.3s}
 .ok{color:#00ff88}.err{color:#ff3355}
 </style>
 </head>
 <body>
-<h1>◈ SHIP COMMANDER <span>— PANEL ADMIN</span></h1>
-<div id="fields"></div>
+<h1>◈ SHIP COMMANDER <span>— PANEL ADMIN · TODAS LAS VARIABLES</span></h1>
+
+<div class="tabbar" id="tabbar"></div>
+<div id="tabGeneral" class="tab active"></div>
+<div id="tabShips"   class="tab"></div>
+<div id="tabWaves"   class="tab"></div>
+
 <div class="actions">
-  <button id="save">GUARDAR</button>
+  <button id="save">GUARDAR TODO</button>
   <button class="secondary" id="reset">Resetear defaults</button>
   <div id="status"></div>
 </div>
 
 <script>
+// Grupos con etiqueta legible para escalares de nivel superior. Cualquier escalar
+// que no esté aquí se vuelca automáticamente en "Otras variables", así TODO es editable.
 const GROUPS = [
   ["Partida", {
     GAME_DURATION_S: ["Duración de partida", "segundos"],
+    TEAM_LIVES:      ["Vidas de equipo (oleadas)", ""],
   }],
   ["Física de nave", {
-    TURN_RATE:      ["Velocidad de giro",   "rad/tick"],
-    THRUST:         ["Empuje adelante",      "px/tick²"],
-    THRUST_FUEL:    ["Consumo empuje",       "/tick"],
-    REVERSE_THRUST: ["Empuje retroceso",     "px/tick²"],
-    REVERSE_FUEL:   ["Consumo retroceso",    "/tick"],
-    FUEL_REGEN:     ["Regeneración fuel",    "/tick"],
-    DRAG:           ["Resistencia (drag)",   "0-1"],
+    TURN_RATE:["Velocidad de giro","rad/tick"], THRUST:["Empuje adelante","px/tick²"],
+    THRUST_FUEL:["Consumo empuje","/tick"], REVERSE_THRUST:["Empuje retroceso","px/tick²"],
+    REVERSE_FUEL:["Consumo retroceso","/tick"], FUEL_REGEN:["Regeneración fuel","/tick"],
+    DRAG:["Resistencia (drag)","0-1"],
   }],
   ["Balas", {
-    BULLET_SPEED:    ["Velocidad",           "px/tick"],
-    BULLET_COOLDOWN: ["Cooldown",            "ticks"],
-    BULLET_DAMAGE:   ["Daño",               "HP"],
-    BULLET_RADIUS:   ["Radio de impacto",    "px"],
+    BULLET_SPEED:["Velocidad","px/tick"], BULLET_COOLDOWN:["Cooldown","ticks"],
+    BULLET_DAMAGE:["Daño","HP"], BULLET_RADIUS:["Radio de impacto","px"],
   }],
   ["Misiles", {
-    MISSILE_SPEED_INIT: ["Velocidad inicial",        "px/tick"],
-    MISSILE_SPEED_MAX:  ["Velocidad máxima",          "px/tick"],
-    MISSILE_COOLDOWN:   ["Cooldown",                  "ticks"],
-    MISSILE_LIFE:       ["Duración (vida)",            "ticks"],
-    MISSILE_TURN:       ["Giro máximo/tick",           "rad/tick"],
-    MISSILE_THRUST:     ["Aceleración",               "px/tick²"],
-    MISSILE_DAMAGE:     ["Daño",                      "HP"],
-    MISSILE_RADIUS:     ["Radio de impacto",           "px"],
-    MISSILE_MAX_ACTIVE: ["Máx misiles simultáneos",   ""],
+    MISSILE_SPEED_INIT:["Velocidad inicial","px/tick"], MISSILE_SPEED_MAX:["Velocidad máxima","px/tick"],
+    MISSILE_COOLDOWN:["Cooldown","ticks"], MISSILE_LIFE:["Duración","ticks"],
+    MISSILE_TURN:["Giro máximo/tick","rad/tick"], MISSILE_THRUST:["Aceleración","px/tick²"],
+    MISSILE_DAMAGE:["Daño","HP"], MISSILE_RADIUS:["Radio impacto","px"], MISSILE_MAX_ACTIVE:["Máx simultáneos",""],
   }],
   ["Bengalas", {
-    FLARE_LIFE:     ["Duración",                "ticks"],
-    FLARE_COOLDOWN: ["Cooldown",                "ticks"],
-    FLARE_RADIUS:   ["Radio de atracción",      "px"],
-    FLARE_TURN:     ["Giro misil distraído",    "rad/tick"],
-    FLARE_THRUST:   ["Empuje misil distraído",  "px/tick²"],
+    FLARE_LIFE:["Duración","ticks"], FLARE_COOLDOWN:["Cooldown","ticks"],
+    FLARE_RADIUS:["Radio atracción","px"], FLARE_TURN:["Giro misil distraído","rad/tick"],
+    FLARE_THRUST:["Empuje misil distraído","px/tick²"], FLARE_MAX_DEFAULT:["Bengalas por defecto","por vida"],
+  }],
+  ["Reaparición", {
+    RESPAWN_DELAY:["Retardo reaparición","s"], RESPAWN_COUNT:["Reapariciones",""],
   }],
   ["IA / Dificultad (oleadas)", {
-    AI_SPEED_MULT:         ["Velocidad de la IA",      "× (menor = + lento)"],
-    AI_TURN_MULT:          ["Agilidad de giro IA",     "× (menor = - esquivo)"],
-    AI_AIM_JITTER:         ["Error de puntería IA",    "rad (mayor = falla +)"],
-    AI_FIRE_COOLDOWN_MULT: ["Cadencia de disparo IA",  "× (mayor = dispara -)"],
+    AI_SPEED_MULT:["Velocidad IA","× (menor=+lento)"], AI_TURN_MULT:["Agilidad giro IA","× (menor=-esquivo)"],
+    AI_AIM_JITTER:["Error puntería IA","rad (mayor=falla+)"], AI_FIRE_COOLDOWN_MULT:["Cadencia disparo IA","× (mayor=-)"],
+    AI_LEAD_FACTOR:["Adelanto puntería","0-1 (1=predictivo)"], AI_FIRE_CONE:["Cono de disparo","rad (menor=preciso)"],
+    AI_BULLET_RANGE:["Alcance cañón IA","px"], AI_MISSILE_CHANCE:["Prob. misil/tick","0-1"],
+    AI_BOMBER_MISSILE_MULT:["× misil del bomber","×"], AI_FLARE_HEALTH_FRAC:["Umbral bengala","frac vida"],
+    AI_REGROUP_HEALTH_FRAC:["Umbral huida","frac vida"], AI_PASS_DISTANCE:["Distancia de pasada","px"],
+    AI_ATTACK_RUN_TIME:["Duración pasada","ms"], AI_DETECT_RANGE:["Radio detección","px (fuera→patrulla)"],
+    AI_FORMATION_SPACING:["Separación formación","px"],
+  }],
+  ["Rayo Capital", {
+    CAPITAL_BEAM_DAMAGE:["Daño","HP"], CAPITAL_BEAM_CHARGE_TIME:["Tiempo de carga","ticks"],
+    CAPITAL_BEAM_RANGE:["Alcance","px"], CAPITAL_BEAM_HALFWIDTH:["Semianchura","px"],
+    CAPITAL_BEAM_LIFE:["Vida efecto","ticks"], EMP_DURATION:["Duración chispas","ticks"],
+  }],
+  ["EMP (Disruptor)", {
+    EMP_PULSE_RADIUS:["Radio pulso","px"], EMP_PULSE_COOLDOWN:["Cooldown","ticks"],
+    EMP_DISABLE_MIN:["Apagado mín","ticks"], EMP_DISABLE_MAX:["Apagado máx","ticks"], EMP_PULSE_LIFE:["Vida onda","ticks"],
+  }],
+  ["Torpedos", {
+    TORPEDO_DAMAGE:["Daño","HP"], TORPEDO_RADIUS:["Radio impacto","px"],
+  }],
+  ["Minas (Interceptor)", {
+    MINE_COOLDOWN:["Cooldown","ticks"], MINE_MAX_ACTIVE:["Máx activas",""], MINE_ARM_TIME:["Tiempo de armado","ticks"],
+    MINE_LIFE:["Vida","ticks"], MINE_TRIGGER_RADIUS:["Radio gatillo","px"], MINE_BLAST_RADIUS:["Radio explosión","px"],
+    MINE_DAMAGE:["Daño","HP"],
+  }],
+  ["Torretas / Artilleros", {
+    TURRET_DAMAGE:["Daño torreta","HP"], TURRET_COOLDOWN:["Cooldown torreta","ticks"], TURRET_BULLET_SPEED:["Vel. bala torreta","px/tick"],
+    GUNNER_MISSILES:["Misiles artillero",""], GUNNER_MISSILE_COOLDOWN:["Cooldown misil artillero","ticks"],
+    CAPITAL_GUNNER_MISSILES:["Misiles artillero Capital",""], CAPITAL_GUNNER_MISSILE_COOLDOWN:["Cooldown","ticks"],
   }],
   ["Asteroides", {
-    ASTEROID_IMPACT_MIN:    ["Velocidad mínima de daño", "px/tick"],
-    ASTEROID_DAMAGE_FACTOR: ["Factor de daño",           "×"],
+    ASTEROID_IMPACT_MIN:["Vel. mínima de daño","px/tick"], ASTEROID_DAMAGE_FACTOR:["Factor de daño","×"],
   }],
   ["Audio", {
-    VOL_MASTER: ["Volumen master",  "0.0 – 1.0"],
-    VOL_MUSIC:  ["Volumen música",  "0.0 – 1.0"],
+    VOL_MASTER:["Volumen master","0-1"], VOL_MUSIC:["Volumen música","0-1"],
   }],
 ];
 
+// Etiquetas legibles para los campos de cada nave
+const SHIP_FIELD_LABELS = {
+  label:"Nombre", desc:"Descripción", maxHp:"HP máximo", thrustMult:"× Empuje", turnMult:"× Giro",
+  dragVal:"Drag (vacío=global)", fuelRegenMult:"× Regen fuel", maxMissiles:"Máx misiles",
+  missileCooldown:"Cooldown misil", radarSignature:"Firma radar", maxFlares:"Bengalas (por vida)",
+  maxShield:"Escudo máx", shieldRegenRate:"Regen escudo/s", shieldRegenDelay:"Retardo regen (s)",
+  crewCapacity:"Tripulación", bulletDamage:"Daño cañón", torpedo:"Dispara torpedos",
+};
+
 let cfg = {};
+const SHIP_KEYS = ["interceptor","fighter","bomber","gunship","capital","emp"];
 
 async function load() {
-  try {
-    cfg = await fetch("/config").then(r => r.json());
-    render();
-  } catch (e) {
-    status("err", "Error al cargar la configuración");
+  try { cfg = await fetch("/config").then(r => r.json()); render(); }
+  catch (e) { status("err", "Error al cargar la configuración"); }
+}
+
+function fieldRow(id, label, value, unit, kind = "number") {
+  const d = document.createElement("div");
+  d.className = "field";
+  if (kind === "bool") {
+    d.innerHTML = `<label>${label}</label>
+      <input type="checkbox" id="${id}" ${value ? "checked" : ""}>
+      <span class="unit">${unit || ""}</span>`;
+  } else if (kind === "text") {
+    d.innerHTML = `<label>${label}</label>
+      <input type="text" class="wide" id="${id}" value="${(value ?? "").toString().replace(/"/g,"&quot;")}">
+      <span class="unit">${unit || ""}</span>`;
+  } else {
+    d.innerHTML = `<label>${label}</label>
+      <input type="number" step="any" id="${id}" value="${value ?? ""}">
+      <span class="unit">${unit || ""}</span>`;
   }
+  return d;
 }
 
 function render() {
-  const wrap = document.getElementById("fields");
+  renderGeneral();
+  renderShips();
+  renderWaves();
+  buildTabs();
+}
+
+function renderGeneral() {
+  const wrap = document.getElementById("tabGeneral");
   wrap.innerHTML = "";
+  const seen = new Set(["SHIP_TYPES", "WAVES", "save"]);
   for (const [groupName, fields] of GROUPS) {
     const g = document.createElement("div");
     g.className = "group";
     g.innerHTML = `<h2>${groupName}</h2>`;
     for (const [key, [label, unit]] of Object.entries(fields)) {
-      const d = document.createElement("div");
-      d.className = "field";
-      d.innerHTML = `
-        <label>${label}</label>
-        <input type="number" id="f_${key}" step="any" value="${cfg[key] ?? ""}">
-        <span class="unit">${unit}</span>`;
-      g.appendChild(d);
+      if (!(key in cfg)) continue;
+      seen.add(key);
+      g.appendChild(fieldRow("f_" + key, label, cfg[key], unit));
+    }
+    wrap.appendChild(g);
+  }
+  // Catch-all: cualquier escalar restante (number/boolean/string) → todo editable
+  const extras = Object.keys(cfg).filter(k =>
+    !seen.has(k) && ["number","boolean","string"].includes(typeof cfg[k]));
+  if (extras.length) {
+    const g = document.createElement("div");
+    g.className = "group";
+    g.innerHTML = `<h2>Otras variables</h2>`;
+    for (const key of extras) {
+      const t = typeof cfg[key];
+      g.appendChild(fieldRow("f_" + key, key, cfg[key], "",
+        t === "boolean" ? "bool" : t === "string" ? "text" : "number"));
     }
     wrap.appendChild(g);
   }
 }
 
+function renderShips() {
+  const wrap = document.getElementById("tabShips");
+  wrap.innerHTML = `<div class="note">Edita cualquier estadística de cada nave. La cápsula de colisión define el casco (proa/popa/semianchura).</div>`;
+  const ships = cfg.SHIP_TYPES || {};
+  for (const type of Object.keys(ships)) {
+    const ship = ships[type];
+    const card = document.createElement("div");
+    card.className = "shipcard";
+    card.innerHTML = `<h3>${(ship.label || type).toUpperCase()} <span style="color:#445">(${type})</span></h3>`;
+    const cols = document.createElement("div");
+    cols.className = "cols";
+    for (const key of Object.keys(ship)) {
+      const val = ship[key];
+      const label = SHIP_FIELD_LABELS[key] || key;
+      const id = `ship_${type}_${key}`;
+      if (key === "collider" && val && typeof val === "object") {
+        cols.appendChild(fieldRow(`${id}_front`, "Casco proa (front)", val.front, "px"));
+        cols.appendChild(fieldRow(`${id}_rear`, "Casco popa (rear)", val.rear, "px"));
+        cols.appendChild(fieldRow(`${id}_radius`, "Casco semianchura", val.radius, "px"));
+      } else if (typeof val === "boolean") {
+        cols.appendChild(fieldRow(id, label, val, "", "bool"));
+      } else if (typeof val === "string") {
+        cols.appendChild(fieldRow(id, label, val, "", "text"));
+      } else if (typeof val === "number" || val === null) {
+        cols.appendChild(fieldRow(id, label, val, "", "number"));
+      }
+      // arrays/objetos complejos (turretHardpoints) se preservan sin editar
+    }
+    card.appendChild(cols);
+    wrap.appendChild(card);
+  }
+}
+
+function renderWaves() {
+  const wrap = document.getElementById("tabWaves");
+  wrap.innerHTML = `<div class="note">Cada oleada es una lista de naves enemigas separadas por comas. Tipos válidos: ${SHIP_KEYS.join(", ")}. Marca "Jefe" en la oleada con nave Capital.</div>`;
+  const list = document.createElement("div");
+  list.id = "wavesList";
+  wrap.appendChild(list);
+  const addBtn = document.createElement("button");
+  addBtn.textContent = "+ Añadir oleada";
+  addBtn.className = "secondary";
+  addBtn.onclick = () => { (cfg.WAVES = cfg.WAVES || []).push({ ships: ["fighter"], boss: false }); drawWaves(); };
+  wrap.appendChild(addBtn);
+  drawWaves();
+}
+
+function drawWaves() {
+  const list = document.getElementById("wavesList");
+  list.innerHTML = "";
+  (cfg.WAVES || []).forEach((w, i) => {
+    const row = document.createElement("div");
+    row.className = "wave";
+    row.innerHTML = `
+      <span class="wlabel">OLEADA ${i + 1}</span>
+      <input type="text" id="wave_${i}" value="${(w.ships || []).join(", ")}">
+      <label class="boss"><input type="checkbox" id="waveboss_${i}" ${w.boss ? "checked" : ""}> Jefe</label>
+      <button class="del" data-i="${i}">✕</button>`;
+    row.querySelector(".del").onclick = () => {
+      syncWavesFromDom();
+      cfg.WAVES.splice(i, 1);
+      drawWaves();
+    };
+    list.appendChild(row);
+  });
+}
+
+function syncWavesFromDom() {
+  (cfg.WAVES || []).forEach((w, i) => {
+    const t = document.getElementById("wave_" + i);
+    const b = document.getElementById("waveboss_" + i);
+    if (t) w.ships = t.value.split(",").map(s => s.trim()).filter(Boolean);
+    if (b) w.boss = b.checked;
+  });
+}
+
+function buildTabs() {
+  const bar = document.getElementById("tabbar");
+  bar.innerHTML = "";
+  const tabs = [["General", "tabGeneral"], ["Naves", "tabShips"], ["Oleadas", "tabWaves"]];
+  for (const [name, id] of tabs) {
+    const b = document.createElement("button");
+    b.textContent = name;
+    if (id === "tabGeneral") b.classList.add("active");
+    b.onclick = () => {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".tabbar button").forEach(t => t.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+      b.classList.add("active");
+    };
+    bar.appendChild(b);
+  }
+}
+
+function readInput(id) {
+  const el = document.getElementById(id);
+  if (!el) return undefined;
+  if (el.type === "checkbox") return el.checked;
+  if (el.type === "text") return el.value;
+  if (el.value === "") return null;        // p.ej. dragVal vacío → null (usa global)
+  return parseFloat(el.value);
+}
+
 function collectValues() {
   const updates = {};
-  for (const [, fields] of GROUPS) {
-    for (const key of Object.keys(fields)) {
-      const el = document.getElementById("f_" + key);
-      if (el) updates[key] = parseFloat(el.value);
+  // Escalares de General
+  for (const [, fields] of GROUPS)
+    for (const key of Object.keys(fields))
+      if (document.getElementById("f_" + key)) {
+        const v = readInput("f_" + key);
+        if (v !== undefined) updates[key] = v;
+      }
+  // Catch-all extras
+  for (const key of Object.keys(cfg)) {
+    if (["SHIP_TYPES","WAVES"].includes(key)) continue;
+    if (document.getElementById("f_" + key) && !(key in updates)) {
+      const v = readInput("f_" + key);
+      if (v !== undefined) updates[key] = v;
     }
   }
+  // Naves — clon profundo y sobre-escritura de los campos renderizados (preserva turretHardpoints)
+  const ships = JSON.parse(JSON.stringify(cfg.SHIP_TYPES || {}));
+  for (const type of Object.keys(ships)) {
+    const ship = ships[type];
+    for (const key of Object.keys(ship)) {
+      if (key === "collider" && ship[key] && typeof ship[key] === "object") {
+        const f = readInput(`ship_${type}_collider_front`);
+        const r = readInput(`ship_${type}_collider_rear`);
+        const rad = readInput(`ship_${type}_collider_radius`);
+        if (f !== undefined) ship.collider.front = f;
+        if (r !== undefined) ship.collider.rear = r;
+        if (rad !== undefined) ship.collider.radius = rad;
+        continue;
+      }
+      const v = readInput(`ship_${type}_${key}`);
+      if (v !== undefined) ship[key] = v;
+    }
+  }
+  updates.SHIP_TYPES = ships;
+  // Oleadas
+  syncWavesFromDom();
+  updates.WAVES = cfg.WAVES || [];
   return updates;
 }
 
 async function post(data) {
   const r = await fetch("/config", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data)
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data)
   });
   if (!r.ok) throw new Error();
 }
@@ -145,24 +358,14 @@ function status(type, msg) {
 }
 
 document.getElementById("save").addEventListener("click", async () => {
-  try {
-    await post(collectValues());
-    status("ok", "✓ Guardado correctamente");
-  } catch (e) {
-    status("err", "✗ Error al guardar");
-  }
+  try { await post(collectValues()); cfg = await fetch("/config").then(r => r.json()); status("ok", "✓ Guardado correctamente"); }
+  catch (e) { status("err", "✗ Error al guardar"); }
 });
 
 document.getElementById("reset").addEventListener("click", async () => {
-  if (!confirm("¿Resetear todos los valores a los defaults?")) return;
-  try {
-    await post({ __reset: true });
-    cfg = await fetch("/config").then(r => r.json());
-    render();
-    status("ok", "✓ Valores reseteados");
-  } catch (e) {
-    status("err", "✗ Error");
-  }
+  if (!confirm("¿Resetear TODOS los valores a los defaults?")) return;
+  try { await post({ __reset: true }); cfg = await fetch("/config").then(r => r.json()); render(); status("ok", "✓ Valores reseteados"); }
+  catch (e) { status("err", "✗ Error"); }
 });
 
 load();

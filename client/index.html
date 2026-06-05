@@ -14,63 +14,69 @@
 
     <h1>Ship Commander</h1>
 
+    <!-- ── SELECTOR DE IDIOMA ── -->
+    <div id="langSwitch">
+      <button data-lang="es">ES</button>
+      <button data-lang="en">EN</button>
+    </div>
+
     <!-- ── MENÚ PRINCIPAL ── -->
     <div id="mainMenu">
       <div id="nameSection">
-        <span>Tag</span>
-        <input id="nameInput" type="text" maxlength="16" placeholder="Escribe tu nombre..." autocomplete="off"
-          spellcheck="false">
-        <button id="setNameBtn">Guardar</button>
-        <span id="nameSavedMsg" class="hidden">✓ Guardado</span>
+        <span data-i18n="menu.tag">Tag</span>
+        <input id="nameInput" type="text" maxlength="16" data-i18n-ph="menu.namePlaceholder"
+          placeholder="Escribe tu nombre..." autocomplete="off" spellcheck="false">
+        <button id="setNameBtn" data-i18n="common.save">Guardar</button>
+        <span id="nameSavedMsg" class="hidden" data-i18n="menu.saved">✓ Guardado</span>
       </div>
 
       <div id="mainMenuActions">
-        <button id="menuPlayOnline" class="menuBigBtn">📡 BUSCAR PARTIDAS</button>
-        <button id="menuSolo" class="menuBigBtn">🚀 VUELA SÓLO</button>
-        <button id="menuControls" class="menuBigBtn">🎮 VER CONTROLES</button>
-        <button id="menuSupport" class="menuBigBtn support" disabled>❤ APOYA EL PROYECTO</button>
+        <button id="menuPlayOnline" class="menuBigBtn" data-i18n="menu.playOnline">📡 BUSCAR PARTIDAS</button>
+        <button id="menuSolo" class="menuBigBtn" data-i18n="menu.solo">🚀 VUELA SÓLO</button>
+        <button id="menuControls" class="menuBigBtn" data-i18n="menu.controls">🎮 VER CONTROLES</button>
+        <button id="menuSupport" class="menuBigBtn support" disabled data-i18n="menu.support">❤ APOYA EL PROYECTO</button>
       </div>
     </div>
 
     <!-- ── BUSCAR PARTIDAS ── -->
     <div id="lobby" class="hidden">
-      <button class="menuBackBtn" data-back>← Menú</button>
+      <button class="menuBackBtn" data-back data-i18n="common.backMenu">← Menú</button>
 
       <div id="lobbyActions">
-        <button id="createRoom">Crear sala</button>
-        <button id="refreshRooms">↺ Actualizar lista</button>
+        <button id="createRoom" data-i18n="lobby.create">Crear sala</button>
+        <button id="refreshRooms" data-i18n="lobby.refresh">↺ Actualizar lista</button>
       </div>
 
-      <h2>Salas disponibles</h2>
+      <h2 data-i18n="lobby.title">Salas disponibles</h2>
       <div id="rooms"></div>
-      <div id="lobbyHint">Crea una sala o únete a una existente para empezar.</div>
+      <div id="lobbyHint" data-i18n="lobby.hint">Crea una sala o únete a una existente para empezar.</div>
     </div>
 
     <!-- ── PRÁCTICA EN SOLITARIO ── -->
     <div id="soloSetup" class="hidden">
-      <button class="menuBackBtn" data-back>← Menú</button>
-      <h2>Vuela sólo</h2>
+      <button class="menuBackBtn" data-back data-i18n="common.backMenu">← Menú</button>
+      <h2 data-i18n="solo.title">Vuela sólo</h2>
 
       <div class="soloOpt">
-        <div class="soloOptLabel">MODO</div>
+        <div class="soloOptLabel" data-i18n="solo.mode">MODO</div>
         <div class="soloChoices" id="soloMode">
-          <button class="soloChoice selected" data-mode="waves">Oleadas</button>
-          <button class="soloChoice" data-mode="free">Vuelo libre</button>
+          <button class="soloChoice selected" data-mode="waves" data-i18n="solo.waves">Oleadas</button>
+          <button class="soloChoice" data-mode="free" data-i18n="solo.free">Vuelo libre</button>
         </div>
       </div>
 
       <div class="soloOpt">
-        <div class="soloOptLabel">DURACIÓN</div>
+        <div class="soloOptLabel" data-i18n="solo.duration">DURACIÓN</div>
         <div class="soloChoices" id="soloDuration">
           <button class="soloChoice" data-secs="180">3 min</button>
           <button class="soloChoice selected" data-secs="300">5 min</button>
           <button class="soloChoice" data-secs="600">10 min</button>
-          <button class="soloChoice" data-secs="0" disabled>Sin límite</button>
+          <button class="soloChoice" data-secs="0" disabled data-i18n="solo.noLimit">Sin límite</button>
         </div>
       </div>
 
       <div class="soloOpt">
-        <div class="soloOptLabel">TAMAÑO DEL ESCENARIO</div>
+        <div class="soloOptLabel" data-i18n="solo.size">TAMAÑO DEL ESCENARIO</div>
         <div class="soloChoices" id="soloSize">
           <button class="soloChoice" data-size="small">3K</button>
           <button class="soloChoice selected" data-size="medium">6K</button>
@@ -80,39 +86,39 @@
       </div>
 
       <div class="soloOpt">
-        <div class="soloOptLabel">NAVE</div>
+        <div class="soloOptLabel" data-i18n="solo.ship">NAVE</div>
         <div id="soloShipCards"></div>
       </div>
 
-      <button id="soloStart" class="menuBigBtn start">▶ EMPEZAR PRÁCTICA</button>
-      <div class="soloHint">Vuela libre para practicar controles y armas. Sal con [F1] → Salir al lobby.</div>
+      <button id="soloStart" class="menuBigBtn start" data-i18n="solo.start">▶ EMPEZAR PRÁCTICA</button>
+      <div class="soloHint" data-i18n="solo.hint">Vuela libre para practicar controles y armas. Sal con [F1] → Salir al lobby.</div>
     </div>
 
     <!-- ── CONTROLES ── -->
     <div id="controlsScreen" class="hidden">
-      <button class="menuBackBtn" data-back>← Menú</button>
-      <h2>Controles</h2>
+      <button class="menuBackBtn" data-back data-i18n="common.backMenu">← Menú</button>
+      <h2 data-i18n="controls.title">Controles</h2>
       <div id="menuControlsBody"></div>
     </div>
 
     <div id="room" class="hidden">
       <div class="roomHeader">
-        <h2>LOBBY</h2>
+        <h2 data-i18n="room.title">LOBBY</h2>
 
       </div>
 
       <div id="players"></div>
-      <div id="roomHint">Esperando jugadores...</div>
+      <div id="roomHint" data-i18n="room.hint">Esperando jugadores...</div>
 
       <div id="roomActions">
-        <button id="switchTeam">Cambiar equipo</button>
-        <button id="leaveRoom">Salir</button>
-        <button id="ready" disabled>Go</button>
+        <button id="switchTeam" data-i18n="room.switchTeam">Cambiar equipo</button>
+        <button id="leaveRoom" data-i18n="common.leave">Salir</button>
+        <button id="ready" disabled data-i18n="room.ready">Go</button>
       </div>
 
       <!-- ── SELECTOR DE NAVE — generado dinámicamente por buildShipCards() ── -->
       <div id="shipSelector">
-        <div class="selectorLabel">NAVE DE COMBATE</div>
+        <div class="selectorLabel" data-i18n="room.shipLabel">NAVE DE COMBATE</div>
         <div id="shipCards"></div>
       </div>
 
@@ -123,14 +129,15 @@
   <div id="hud" class="hidden">
 
     <div id="topLeft">
-      <div>HP: <span id="hp">100</span></div>
-      <div>SHD: <span id="shieldEl">—</span></div>
-      <div>Fuel: <span id="fuel">100</span></div>
-      <div>Speed: <span id="speed">0</span></div>
-      <div>K/D: <span id="kd">0/0</span></div>
-      <div>MSL: <span id="mslCd">LISTO</span></div>
-      <div>FLT: <span id="inertiaMode">CPLD</span></div>
-      <div>CAÑÓN: <span id="weaponHeatEl">FRÍO</span></div>
+      <div><span data-i18n="hud.hp">HP</span>: <span id="hp">100</span></div>
+      <div><span data-i18n="hud.shield">SHD</span>: <span id="shieldEl">—</span></div>
+      <div><span data-i18n="hud.fuel">Fuel</span>: <span id="fuel">100</span></div>
+      <div><span data-i18n="hud.speed">Vel</span>: <span id="speed">0</span></div>
+      <div><span data-i18n="hud.kd">K/D</span>: <span id="kd">0/0</span></div>
+      <div><span data-i18n="hud.msl">MSL</span>: <span id="mslCd">LISTO</span></div>
+      <div><span data-i18n="hud.flares">BENG</span>: <span id="flaresEl">—</span></div>
+      <div><span data-i18n="hud.flight">FLT</span>: <span id="inertiaMode">CPLD</span></div>
+      <div><span data-i18n="hud.cannon">CAÑÓN</span>: <span id="weaponHeatEl">FRÍO</span></div>
       <div id="abilityRow" style="display:none"><span id="abilityName">ESP</span>: <span id="abilityCd">LISTO</span>
       </div>
     </div>
@@ -141,7 +148,7 @@
 
     <div id="topRight">
       <div id="alive"></div>
-      <div id="hudControls">[F1] MobiGlass · [Enter] Chat</div>
+      <div id="hudControls" data-i18n="hud.controlsLine">[F1] MobiGlass · [Enter] Chat</div>
     </div>
 
   </div>
@@ -149,15 +156,15 @@
   <!-- ── PANEL NAVE AL MORIR ── -->
   <div id="deadPanel" class="hidden">
     <div id="deadPanelInner">
-      <div id="deadPanelTitle">SELECCIONAR NAVE</div>
+      <div id="deadPanelTitle" data-i18n="dead.selectShip">SELECCIONAR NAVE</div>
       <div id="deadShipCards"></div>
       <div id="deadTurretSection" class="hidden">
-        <div id="deadTurretLabel">O ENTRA DE ARTILLERO</div>
+        <div id="deadTurretLabel" data-i18n="dead.turret">O ENTRA DE ARTILLERO</div>
         <div id="deadTurretOptions"></div>
       </div>
       <div id="deadPanelActions">
-        <button id="deadSwitchTeamBtn">⇄ Cambiar equipo</button>
-        <button id="deadLeaveBtn">↩ Salir al lobby</button>
+        <button id="deadSwitchTeamBtn" data-i18n="dead.switchTeam">⇄ Cambiar equipo</button>
+        <button id="deadLeaveBtn" data-i18n="dead.leave">↩ Salir al lobby</button>
       </div>
     </div>
   </div>
@@ -200,24 +207,29 @@
         <div class="mobiPane hidden" id="pane-ajustes">
           <div class="mobiSettingsSection">
             <div class="mobiSettingsRow">
-              <button id="muteBtn">🔊 Sonido</button>
+              <button id="muteBtn" data-i18n="settings.sound">🔊 Sonido</button>
             </div>
-            <div class="mobiSettingsLabel">VOLUMEN EFECTOS</div>
+            <div class="mobiSettingsLabel" data-i18n="settings.volEffects">VOLUMEN EFECTOS</div>
             <div class="mobiSettingsRow">
               <input type="range" id="volEffects" min="0" max="1" step="0.05" value="0.8">
               <span id="volEffectsVal">80%</span>
             </div>
-            <div class="mobiSettingsLabel">VOLUMEN MÚSICA</div>
+            <div class="mobiSettingsLabel" data-i18n="settings.volMusic">VOLUMEN MÚSICA</div>
             <div class="mobiSettingsRow">
               <input type="range" id="volMusic" min="0" max="1" step="0.05" value="0.5">
               <span id="volMusicVal">50%</span>
             </div>
-            <div class="mobiSettingsLabel">PISTA DE MÚSICA</div>
+            <div class="mobiSettingsLabel" data-i18n="settings.musicTrack">PISTA DE MÚSICA</div>
             <div class="mobiSettingsRow">
               <select id="musicTrackSel">
-                <option value="A">Pista A — Ambiental</option>
-                <option value="B">Pista B — Lo-Fi Chill</option>
+                <option value="A" data-i18n="settings.trackA">Pista A — Ambiental</option>
+                <option value="B" data-i18n="settings.trackB">Pista B — Lo-Fi Chill</option>
               </select>
+            </div>
+            <div class="mobiSettingsLabel" data-i18n="settings.language">IDIOMA</div>
+            <div class="mobiSettingsRow" id="mobiLangSwitch">
+              <button data-lang="es">ES</button>
+              <button data-lang="en">EN</button>
             </div>
           </div>
         </div>
@@ -228,19 +240,19 @@
       <div id="mobiTabBar">
         <button class="mobiTab active" data-pane="piloto">
           <span class="tabIcon">◉</span>
-          <span class="tabLabel">PILOTO</span>
+          <span class="tabLabel" data-i18n="mobi.pilot">PILOTO</span>
         </button>
         <button class="mobiTab" data-pane="partida">
           <span class="tabIcon">⬡</span>
-          <span class="tabLabel">PARTIDA</span>
+          <span class="tabLabel" data-i18n="mobi.match">PARTIDA</span>
         </button>
         <button class="mobiTab" data-pane="controles">
           <span class="tabIcon">▦</span>
-          <span class="tabLabel">CONTROLES</span>
+          <span class="tabLabel" data-i18n="mobi.controls">CONTROLES</span>
         </button>
         <button class="mobiTab" data-pane="ajustes">
           <span class="tabIcon">◎</span>
-          <span class="tabLabel">AJUSTES</span>
+          <span class="tabLabel" data-i18n="mobi.settings">AJUSTES</span>
         </button>
       </div>
 
@@ -249,18 +261,18 @@
 
   <!-- ── GAME OVER ── -->
   <div id="gameOver" class="hidden">
-    <div id="gameOverHostHint" class="hidden gameOverHint">Eres el HOST · puedes reiniciar la partida para todos o
+    <div id="gameOverHostHint" class="hidden gameOverHint" data-i18n="gameover.hostHint">Eres el HOST · puedes reiniciar la partida para todos o
       volver al lobby</div>
-    <div id="gameOverGuestHint" class="hidden gameOverHint">Esperando a que el HOST reinicie... · puedes volver al lobby
+    <div id="gameOverGuestHint" class="hidden gameOverHint" data-i18n="gameover.guestHint">Esperando a que el HOST reinicie... · puedes volver al lobby
       cuando quieras</div>
-    <button id="restartBtn" class="hidden">↺ Reiniciar partida</button>
-    <button id="backToLobby">↩ Volver al lobby</button>
+    <button id="restartBtn" class="hidden" data-i18n="gameover.restart">↺ Reiniciar partida</button>
+    <button id="backToLobby" data-i18n="gameover.back">↩ Volver al lobby</button>
   </div>
 
   <!-- ── CHAT ── -->
   <div id="chatContainer" class="hidden">
-    <input id="chatInput" type="text" maxlength="60" placeholder="Mensaje... (Enter enviar · Esc cancelar)"
-      autocomplete="off" spellcheck="false">
+    <input id="chatInput" type="text" maxlength="60" data-i18n-ph="chat.placeholder"
+      placeholder="Mensaje... (Enter enviar · Esc cancelar)" autocomplete="off" spellcheck="false">
   </div>
 
   <!-- ── CONEXIÓN PERDIDA ── -->
@@ -268,15 +280,25 @@
     <div id="connLostInner">
       <div id="connLostIcon">📡</div>
       <div id="connLostTitle">30K</div>
-      <div id="connLostMsg">Reconectando<span id="connLostDots">...</span></div>
-      <div id="connLostHint">Se reconectará automáticamente en cuanto el servidor vuelva.</div>
-      <button id="connLostReload">↻ Reintentar ahora</button>
+      <div id="connLostMsg"><span data-i18n="conn.reconnecting">Reconectando</span><span id="connLostDots">...</span></div>
+      <div id="connLostHint" data-i18n="conn.hint">Se reconectará automáticamente en cuanto el servidor vuelva.</div>
+      <button id="connLostReload" data-i18n="conn.retry">↻ Reintentar ahora</button>
+    </div>
+  </div>
+
+  <!-- ── ARRANQUE / DESPERTAR DEL SERVIDOR (anti-standby, p.ej. Render) ── -->
+  <div id="serverBoot">
+    <div id="serverBootInner">
+      <div class="bootSpinner"></div>
+      <div id="serverBootTitle" data-i18n="boot.waking">Conectando con el servidor...</div>
+      <div id="serverBootCold" class="hidden" data-i18n="boot.cold">El servidor estaba en reposo. Despertándolo, espera unos segundos...</div>
     </div>
   </div>
 
   <!-- ── CANVAS ── -->
   <canvas id="c"></canvas>
 
+  <script src="i18n.js"></script>
   <script src="particles.js"></script>
   <script src="sounds.js"></script>
   <script src="game.js"></script>

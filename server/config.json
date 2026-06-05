@@ -149,9 +149,9 @@
       "shieldRegenRate": 14,
       "shieldRegenDelay": 8,
       "collider": {
-        "front": 60,
-        "rear": -54,
-        "radius": 40
+        "front": 104,
+        "rear": -96,
+        "radius": 44
       }
     }
   }
