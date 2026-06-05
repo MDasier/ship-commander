@@ -118,3 +118,9 @@ function drawParticles(ctx, camX, camY) {
   });
   ctx.restore();
 }
+
+// ── Superficie pública del módulo (consumida por game.js como ES module) ──
+export {
+  spawnExplosion, spawnBeamImpact, spawnThrustParticle, spawnSmokeParticle,
+  updateParticles, drawStars, drawParticles,
+};

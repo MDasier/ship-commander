@@ -867,3 +867,12 @@ function setMuted(on) {
 }
 
 function isMuted() { return muted; }
+
+// ── Superficie pública del módulo (consumida por game.js como ES module) ──
+export {
+  initAudio, startMusic, stopMusic, setMusicTrack, setMusicVolume, setEffectsVolume,
+  setMuted, isMuted, setMissileWarning, resetAudio,
+  playShootSound, playBeamReadySound, playAbilityReadySound, playEmpSound,
+  playBeamFireSound, playExplosionSound, playMissileSound, playVictorySound,
+  playSelfDestructBeep, playAlertSound, playVoiceAlert, playPingSound,
+};

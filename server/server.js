@@ -69,7 +69,10 @@ const ADMIN_PORT = PORT + 1;
 // ─────────────────────────────────────────────
 // HTTP admin server (port 8081)
 // ─────────────────────────────────────────────
-const adminHtml = fs.readFileSync(path.join(__dirname, "admin.html"));
+// El panel admin se sirve desde el build de Vite (dist/admin.html). Se lee por
+// petición (no en arranque) para no romper si aún no se ha ejecutado `npm run build`
+// — en desarrollo el panel lo sirve el dev server de Vite, no este servidor.
+const adminHtmlPath = path.join(__dirname, "../dist/admin.html");
 
 const adminServer = http.createServer((req, res) => {
   res.setHeader("Access-Control-Allow-Origin",  "*");
@@ -109,9 +112,17 @@ const adminServer = http.createServer((req, res) => {
     }
   }
 
-  // Admin panel HTML
-  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-  res.end(adminHtml);
+  // Admin panel HTML (build de Vite)
+  fs.readFile(adminHtmlPath, (err, data) => {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    if (err) {
+      res.end("<h1>Panel admin</h1><p>No se encontró <code>dist/admin.html</code>. " +
+              "Ejecuta <code>npm run build</code>, o en desarrollo abre el panel desde el " +
+              "dev server de Vite (<code>npm run dev:client</code> → <code>/admin.html</code>).</p>");
+      return;
+    }
+    res.end(data);
+  });
 });
 
 adminServer.listen(ADMIN_PORT, () =>
@@ -121,11 +132,20 @@ adminServer.listen(ADMIN_PORT, () =>
 // ─────────────────────────────────────────────
 // Game HTTP server — serves client + WebSocket on port 8080
 // ─────────────────────────────────────────────
-const clientDir = path.join(__dirname, "../client");
+// En producción se sirve el build de Vite. En desarrollo el cliente lo sirve el
+// dev server de Vite (:5173); este servidor solo aporta WebSocket (/ws) y, vía
+// proxy, /config — los estáticos de dist/ aquí solo se usan en producción.
+const clientDir = path.join(__dirname, "../dist");
 const MIME_TYPES = {
-  ".html": "text/html; charset=utf-8",
-  ".js":   "application/javascript; charset=utf-8",
-  ".css":  "text/css; charset=utf-8",
+  ".html":  "text/html; charset=utf-8",
+  ".js":    "application/javascript; charset=utf-8",
+  ".css":   "text/css; charset=utf-8",
+  ".json":  "application/json; charset=utf-8",
+  ".map":   "application/json; charset=utf-8",
+  ".svg":   "image/svg+xml",
+  ".png":   "image/png",
+  ".ico":   "image/x-icon",
+  ".woff2": "font/woff2",
 };
 
 const gameHttpServer = http.createServer((req, res) => {
@@ -145,7 +165,7 @@ const gameHttpServer = http.createServer((req, res) => {
   });
 });
 
-const wss     = new WebSocket.Server({ server: gameHttpServer });
+const wss     = new WebSocket.Server({ server: gameHttpServer, path: "/ws" });
 const clients = new Map();
 const rooms   = {};
 
