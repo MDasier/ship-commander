@@ -2307,7 +2307,7 @@ function worldToScreen(x, y, camX, camY) {
   };
 }
 //LIMITES Y GRID DEL MAPA
-function drawWorldBounds(camX, camY) {
+function drawWorldBoundsOLD(camX, camY) {
   const me = getMe();
   if (!me) return;
 
@@ -2367,6 +2367,202 @@ function drawWorldBounds(camX, camY) {
 
   ctx.globalAlpha = 1;
 }
+function drawWorldBounds(camX, camY) {
+  const me = getMe();
+  if (!me) return;
+
+  const WORLD_SIZE = 10000;
+  const WARNING_DIST = 1000;
+
+  const leftDist   = me.x;
+  const rightDist  = WORLD_SIZE - me.x;
+  const topDist    = me.y;
+  const bottomDist = WORLD_SIZE - me.y;
+
+  const leftX   = worldToScreen(0, 0, camX, camY).x;
+  const rightX  = worldToScreen(WORLD_SIZE, 0, camX, camY).x;
+  const topY    = worldToScreen(0, 0, camX, camY).y;
+  const bottomY = worldToScreen(0, WORLD_SIZE, camX, camY).y;
+
+  const t = performance.now() * 0.003;
+
+  drawEdge(
+    leftDist,
+    WARNING_DIST,
+    drawVerticalBarrier(leftX, true)
+  );
+  
+  drawEdge(
+    rightDist,
+    WARNING_DIST,
+    drawVerticalBarrier(rightX, false)
+  );
+  
+  drawEdge(
+    topDist,
+    WARNING_DIST,
+    drawHorizontalBarrier(topY, true)
+  );
+  
+  drawEdge(
+    bottomDist,
+    WARNING_DIST,
+    drawHorizontalBarrier(bottomY, false)
+  );
+
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+
+  // -------------------------
+
+  function drawEdge(dist, maxDist, render) {
+    if (dist >= maxDist) return;
+    const intensity = Math.pow(
+      1 - dist / maxDist,
+      1.8
+    );
+    render(intensity);
+  }
+
+  function drawVerticalBarrier(x, isLeft, color = "orange") {
+
+    const colors = {
+      red:   { r: 255, g: 50,  b: 50,  glow: "#ff5555" },
+      orange:{ r: 255, g: 140, b: 0,   glow: "#ff9900" },
+      gray:  { r: 180, g: 180, b: 180, glow: "#bbbbbb" }
+    };
+  
+    const c = colors[color] || colors.red;
+  
+    return function (intensity) {
+  
+      const fogWidth = Math.min(canvas.width * 0.35, 300);
+  
+      const grad = ctx.createLinearGradient(
+        isLeft ? x : x - fogWidth,
+        0,
+        isLeft ? x + fogWidth : x,
+        0
+      );
+  
+      const rgba = (a) => `rgba(${c.r},${c.g},${c.b},${a})`;
+  
+      if (isLeft) {
+        grad.addColorStop(0, rgba(0.30 * intensity));
+        grad.addColorStop(1, rgba(0));
+      } else {
+        grad.addColorStop(0, rgba(0));
+        grad.addColorStop(1, rgba(0.30 * intensity));
+      }
+  
+      ctx.fillStyle = grad;
+  
+      ctx.fillRect(
+        isLeft ? x : x - fogWidth,
+        0,
+        fogWidth,
+        canvas.height
+      );
+  
+      // Glow
+      ctx.shadowBlur = 30 * intensity;
+      ctx.shadowColor = c.glow;
+  
+      // Línea principal
+      ctx.strokeStyle = rgba(0.9 * intensity);
+      ctx.lineWidth = 4;
+  
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+  
+      // Ondulación energética
+      ctx.strokeStyle = `rgba(255,255,255,${0.25 * intensity})`;
+      ctx.lineWidth = 1;
+  
+      ctx.beginPath();
+  
+      for (let y = 0; y <= canvas.height; y += 6) {
+        const wave = Math.sin(y * 0.025 + t) * 8 * intensity;
+  
+        if (y === 0) ctx.moveTo(x + wave, y);
+        else ctx.lineTo(x + wave, y);
+      }
+  
+      ctx.stroke();
+    };
+  }
+
+  function drawHorizontalBarrier(y, isTop, color = "orange") {
+
+    const colors = {
+      red:   { r: 255, g: 50,  b: 50,  glow: "#ff5555" },
+      orange:{ r: 255, g: 140, b: 0,   glow: "#ff9900" },
+      gray:  { r: 180, g: 180, b: 180, glow: "#bbbbbb" }
+    };
+  
+    const c = colors[color] || colors.red;
+  
+    return function (intensity) {
+  
+      const fogHeight = Math.min(canvas.height * 0.35, 300);
+  
+      const grad = ctx.createLinearGradient(
+        0,
+        isTop ? y : y - fogHeight,
+        0,
+        isTop ? y + fogHeight : y
+      );
+  
+      const rgba = (a) => `rgba(${c.r},${c.g},${c.b},${a})`;
+  
+      if (isTop) {
+        grad.addColorStop(0, rgba(0.30 * intensity));
+        grad.addColorStop(1, rgba(0));
+      } else {
+        grad.addColorStop(0, rgba(0));
+        grad.addColorStop(1, rgba(0.30 * intensity));
+      }
+  
+      ctx.fillStyle = grad;
+  
+      ctx.fillRect(
+        0,
+        isTop ? y : y - fogHeight,
+        canvas.width,
+        fogHeight
+      );
+  
+      ctx.shadowBlur = 30 * intensity;
+      ctx.shadowColor = c.glow;
+  
+      ctx.strokeStyle = rgba(0.9 * intensity);
+      ctx.lineWidth = 4;
+  
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+  
+      ctx.strokeStyle = `rgba(255,255,255,${0.25 * intensity})`;
+      ctx.lineWidth = 1;
+  
+      ctx.beginPath();
+  
+      for (let x = 0; x <= canvas.width; x += 6) {
+        const wave = Math.sin(x * 0.025 + t) * 8 * intensity;
+  
+        if (x === 0) ctx.moveTo(x, y + wave);
+        else ctx.lineTo(x, y + wave);
+      }
+  
+      ctx.stroke();
+    };
+  }
+}
+
+
 function drawGrid(camX, camY) {
   return;
   ctx.strokeStyle = "#111";
@@ -2396,6 +2592,8 @@ function drawGrid(camX, camY) {
   }
 
 }
+
+
 //!EFECTO DE PING
 function drawpingEffect(camX, camY) {
   const now = performance.now();

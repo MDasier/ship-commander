@@ -35,9 +35,9 @@ const I18N = {
     "menu.tag": "Tag",
     "menu.namePlaceholder": "Escribe tu nombre...",
     "menu.saved": "✓ Guardado",
-    "menu.playOnline": "📡 BUSCAR PARTIDAS",
-    "menu.solo": "🚀 VUELA SÓLO",
-    "menu.controls": "🎮 VER CONTROLES",
+    "menu.playOnline": "COOP",
+    "menu.solo": "VUELA SÓLO",
+    "menu.controls": "VER CONTROLES",
     "menu.support": "❤ APOYA EL PROYECTO",
 
     // Lobby
@@ -128,7 +128,7 @@ const I18N = {
     "settings.volMusic": "VOLUMEN MÚSICA",
     "settings.musicTrack": "PISTA DE MÚSICA",
     "settings.trackA": "Pista A — Ambiental",
-    "settings.trackB": "Pista B — Lo-Fi Chill",
+    "settings.trackB": "Pista B — Lo-Fi",
     "settings.language": "IDIOMA",
 
     // Game over
@@ -208,9 +208,9 @@ const I18N = {
     "menu.tag": "Tag",
     "menu.namePlaceholder": "Type your name...",
     "menu.saved": "✓ Saved",
-    "menu.playOnline": "📡 FIND MATCHES",
-    "menu.solo": "🚀 FLY SOLO",
-    "menu.controls": "🎮 VIEW CONTROLS",
+    "menu.playOnline": "COOP",
+    "menu.solo": "FLY SOLO",
+    "menu.controls": "VIEW CONTROLS",
     "menu.support": "❤ SUPPORT THE PROJECT",
 
     "lobby.create": "Create room",
@@ -294,7 +294,7 @@ const I18N = {
     "settings.volMusic": "MUSIC VOLUME",
     "settings.musicTrack": "MUSIC TRACK",
     "settings.trackA": "Track A — Ambient",
-    "settings.trackB": "Track B — Lo-Fi Chill",
+    "settings.trackB": "Track B — Lo-Fi",
     "settings.language": "LANGUAGE",
 
     "gameover.hostHint": "You are the HOST · restart the match for everyone or return to the lobby",

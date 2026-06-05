@@ -85,7 +85,7 @@
       "missileCooldown": 110,
       "radarSignature": 100,
       "maxFlares": 6,
-      "maxShield": 35,
+      "maxShield": 50,
       "shieldRegenRate": 7,
       "shieldRegenDelay": 3.5,
       "collider": {
@@ -197,7 +197,7 @@
     "emp": {
       "label": "Disruptor",
       "desc": "Sigilo extremo · Pulso EMP [X] apaga naves 2-4s · 4 torpedos · Cañón débil",
-      "maxHp": 50,
+      "maxHp": 140,
       "thrustMult": 1,
       "turnMult": 1,
       "dragVal": null,
@@ -208,7 +208,7 @@
       "maxFlares": 8,
       "bulletDamage": 8,
       "torpedo": true,
-      "maxShield": 30,
+      "maxShield": 100,
       "shieldRegenRate": 7,
       "shieldRegenDelay": 4,
       "collider": {
