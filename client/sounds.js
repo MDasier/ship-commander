@@ -502,31 +502,6 @@ function playExplosionSound() {
   boom.start(t);
   boom.stop(t + 0.6);
 }
-function playExplosionSoundOLD() {
-  if (!audioCtx) return;
-  const sr = audioCtx.sampleRate;
-  const dur = 0.55;
-  const buf = audioCtx.createBuffer(1, sr * dur, sr);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-
-  const source = audioCtx.createBufferSource();
-  source.buffer = buf;
-
-  const filter = audioCtx.createBiquadFilter();
-  filter.type = "lowpass";
-  filter.frequency.setValueAtTime(1400, audioCtx.currentTime);
-  filter.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.55);
-
-  const gain = audioCtx.createGain();
-  gain.gain.setValueAtTime(0.45, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.55);
-
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(sfxGain);
-  source.start();
-}
 
 function playMissileSound() {
   if (!audioCtx) return;
@@ -567,8 +542,7 @@ function setMissileWarning(active) {
   beep();
 }
 
-// Fanfarria de victoria desactivada (a petición). Se deja como no-op para no
-// romper las llamadas existentes.
+// Fanfarria de victoria desactivada
 function playVictorySound() {}
 
 function playSelfDestructBeep(n) {
@@ -672,7 +646,7 @@ if (typeof window !== "undefined" && "speechSynthesis" in window) {
 // ── PING del escáner (sonar tipo Star Citizen) ────────────────
 // Chirp tonal brillante que sube rápido y resuena, con cola de ecos (delay con
 // realimentación) → sensación de "pwiiing" de radar.
-function playPingSound() {
+function playPingSoundOLD() {
   if (!audioCtx) return;
   const t0 = audioCtx.currentTime;
 
@@ -718,6 +692,81 @@ function playPingSound() {
     osc.start(t0);
     osc.stop(t0 + 1.6);
   });
+}
+function playPingSound() {
+  if (!audioCtx) return;
+
+  const t0 = audioCtx.currentTime;
+
+  // Bus principal
+  const out = audioCtx.createGain();
+  out.gain.setValueAtTime(0.0001, t0);
+  out.gain.exponentialRampToValueAtTime(0.35, t0 + 0.03);
+  out.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.8);
+
+  // Filtro grave
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(220, t0);
+  filter.frequency.exponentialRampToValueAtTime(340, t0 + 0.8);
+  filter.Q.value = 2.5;
+
+  out.connect(filter);
+
+  // Delay largo tipo AWACS
+  const delay = audioCtx.createDelay(1.5);
+  delay.delayTime.value = 0.38;
+
+  const feedback = audioCtx.createGain();
+  feedback.gain.value = 0.42;
+
+  filter.connect(sfxGain);
+
+  filter.connect(delay);
+  delay.connect(feedback);
+  feedback.connect(delay);
+
+  delay.connect(sfxGain);
+
+  // LFO muy lento para dar sensación electrónica
+  const lfo = audioCtx.createOscillator();
+  const lfoGain = audioCtx.createGain();
+
+  lfo.type = "sine";
+  lfo.frequency.value = 0.7;
+  lfoGain.gain.value = 6;
+
+  lfo.connect(lfoGain);
+
+  const partials = [
+    { f: 180, g: 0.85, type: "sine" },
+    { f: 270, g: 0.30, type: "triangle" },
+    { f: 360, g: 0.15, type: "sine" }
+  ];
+
+  partials.forEach(p => {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+
+    osc.type = p.type;
+
+    // Barrido lento estilo radar AWACS
+    osc.frequency.setValueAtTime(p.f * 1.25, t0);
+    osc.frequency.exponentialRampToValueAtTime(p.f, t0 + 1.2);
+
+    lfoGain.connect(osc.frequency);
+
+    g.gain.value = p.g;
+
+    osc.connect(g);
+    g.connect(out);
+
+    osc.start(t0);
+    osc.stop(t0 + 3.0);
+  });
+
+  lfo.start(t0);
+  lfo.stop(t0 + 3.0);
 }
 
 function resetAudio() {

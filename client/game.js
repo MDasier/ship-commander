@@ -1470,7 +1470,7 @@ document.getElementById("switchTeam").onclick = () => {
 
 // ── Navegación del menú principal ──────────────
 // Enlace de donaciones — reemplázalo por el tuyo (PayPal.me, Ko-fi, etc.)
-const SUPPORT_URL = "https://www.paypal.com/paypalme/";
+const SUPPORT_URL = "https://www.paypal.com/paypalme/mdasier";
 
 const MENU_SCREENS = ["mainMenu", "lobby", "soloSetup", "controlsScreen", "room"];
 function showMenuScreen(name) {
