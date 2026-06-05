@@ -199,6 +199,14 @@ const DEFAULTS = {
       shieldRegenDelay: 8,
       // Casco alargado tipo Idris-M: cápsula larga que cubre proa→popa.
       collider: { front: 104, rear: -96, radius: 44 },
+      // Puntos de montaje de las 3 torretas (coords locales, +x = proa). DEBEN
+      // coincidir con SHIP_SHAPES.capital.turretHardpoints en client/game.js para
+      // que las balas salgan de donde se dibujan las torretas.
+      turretHardpoints: [
+        [-13.3, -38.1],
+        [-13.3, 38.1],
+        [87.1, -0.2],
+      ],
     },
     emp: {
       label: "Disruptor",

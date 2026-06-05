@@ -1051,9 +1051,21 @@ wss.on("connection", ws => {
             : (origin.turretAngle ?? 0))
         : player.angle;
 
+      // Origen: artillero de Capital lanza desde el hardpoint de su torreta
+      let mox = origin.x, moy = origin.y;
+      if (player.pilotingFor && origin.shipType === "capital") {
+        const slot = (origin.gunnerIds || []).indexOf(player.id);
+        const hp = (CFG.SHIP_TYPES.capital.turretHardpoints || [])[slot];
+        if (hp) {
+          const ca = Math.cos(origin.angle), sa = Math.sin(origin.angle);
+          mox = origin.x + hp[0] * ca - hp[1] * sa;
+          moy = origin.y + hp[0] * sa + hp[1] * ca;
+        }
+      }
+
       room.missiles.push({
-        x:        origin.x,
-        y:        origin.y,
+        x:        mox,
+        y:        moy,
         vx:       Math.cos(fireAngle) * CFG.MISSILE_SPEED_INIT,
         vy:       Math.sin(fireAngle) * CFG.MISSILE_SPEED_INIT,
         team:     player.team,
@@ -1159,8 +1171,20 @@ wss.on("connection", ws => {
         const fireAngle = (pilot.shipType === "capital" && pilot.turretAngles)
           ? (pilot.turretAngles[player.id] ?? 0)
           : (pilot.turretAngle ?? 0);
+        // Origen de la bala: la Capital dispara desde el hardpoint de la torreta
+        // (rotado con el casco); el Gunship desde el centro.
+        let ox = pilot.x, oy = pilot.y;
+        if (pilot.shipType === "capital") {
+          const slot = (pilot.gunnerIds || []).indexOf(player.id);
+          const hp = (CFG.SHIP_TYPES.capital.turretHardpoints || [])[slot];
+          if (hp) {
+            const ca = Math.cos(pilot.angle), sa = Math.sin(pilot.angle);
+            ox = pilot.x + hp[0] * ca - hp[1] * sa;
+            oy = pilot.y + hp[0] * sa + hp[1] * ca;
+          }
+        }
         room.bullets.push({
-          x: pilot.x, y: pilot.y,
+          x: ox, y: oy,
           vx: Math.cos(fireAngle) * CFG.TURRET_BULLET_SPEED,
           vy: Math.sin(fireAngle) * CFG.TURRET_BULLET_SPEED,
           team: player.team, ownerId: player.id,
