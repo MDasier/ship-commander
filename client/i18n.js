@@ -402,3 +402,6 @@ function setLang(l) {
 }
 
 function getLang() { return LANG; }
+
+// ── Superficie pública del módulo (consumida por game.js como ES module) ──
+export { i18nt, applyI18n, onLangChange, setLang, getLang };

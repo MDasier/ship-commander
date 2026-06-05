@@ -297,10 +297,8 @@
   <!-- ── CANVAS ── -->
   <canvas id="c"></canvas>
 
-  <script src="i18n.js"></script>
-  <script src="particles.js"></script>
-  <script src="sounds.js"></script>
-  <script src="game.js"></script>
+  <!-- Punto de entrada ES module · game.js importa i18n/particles/sounds. Vite lo empaqueta. -->
+  <script type="module" src="/game.js"></script>
 
 </body>
 
