@@ -6,16 +6,25 @@ Ship Commander es un juego de combate espacial multijugador en el navegador. El 
 
 ## Comandos
 
+Requiere **Node 24.16+ (LTS)** y **pnpm** (gestor fijado en `packageManager`). El cliente se empaqueta con **Vite 8** (bundler Rolldown); el servidor sigue siendo Node + `ws`. Hay **un único `package.json` en la raíz** que cubre cliente y servidor (`server/` no tiene el suyo; `server.js` resuelve `ws` desde el `node_modules` de la raíz).
+
 ```bash
-cd server
-npm install        # única dependencia: ws
-node server.js     # → juego+cliente en :8080, panel admin en :8081
+pnpm install          # cliente (vite) + servidor (ws) — un solo install
+
+# Desarrollo (dos terminales):
+pnpm run dev:client   # Vite + HMR en :5173 (proxy /ws→:8080 y /config→:8081)
+pnpm run dev:server   # node server/server.js → :8080 (juego+WS) y :8081 (admin)
+
+# Producción:
+pnpm run build        # vite build → dist/  (index.html + admin.html + assets hasheados)
+pnpm start            # node server/server.js sirve dist/ en :8080 y :8081
 ```
 
-- **No hay build step, ni bundler, ni tests.** El cliente son ficheros JS vanilla servidos como estáticos por el propio `server.js`. Editar → recargar el navegador. (Ver `DEPLOY.md` para el razonamiento de por qué no hay Vite y cómo desplegar.)
-- Para probar multijugador en local: abrir varias pestañas en `http://localhost:8080`.
+- **En desarrollo** se abre `http://localhost:5173` (lo sirve Vite con HMR). **En producción** el propio `server.js` sirve el build de `dist/` en `:8080`. El deploy sigue siendo "arranca `server.js`" — solo hay que `pnpm run build` antes.
+- **No hay tests.**
+- Para probar multijugador en local: abrir varias pestañas en la URL activa.
 - `PORT` (env) cambia el puerto del juego; el panel admin es siempre `PORT + 1`.
-- Tras cambiar las formas de las naves (`SHIP_SHAPES` en `client/game.js`), regenerar los presets del editor: `node tools/gen-presets.js`.
+- Tras cambiar las formas de las naves (`SHIP_SHAPES` en `client/game.js`), regenerar los presets del editor: `node tools/gen-presets.js`. ⚠️ `tools/*.js` son CommonJS; por eso la config de Vite es `vite.config.mjs` (ESM) y la raíz **no** declara `"type": "module"`.
 
 ## Arquitectura — invariantes que NO se deben romper
 
@@ -40,21 +49,32 @@ El **modelo de colisión** es una cápsula: segmento proa→popa (`collider.fron
 
 El **protocolo de mensajes** cliente↔servidor (campos `type` en ambos sentidos, contenido de `state`) está tabulado en el README sección "Arquitectura Técnica Detallada". Si añades un mensaje nuevo, manéjalo en el `switch`/handler de `server.js` y en el receptor de `game.js`.
 
+El **WebSocket usa el path `/ws`** (no la raíz): el servidor monta `new WebSocket.Server({ server, path: "/ws" })` y el cliente conecta a `…/ws`. Es necesario para no chocar con el socket de HMR de Vite en dev y para que el proxy del dev server distinga el tráfico del juego. No conectes a la raíz.
+
+## ES modules y empaquetado (Vite)
+
+El cliente son **ES modules**. `client/index.html` carga un único `<script type="module" src="/game.js">`; `game.js` hace `import` de `i18n.js`, `particles.js` y `sounds.js`, que exportan su superficie pública con un `export { … }` al final de cada fichero. Al añadir una función que `game.js` deba usar de esos módulos, **añádela al `export` del módulo y al `import` de `game.js`** (si no, `ReferenceError` en runtime).
+
+`admin.html` vive en `client/` y es una segunda entrada de Vite (multi-page, ver `vite.config.mjs`). Es autocontenido (script inline, sin assets externos) y hace `fetch("/config")`; en dev el proxy de Vite lo redirige a `:8081`, en prod lo sirve el servidor admin desde `dist/admin.html`.
+
 ## Ficheros
 
 | Fichero | Rol |
 |---|---|
-| `server/server.js` (~2.5k líneas) | Servidor autoritativo: física, colisiones, salas, timer, IA, oleadas, ambos servidores HTTP |
+| `vite.config.mjs` (raíz) | Config de Vite 8: `root: client`, multi-page (index + admin), `outDir: dist`, proxy `/ws` y `/config` para dev |
+| `server/server.js` (~2.5k líneas) | Servidor autoritativo: física, colisiones, salas, timer, IA, oleadas, ambos servidores HTTP. Sirve `dist/` en prod |
 | `server/config.js` | `DEFAULTS` + carga/merge/persistencia de `config.json`; exporta `CFG` |
-| `server/admin.html` | Panel admin (`:8081`) |
-| `client/game.js` (~4.5k líneas) | WebSocket, render loop, input, navegación de menús, `SHIP_SHAPES` |
-| `client/particles.js` | Campo de estrellas + sistema de partículas |
-| `client/sounds.js` | Música y SFX procedurales (Web Audio API, sin assets) |
-| `client/i18n.js` | Traducciones ES/EN; `t("key", {vars})` + `data-i18n` en el DOM. Los textos con teclas de control se componen en `game.js` con `bindingText()`, no aquí |
+| `client/index.html` | Juego. Entrada Vite principal; carga `/game.js` como módulo |
+| `client/admin.html` | Panel admin (`:8081`). Segunda entrada Vite; autocontenido, `fetch("/config")` |
+| `client/game.js` (~4.5k líneas) | Entrada ES module: WebSocket, render loop, input, menús, `SHIP_SHAPES`; importa i18n/particles/sounds |
+| `client/particles.js` | Campo de estrellas + sistema de partículas (módulo) |
+| `client/sounds.js` | Música y SFX procedurales (Web Audio API, sin assets) (módulo) |
+| `client/i18n.js` | Traducciones ES/EN; `i18nt("key", {vars})` + `data-i18n` en el DOM. Los textos con teclas de control se componen en `game.js` con `bindingText()`, no aquí |
 | `client/styles.css` | Toda la UI. Convención: unidades **rem**, texto **≥ 16px** |
 | `tools/ship-editor.html` | Editor visual de formas de nave |
-| `tools/ship-presets.js` | **Auto-generado** desde `SHIP_SHAPES` por `gen-presets.js` — no editar a mano |
+| `tools/ship-presets.js` | **Auto-generado** desde `SHIP_SHAPES` por `gen-presets.js` (CommonJS) — no editar a mano |
+| `dist/` | Salida de `vite build` (gitignored); servida por `server.js` en prod |
 
 ## Idioma
 
-El proyecto está documentado y comentado en español. El cliente es bilingüe ES/EN vía `i18n.js`; al añadir texto de UI, usa claves `t(...)` y entradas en ambos idiomas en `I18N`.
+El proyecto está documentado y comentado en español. El cliente es bilingüe ES/EN vía `i18n.js`; al añadir texto de UI, usa claves `i18nt(...)` (o `data-i18n` en el HTML) y entradas en ambos idiomas en `I18N`.

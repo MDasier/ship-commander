@@ -149,37 +149,51 @@ Los cambios se aplican **inmediatamente** a las partidas en curso y se persisten
 | Renderizado | Canvas 2D API |
 | Audio | Web Audio API |
 | Estilos | CSS (sin frameworks) |
-| Build | Ninguno — archivos planos, sin bundler |
+| Build | [Vite 8](https://vite.dev) (bundler Rolldown) — empaqueta el cliente |
 
-Sin librerías de terceros en el cliente. La única dependencia es `ws` en el servidor.
+Sin librerías de terceros **en tiempo de ejecución** en el cliente (el bundle es JS vanilla). La única dependencia de runtime es `ws` en el servidor; Vite es solo una `devDependency` de build.
 
 ---
 
 ## Inicio rápido
 
 ### Requisitos
-- Node.js 18+
+- Node.js **24.16+ (LTS)** — requerido por Vite 8
+- **pnpm** (gestor de paquetes del proyecto; fijado en `packageManager`)
 
-### Ejecutar en local
+### Instalar
+
+Un único `package.json` en la raíz cubre cliente (Vite) y servidor (`ws`):
 
 ```bash
-# Instalar dependencia del servidor
-cd server
-npm install
-
-# Arrancar el servidor de juego
-node server.js
-# → Game:         http://localhost:8080
-# → Panel admin:  http://localhost:8081
+pnpm install
 ```
 
-Abre `http://localhost:8080` en el navegador. El servidor sirve el cliente directamente — no hace falta abrir archivos locales.
+### Desarrollo (con HMR)
 
-Abre varias pestañas para probar el multijugador en local.
+Vite sirve el cliente con recarga en caliente y hace de proxy del WebSocket y del panel admin hacia el servidor. Necesita **dos terminales**:
+
+```bash
+pnpm run dev:server   # node server/server.js → :8080 (juego+WS) y :8081 (admin)
+pnpm run dev:client   # Vite + HMR → http://localhost:5173
+```
+
+Abre `http://localhost:5173`. Abre varias pestañas para probar el multijugador.
+
+### Producción
+
+```bash
+pnpm run build        # vite build → dist/
+pnpm start            # node server/server.js sirve dist/ en :8080
+```
+
+Abre `http://localhost:8080`. El servidor sirve el build de `dist/` directamente — no hace falta servidor web aparte.
 
 ### Panel de configuración
 
-Abre `http://localhost:8081` para acceder al panel admin y modificar cualquier variable de juego en tiempo real. Los cambios se guardan en `server/config.json`.
+Panel admin para modificar cualquier variable de juego en tiempo real (los cambios se guardan en `server/config.json`):
+- **Producción:** `http://localhost:8081`
+- **Desarrollo:** `http://localhost:5173/admin.html` (Vite hace de proxy de `/config` hacia `:8081`)
 
 ---
 
@@ -212,18 +226,23 @@ Abre `http://localhost:8081` para acceder al panel admin y modificar cualquier v
 
 ```
 ship-commander/
-├── client/
-│   ├── index.html      # Menú principal, lobby, práctica, HUD, MobiGlass, Game Over, panel de muerte, overlay de reconexión
-│   ├── game.js         # Cliente WebSocket, loop de renderizado, input, IA de UI, navegación de menús
-│   ├── particles.js    # Campo de estrellas, sistema de partículas (explosiones, empuje, impacto del rayo)
-│   ├── sounds.js       # Música y efectos de sonido procedurales (Web Audio API)
+├── vite.config.mjs     # Config de Vite 8 (root: client, multi-page, proxy /ws y /config)
+├── package.json        # Único: cliente (vite) + servidor (ws); scripts, engines, packageManager (pnpm)
+├── pnpm-lock.yaml      # Lockfile (commiteado)
+├── client/             # ← empaquetado por Vite (ES modules)
+│   ├── index.html      # Entrada principal: menú, lobby, práctica, HUD, MobiGlass… carga /game.js como módulo
+│   ├── admin.html      # Panel admin (2.ª entrada Vite); autocontenido, fetch("/config")
+│   ├── game.js         # Entrada ES module: WebSocket, render loop, input, menús; importa i18n/particles/sounds
+│   ├── i18n.js         # Traducciones ES/EN (módulo)
+│   ├── particles.js    # Campo de estrellas, sistema de partículas (módulo)
+│   ├── sounds.js       # Música y SFX procedurales — Web Audio API (módulo)
 │   └── styles.css      # Todos los estilos UI (convención: unidades rem, texto ≥ 16px)
-└── server/
-    ├── server.js       # Servidor autoritativo — física, colisiones, salas, timer, IA de bots, oleadas
-    ├── config.js       # Carga y exporta la configuración (con defaults y persistencia)
-    ├── config.json     # Valores personalizados (generado automáticamente al guardar)
-    ├── admin.html      # Panel admin web (servido en puerto 8081)
-    └── package.json
+├── server/             # ← Node + ws (sin package.json propio; usa el de la raíz)
+│   ├── server.js       # Servidor autoritativo — física, colisiones, salas, timer, IA, oleadas. Sirve dist/ en prod
+│   ├── config.js       # Carga y exporta la configuración (con defaults y persistencia)
+│   └── config.json     # Valores personalizados (generado automáticamente al guardar)
+├── tools/              # Utilidades CommonJS (editor de naves, generador de presets)
+└── dist/               # Salida de `vite build` (gitignored)
 ```
 
 ---

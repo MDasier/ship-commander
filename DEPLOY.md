@@ -3,29 +3,26 @@
 ## Arquitectura
 
 ```
-server/server.js   puerto 8080 — HTTP (cliente estático) + WebSocket (juego)
-server/server.js   puerto 8081 — HTTP (panel admin)
+server/server.js   puerto 8080 — HTTP (sirve dist/) + WebSocket del juego (path /ws)
+server/server.js   puerto 8081 — HTTP (panel admin → dist/admin.html + API /config)
 ```
 
-El servidor sirve los archivos del cliente directamente en el puerto 8080. No hace falta ningún servidor web separado. La URL del WebSocket en el cliente es dinámica (`location.host`), por lo que funciona en local, en producción y via túnel sin cambiar ningún archivo.
+El cliente se empaqueta con **Vite** (`npm run build` → `dist/`). En producción el propio `server.js` sirve `dist/` en el puerto 8080; no hace falta ningún servidor web separado. La URL del WebSocket en el cliente es dinámica (`location.host` + `/ws`), por lo que funciona en local, en producción y vía túnel sin cambiar ningún archivo.
 
 No hay base de datos. El estado de las partidas vive en memoria y se pierde al reiniciar el proceso (comportamiento esperado).
 
 ---
 
-## Build y herramientas — ¿por qué no hay Vite / bundler?
+## Build con Vite — el patrón híbrido
 
-El proyecto **no usa ningún build step** (ni Vite, ni Webpack, ni bundler). Es intencionado y, para este caso, **simplifica el despliegue**, no lo complica:
+El cliente se empaqueta con **Vite 8** (bundler Rolldown), pero **solo como paso de build del frontend**: el servidor WebSocket con estado sigue siendo el mismo proceso Node de siempre. Es el patrón híbrido:
 
-- **El cliente no es el cuello de botella del deploy.** Son 3 ficheros JS vanilla (`game.js`, `sounds.js`, `particles.js`) + HTML/CSS servidos como estáticos por el propio proceso Node. No hay nada que compilar.
-- **Lo difícil de desplegar es el servidor WebSocket con estado**, y eso una herramienta de frontend como Vite no lo toca. Las partidas viven en memoria y requieren un proceso Node de larga duración con conexiones WS persistentes → no se puede hacer "estático puro" ni serverless.
-- Con Vite, en producción seguirías necesitando **el mismo `server.js`** para el WebSocket, pero además tendrías que ejecutar `vite build` y servir su salida. Es decir: **una pieza y un paso más**, no menos.
+- **Desarrollo:** Vite dev server con HMR (`:5173`) + `node server/server.js` (`:8080`/`:8081`) en dos terminales. Vite hace de proxy de `/ws` → `:8080` y de `/config` → `:8081`, así que el cliente no cambia entre dev y prod.
+- **Producción:** `npm run build` genera `dist/` (HTML + JS/CSS hasheados) y `server.js` lo sirve. **El deploy sigue siendo "arranca `server.js`"**, solo que precedido de un `npm run build`.
 
-**Cuándo SÍ compensaría Vite** (es ganancia de *experiencia de desarrollo*, no de deploy): HMR al editar el cliente, modularizar `game.js` en imports ES, minificado/tree-shaking o TypeScript.
+Por qué Vite no toca el servidor: las partidas viven en memoria y requieren un proceso Node de larga duración con conexiones WS persistentes → eso no es "estático puro" ni serverless, y una herramienta de frontend no lo empaqueta. Vite aporta al **cliente**: HMR, ES modules (`game.js` importa `i18n`/`particles`/`sounds`), minificado y tree-shaking.
 
-**Patrón híbrido recomendado** si algún día se quiere ese DX sin perder la simpleza de despliegue: usar Vite **solo en desarrollo** (su dev server con HMR y un proxy de WebSocket hacia `:8080`) y en producción `vite build` servido por el mismo Node. Así el deploy sigue siendo "arranca `server.js`".
-
-> Lo que de verdad reduce la fricción de despliegue aquí no es un bundler, sino empaquetar el **servidor**: el PaaS documentado abajo (prácticamente un clic) o un **Dockerfile** (un contenedor reproducible: instala `ws`, copia `client/` + `server/`, `node server.js`).
+> Para un contenedor reproducible: un **Dockerfile** que instale deps de raíz + `server/`, ejecute `npm run build` y arranque `node server/server.js` (copiando `dist/` + `server/`).
 
 ---
 
@@ -41,13 +38,17 @@ El puerto del panel admin es siempre `PORT + 1` (o `8081` si `PORT` no está def
 
 ## Ejecutar en local
 
+Requiere **Node 24.16+ (LTS)** y **pnpm** (un único `package.json` en la raíz cubre cliente y servidor).
+
 ```bash
-cd server
-npm install
-node server.js
+pnpm install        # cliente (vite) + servidor (ws)
+pnpm run build      # → dist/
+pnpm start          # node server/server.js
 # → Game:        http://localhost:8080
 # → Panel admin: http://localhost:8081
 ```
+
+Para desarrollo con HMR usa dos terminales (`pnpm run dev:server` + `pnpm run dev:client`, → `:5173`); ver `README.md`.
 
 ---
 
@@ -55,15 +56,16 @@ node server.js
 
 ### Railway · Render · Fly.io
 
-Cualquiera de las tres detecta Node.js automáticamente.
+Cualquiera de las tres detecta Node.js automáticamente. Ahora hay un paso de build (Vite empaqueta el cliente), así que el **root directory es la raíz del repo**, no `server/`:
 
 1. Subir el repositorio a GitHub
 2. Conectar el repositorio en la plataforma elegida
-3. **Root directory:** `server/`
-4. **Start command:** `node server.js`
-5. La plataforma asigna `PORT` automáticamente — el servidor ya lo lee con `process.env.PORT || 8080`
+3. **Root directory:** raíz del repo
+4. **Build command:** `pnpm install && pnpm run build` (instala deps y genera `dist/`)
+5. **Start command:** `node server/server.js`
+6. La plataforma asigna `PORT` automáticamente — el servidor ya lo lee con `process.env.PORT || 8080`
 
-> **Railway** es la opción más rápida: detecta `package.json` en `server/` sin configuración adicional.
+> Asegúrate de que la plataforma use Node **24.16+** (lo declara `engines` en `package.json`).
 
 **Sobre el panel admin en producción:** el puerto 8081 normalmente no estará expuesto públicamente en PaaS. Es intencionado — el panel no tiene autenticación. Si necesitas acceder al panel en producción, usa un túnel SSH o expón el puerto manualmente con restricción de IP.
 
@@ -100,9 +102,8 @@ certbot --nginx -d tu-dominio.com
 ### pm2
 
 ```bash
-cd server
-npm install
-pm2 start server.js --name shipcommander
+pnpm install && pnpm run build    # genera dist/ (en la raíz del repo)
+pm2 start server/server.js --name shipcommander
 pm2 save
 pm2 startup   # para que arranque con el sistema
 ```
