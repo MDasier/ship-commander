@@ -59,6 +59,24 @@
   <div class="sub">Editor autónomo · no toca el juego. Exporta en formato <b>SHIP_SHAPES</b>.</div>
 
   <div class="group">
+    <h2>Cargar nave existente</h2>
+    <div class="row">
+      <select id="loadShip" style="flex:1;background:#0a1120;border:1px solid #25406a;color:#c8d8f0;padding:5px;border-radius:4px;font-family:inherit"></select>
+      <button id="loadShipBtn">Cargar</button>
+    </div>
+    <div class="hint">Plantillas tomadas del juego. Para refrescarlas tras editar el juego: <span class="kbd">node tools/gen-presets.js</span>.</div>
+  </div>
+
+  <div class="group" id="warnGroup" style="border-color:#5a3a1a">
+    <h2>⚠ Consistencia</h2>
+    <div class="hint" id="warnList">—</div>
+    <div class="row" style="margin-top:6px">
+      <label class="chk"><input type="checkbox" id="showShieldChk" checked> Mostrar escudo</label>
+      <button id="fitShieldBtn">Ajustar shieldR al casco</button>
+    </div>
+  </div>
+
+  <div class="group">
     <h2>Modo de edición</h2>
     <div class="row" id="modes">
       <button data-mode="body" class="active">Cuerpo</button>
@@ -133,6 +151,13 @@
   </div>
 
   <div class="group">
+    <h2>Sincronizar servidor (config.js)</h2>
+    <div class="hint">El collider y los hardpoints de torreta del servidor deben coincidir con la forma. Pega esto en <b>server/config.js → SHIP_TYPES.&lt;nave&gt;</b>.</div>
+    <div class="row"><button id="copyServerBtn">Copiar snippet servidor</button></div>
+    <textarea id="serverArea" spellcheck="false" style="height:120px"></textarea>
+  </div>
+
+  <div class="group">
     <h2>Atajos</h2>
     <div class="hint">
       <b>Cuerpo:</b> clic = añadir vértice · arrastrar = mover · <span class="kbd">Shift</span>+clic o clic dcho = borrar · doble clic en una arista = insertar.<br>
@@ -143,6 +168,7 @@
   </div>
 </div>
 
+<script src="ship-presets.js"></script>
 <script>
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -172,6 +198,50 @@ let drag = null;                // {kind, ...}
 let lineDraft = null;
 let selected = -1;
 let spaceHeld = false;
+let showShield = true;
+
+// ── Cargar una nave existente (formato SHIP_SHAPES) ──
+function trySplitSymmetric(full){
+  const tol = 1.6;
+  const sym = full.every(p => full.some(q => Math.abs(q.x-p.x)<tol && Math.abs(q.y+p.y)<tol));
+  if (!sym) return null;
+  const n = full.length;
+  const axis = []; for (let i=0;i<n;i++) if (Math.abs(full[i].y)<tol) axis.push(i);
+  if (!axis.length) return null;
+  const start = axis[0];
+  const collect = dir => {
+    const res = [full[start]]; let i=start;
+    for (let k=0;k<n;k++){ i=(i+dir+n)%n; res.push(full[i]); if (Math.abs(full[i].y)<tol) break; }
+    return res;
+  };
+  const sc = a => a.filter(p=>p.y<0).length - a.filter(p=>p.y>0).length;
+  const fwd=collect(1), bwd=collect(-1);
+  let half = sc(fwd)>=sc(bwd) ? fwd : bwd;
+  if (half.length < 2) return null;
+  if (half[0].x < half[half.length-1].x) half = half.slice().reverse(); // proa→popa
+  return half;
+}
+function loadShape(obj){
+  if (!obj || !obj.body) return;
+  const full = obj.body.map(p=>({x:p[0],y:p[1]}));
+  const half = trySplitSymmetric(full);
+  if (half){ sym=true; body=half; } else { sym=false; body=full; }
+  document.getElementById('symChk').checked = sym;
+  lines   = (obj.lines||[]).map(L=>({a:{x:L[0][0],y:L[0][1]}, b:{x:L[1][0],y:L[1][1]}}));
+  turrets = (obj.turretHardpoints||[]).map(p=>({x:p[0],y:p[1]}));
+  if (sym){
+    lines   = lines.filter(L => (L.a.y+L.b.y)/2 <= 0.5);  // conserva lado superior + eje
+    turrets = turrets.filter(t => t.y <= 0.5);
+  }
+  if (obj.cockpit){
+    cockpit = { x:obj.cockpit[0], y:obj.cockpit[1], rx:obj.cockpit[2], ry:obj.cockpit[3], rect:!!obj.cockpitRect };
+    document.getElementById('cockpitRectChk').checked = !!obj.cockpitRect;
+  }
+  if (obj.shieldR!=null){ meta.shieldR=obj.shieldR; document.getElementById('metaShieldR').value=obj.shieldR; }
+  if (obj.hpBarW!=null){ meta.hpBarW=obj.hpBarW; document.getElementById('metaHpBarW').value=obj.hpBarW; }
+  if (obj.uiOffY!=null){ meta.uiOffY=obj.uiOffY; document.getElementById('metaUiOffY').value=obj.uiOffY; }
+  selected=-1; lineDraft=null; syncExport();
+}
 
 // ── Transformaciones ────────────────────────────────────
 function OX(){ return canvas.width/2 + panX; }
@@ -190,16 +260,29 @@ function fullBody(){
   }
   return out;
 }
+function eqP(a,b){ return Math.abs(a.x-b.x)<0.6 && Math.abs(a.y-b.y)<0.6; }
 function fullLines(){
   if (!sym) return lines;
   const out = [];
   for (const L of lines){
     out.push(L);
-    const onAxis = Math.abs(L.a.y)<0.5 && Math.abs(L.b.y)<0.5;
-    if (!onAxis) out.push({ a:{x:L.a.x,y:-L.a.y}, b:{x:L.b.x,y:-L.b.y} });
+    const ma={x:L.a.x,y:-L.a.y}, mb={x:L.b.x,y:-L.b.y};
+    // no reflejar líneas auto-simétricas (sobre el eje o centradas verticalmente)
+    const self = (eqP(ma,L.a)&&eqP(mb,L.b)) || (eqP(ma,L.b)&&eqP(mb,L.a));
+    if (!self) out.push({ a:ma, b:mb });
   }
   return out;
 }
+// Punto dentro de polígono (ray casting)
+function pointInPoly(p, poly){
+  let inside=false;
+  for (let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const xi=poly[i].x, yi=poly[i].y, xj=poly[j].x, yj=poly[j].y;
+    if (((yi>p.y)!==(yj>p.y)) && (p.x < (xj-xi)*(p.y-yi)/((yj-yi)||1e-9)+xi)) inside=!inside;
+  }
+  return inside;
+}
+function maxExtent(poly){ let m=1; for(const p of poly) m=Math.max(m,Math.hypot(p.x,p.y)); return m; }
 function fullTurrets(){
   if (!sym) return turrets;
   const out = [];
@@ -235,6 +318,8 @@ function draw(){
   drawAxes();
 
   const fb = fullBody();
+  const warn = { lines:0, turrets:0, cockpit:false, shieldSmall:false };
+  const ext = maxExtent(fb);
   // casco
   if (fb.length >= 2){
     ctx.beginPath();
@@ -248,10 +333,24 @@ function draw(){
     ctx.stroke();
   }
 
-  // líneas de chasis
-  ctx.strokeStyle = 'rgba(180,210,255,0.55)';
+  // escudo (radio meta.shieldR) y extensión máxima del casco
+  if (showShield){
+    const o = w2s({x:0,y:0});
+    ctx.setLineDash([6,5]);
+    ctx.strokeStyle = 'rgba(120,200,255,0.5)';
+    ctx.beginPath(); ctx.arc(o.x,o.y, meta.shieldR*zoom, 0, 7); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,120,120,0.35)';
+    ctx.beginPath(); ctx.arc(o.x,o.y, ext*zoom, 0, 7); ctx.stroke();
+    ctx.setLineDash([]);
+    if (ext > meta.shieldR + 0.5) warn.shieldSmall = true;
+  }
+
+  // líneas de chasis (rojo si algún extremo sale del casco)
   ctx.lineWidth = 1;
   for (const L of fullLines()){
+    const out = !pointInPoly(L.a,fb) || !pointInPoly(L.b,fb);
+    if (out) warn.lines++;
+    ctx.strokeStyle = out ? '#ff4060' : 'rgba(180,210,255,0.55)';
     const a=w2s(L.a), b=w2s(L.b);
     ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
   }
@@ -260,16 +359,26 @@ function draw(){
     ctx.fillStyle='#ffcc44'; ctx.beginPath(); ctx.arc(a.x,a.y,4,0,7); ctx.fill();
   }
 
-  // cabina
+  // cabina (anillo rojo si el centro sale del casco)
+  warn.cockpit = !pointInPoly({x:cockpit.x,y:cockpit.y}, fb);
   drawCockpit(ctx, w2s, true);
-
-  // torretas
-  for (const t of fullTurrets()){
-    const s=w2s(t);
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.strokeStyle='#ffaa55'; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.arc(s.x,s.y,7,0,7); ctx.fill(); ctx.stroke();
-    ctx.fillStyle='#ffaa55'; ctx.fillRect(s.x-1, s.y-9, 2, 9);
+  if (warn.cockpit){
+    const cc=w2s({x:cockpit.x,y:cockpit.y});
+    ctx.strokeStyle='#ff4060'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(cc.x,cc.y, Math.max(cockpit.rx,cockpit.ry)*zoom+3, 0, 7); ctx.stroke();
   }
+
+  // torretas (rojo si salen del casco)
+  for (const t of fullTurrets()){
+    const out = !pointInPoly(t,fb);
+    if (out) warn.turrets++;
+    const s=w2s(t);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.strokeStyle = out ? '#ff4060' : '#ffaa55'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(s.x,s.y,7,0,7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = out ? '#ff4060' : '#ffaa55'; ctx.fillRect(s.x-1, s.y-9, 2, 9);
+  }
+
+  updateWarnings(warn, ext);
 
   // handles del cuerpo (solo los puntos editables)
   if (mode==='body'){
@@ -524,6 +633,33 @@ $('cockpitRectChk').onchange = e=>{ cockpit.rect=e.target.checked; syncExport();
 $('mirrorBtn').onclick = ()=>{ body=body.map(p=>({x:p.x,y:-Math.abs(p.y)})); syncExport(); };
 $('clearBtn').onclick = ()=>{ if(confirm('¿Vaciar el cuerpo?')){ body=[]; selected=-1; syncExport(); } };
 
+// Cargar nave existente
+(function(){
+  const sel=$('loadShip');
+  if (window.SHIP_PRESETS){
+    for (const k of Object.keys(SHIP_PRESETS)){ const o=document.createElement('option'); o.value=k; o.textContent=k; sel.appendChild(o); }
+  } else {
+    const o=document.createElement('option'); o.textContent='(ship-presets.js no cargado)'; sel.appendChild(o);
+  }
+})();
+$('loadShipBtn').onclick = ()=>{
+  const k=$('loadShip').value;
+  if (window.SHIP_PRESETS && SHIP_PRESETS[k]){ loadShape(SHIP_PRESETS[k]); status('Cargada: '+k); }
+};
+$('showShieldChk').onchange = e=> showShield=e.target.checked;
+$('fitShieldBtn').onclick = ()=>{ meta.shieldR=Math.ceil(maxExtent(fullBody())); $('metaShieldR').value=meta.shieldR; syncExport(); };
+$('copyServerBtn').onclick = ()=> navigator.clipboard.writeText($('serverArea').value).then(()=>status('Snippet servidor copiado ✓'));
+
+function updateWarnings(w, ext){
+  const el=$('warnList'); const m=[];
+  if (w.turrets) m.push(`⚠ ${w.turrets} torreta(s) fuera del casco`);
+  if (w.cockpit) m.push('⚠ cabina fuera del casco');
+  if (w.lines)   m.push(`⚠ ${w.lines} línea(s) con extremos fuera`);
+  if (w.shieldSmall) m.push(`⚠ shieldR (${meta.shieldR}) &lt; casco (${Math.ceil(ext)}) → usa “Ajustar shieldR”`);
+  el.innerHTML = m.length ? m.join('<br>') : '✓ Todo encaja dentro del casco';
+  el.style.color = m.length ? '#ffb070' : '#7fdf9f';
+}
+
 $('metaName').oninput = e=>{ meta.name=e.target.value||'nave'; syncExport(); };
 $('metaShieldR').oninput = e=>{ meta.shieldR=+e.target.value; syncExport(); };
 $('metaHpBarW').oninput = e=>{ meta.hpBarW=+e.target.value; syncExport(); };
@@ -588,6 +724,15 @@ function syncExport(){
   }
   s += `  },`;
   $('exportArea').value = s;
+
+  // ── Snippet para server/config.js (collider derivado del casco + hardpoints) ──
+  let minX=1e9,maxX=-1e9,maxAbsY=0;
+  for (const p of fb){ minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); maxAbsY=Math.max(maxAbsY,Math.abs(p.y)); }
+  if (fb.length<2){ minX=0; maxX=0; }
+  let sv = `// server/config.js → SHIP_TYPES.${meta.name}\n`;
+  sv += `collider: { front: ${r(maxX)}, rear: ${r(minX)}, radius: ${Math.ceil(maxAbsY)} },\n`;
+  if (ft.length) sv += `turretHardpoints: [ ${fmtPts(ft)} ],`;
+  $('serverArea').value = sv;
 }
 
 // ── Init ────────────────────────────────────────────────

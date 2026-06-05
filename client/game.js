@@ -348,61 +348,6 @@ const SHIP_SHAPES = {
       [87.1, -0.2]
     ],
   }
-  /*
-  capital: {
-    // Fragata pesada tipo Idris-M (Star Citizen): casco largo, proa que se estrecha
-    // hasta una punta ROMA (no afilada), costados casi paralelos en el centro y popa
-    // ancha con bahía de hangar central entre los bloques de motor.
-    body: [
-      [112, 0],                                  // proa (punta corta y roma — cañón de riel)
-      [106, -7], [96, -14],                      // morro estrechándose
-      [78, -22], [52, -27],
-      [20, -30],                                 // entra en el cuerpo central (lados casi paralelos)
-      [-18, -31], [-52, -33],
-      [-74, -37],                                // ensancha hacia popa
-      [-88, -42], [-98, -36],                    // góndola de motor
-      [-102, -22], [-102, -8],                   // popa (lado de la bahía)
-      [-94, 0],                                  // muesca central del hangar
-      [-102, 8], [-102, 22],
-      [-98, 36], [-88, 42],                      // góndola de motor
-      [-74, 37],
-      [-52, 33], [-18, 31],
-      [20, 30],                                  // cuerpo central
-      [52, 27], [78, 22],
-      [96, 14], [106, 7],                        // morro
-    ],
-    engine: [[-100, -26], [-120, 0], [-100, 26]],
-    hpBarW: 190,
-    uiOffY: -70,
-    shieldR: 108,
-    // Torre de mando (puente): bloque rectangular elevado en el tercio de proa
-    cockpit: [34, 0, 16, 12],
-    cockpitRect: true,
-    lines: [
-      [[104, 0], [-92, 0]],          // espina dorsal
-      // costados internos (paralelos) → silueta de fragata, no de triángulo
-      [[78, -22], [-74, -37]],
-      [[78, 22], [-74, 37]],
-      // mamparos transversales
-      [[52, -27], [52, 27]],
-      [[-18, -31], [-18, 31]],
-      [[-52, -33], [-52, 33]],
-      // contorno de la superestructura / torre de mando
-      [[18, -16], [50, -16]],
-      [[18, 16], [50, 16]],
-      [[18, -16], [18, 16]],
-      [[50, -16], [50, 16]],
-      // bahía de hangar a popa (uve hacia la muesca central)
-      [[-74, -14], [-94, 0]],
-      [[-74, 14], [-94, 0]],
-    ],
-    // Posiciones de las 3 torretas en coordenadas locales de nave
-    turretHardpoints: [
-      [70, -18],   // torreta de proa izquierda
-      [70, 18],   // torreta de proa derecha
-      [-40, 0],   // torreta dorsal trasera
-    ],
-  },*/
 };
 
 const pingEffect = [];
