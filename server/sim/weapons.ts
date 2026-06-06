@@ -6,7 +6,7 @@ const { shipCapsule, segToSegDist, isSheltered } = require("./physics.ts");
 const { applyDamage, updateDamageLog, killPlayer } = require("../entities/player.ts");
 
 // Aplica el efecto EMP a una nave. `ticks` = duración; `disable` = si además la "apaga".
-function applyEmp(target, ticks, disable) {
+function applyEmp(target: Player, ticks: number, disable: boolean): void {
   target.empTimer = Math.max(target.empTimer ?? 0, ticks);
   target.empMax   = Math.max(target.empMax ?? 0, ticks);
   if (disable) target.empDisableTicks = Math.max(target.empDisableTicks ?? 0, ticks);
@@ -15,7 +15,7 @@ function applyEmp(target, ticks, disable) {
 // Disparo principal de la nave Capital: un rayo instantáneo (hitscan) muy potente.
 // Traza una línea desde la proa; impacta al primer enemigo en su trayectoria
 // (o se detiene en un asteroide), aplica daño grande y deja un efecto visual.
-function fireCapitalBeam(player, room) {
+function fireCapitalBeam(player: Player, room: Room): void {
   const cos = Math.cos(player.angle), sin = Math.sin(player.angle);
   const col = (CFG.SHIP_TYPES.capital.collider) || { front: 0 };
   const ox = player.x + col.front * cos;   // origen en la proa
@@ -24,7 +24,7 @@ function fireCapitalBeam(player, room) {
   const ex = ox + cos * range, ey = oy + sin * range;
 
   // Distancia a lo largo del rayo de un punto proyectado sobre la dirección
-  const along = (px, py) => (px - ox) * cos + (py - oy) * sin;
+  const along = (px: number, py: number) => (px - ox) * cos + (py - oy) * sin;
 
   // 1) Asteroide sólido (z=0) que bloquea el rayo más cerca
   let blockDist = range;
@@ -40,7 +40,7 @@ function fireCapitalBeam(player, room) {
   }
 
   // 2) Enemigo más cercano cuya cápsula intersecta el rayo dentro de blockDist
-  let hitPlayer = null, hitDist = blockDist;
+  let hitPlayer: Player | null = null, hitDist = blockDist;
   for (const p of Object.values(room.players)) {
     if (p.dead || p.team === player.team || p.pilotingFor || p.id === player.id) continue;
     const cap = shipCapsule(p);
@@ -77,7 +77,7 @@ function fireCapitalBeam(player, room) {
 }
 
 // Pulso EMP en área del Disruptor: apaga a todos los enemigos dentro del radio 2-4s.
-function fireEmpPulse(player, room) {
+function fireEmpPulse(player: Player, room: Room): void {
   const R = CFG.EMP_PULSE_RADIUS;
   for (const p of Object.values(room.players)) {
     if (p.dead || p.team === player.team || p.pilotingFor || p.id === player.id) continue;
@@ -95,7 +95,7 @@ function fireEmpPulse(player, room) {
 }
 
 // El Interceptor suelta una mina en su posición; explota al pasar un enemigo por encima.
-function dropMine(player, room) {
+function dropMine(player: Player, room: Room): void {
   const active = room.mines.filter(m => m.ownerId === player.id).length;
   if (active >= CFG.MINE_MAX_ACTIVE) return;
   room.mines.push({
@@ -109,7 +109,7 @@ function dropMine(player, room) {
   });
 }
 
-function steerMissile(m, tx, ty, maxTurn, thrust) {
+function steerMissile(m: Missile, tx: number, ty: number, maxTurn: number, thrust: number): void {
   const dx = tx - m.x;
   const dy = ty - m.y;
   const currentSpeed = Math.hypot(m.vx, m.vy);

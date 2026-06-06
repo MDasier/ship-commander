@@ -6,10 +6,10 @@
 const CFG = require("../config");
 const { segmentHitsAsteroid, shipCapsule, segToSegDist, isSheltered } = require("./physics.ts");
 const { applyDamage, registerCrewDamage, killPlayer } = require("../entities/player.ts");
-const { steerMissile } = require("./weapons");
+const { steerMissile } = require("./weapons.ts");
 
-function collideAsteroids(room) {
-  Object.values(room.players).forEach(p => {
+function collideAsteroids(room: Room): void {
+  Object.values(room.players).forEach((p: Player) => {
     if (p.dead) return;
 
     for (const ast of room.asteroids) {
@@ -67,7 +67,7 @@ function collideAsteroids(room) {
   });
 }
 
-function stepBullets(room) {
+function stepBullets(room: Room): void {
   room.bullets.forEach(b => {
     b.x += b.vx;
     b.y += b.vy;
@@ -163,7 +163,7 @@ function stepBullets(room) {
   }
 }
 
-function stepMissiles(room) {
+function stepMissiles(room: Room): void {
   room.missiles.forEach(m => {
     const flares = room.flare || [];
 

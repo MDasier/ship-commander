@@ -5,7 +5,7 @@ const CFG = require("../config");
 const { FPS } = require("../constants.ts");
 const { applyShipStats } = require("../entities/player.ts");
 const { spawnPos } = require("../entities/spawn.ts");
-const { setWaveBanner, TEAM_LIVES } = require("../ai/waves");
+const { setWaveBanner, TEAM_LIVES } = require("../ai/waves.ts");
 const { broadcastRoom } = require("../net/broadcast.ts");
 
 function startGame(room) {

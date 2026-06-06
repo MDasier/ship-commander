@@ -5,7 +5,7 @@
 const CFG = require("../config");
 const { applyDamage, registerCrewDamage, killPlayer } = require("../entities/player.ts");
 
-function stepEffects(room) {
+function stepEffects(room: Room): void {
   // ── Beams (rayo de la Capital): solo efecto visual, el daño ya se aplicó al disparar
   room.beams = (room.beams || []).filter(b => { b.life--; return b.life > 0; });
 

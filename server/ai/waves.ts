@@ -4,13 +4,13 @@
 
 const CFG = require("../config");
 const { FPS } = require("../constants.ts");
-const { makeBot } = require("./ai");
+const { makeBot } = require("./ai.ts");
 
 // Oleadas escaladas: cada vez más naves/dureza hasta el jefe (Capital).
-const WAVES = () => CFG.WAVES;
-const TEAM_LIVES = () => CFG.TEAM_LIVES;
+const WAVES = (): any[] => CFG.WAVES;
+const TEAM_LIVES = (): number => CFG.TEAM_LIVES;
 
-function spawnWave(room, n) {
+function spawnWave(room: Room, n: number): void {
   const wave = WAVES()[n - 1];
   if (!wave) return;
 
@@ -21,18 +21,18 @@ function spawnWave(room, n) {
     ships.push(wave.boss ? "fighter" : wave.ships[i % wave.ships.length]);
   }
 
-  ships.forEach(t => makeBot(room, t));
+  ships.forEach((t: string) => makeBot(room, t));
 }
 
 // Gestiona la progresión de oleadas de una sala.
 // El banner se envía como clave i18n + número; el cliente lo traduce al idioma local.
-function setWaveBanner(room, key, n = 0, ms = 3000) {
+function setWaveBanner(room: Room, key: string, n: number = 0, ms: number = 3000): void {
   room.waveBannerKey = key;
   room.waveBannerN   = n;
   room.waveBannerUntil = Date.now() + ms;
 }
 
-function manageWaves(room) {
+function manageWaves(room: Room): void {
   if (room.winner) return;
 
   const humans = Object.values(room.players).filter(p => !p.isBot && !p.pilotingFor);
@@ -52,21 +52,21 @@ function manageWaves(room) {
   const livingBots = Object.values(room.players).filter(p => p.isBot && !p.dead).length;
 
   if (room.waveState === "intermission") {
-    if (--room.waveTimer <= 0) {
-      room.wave++;
+    if (--room.waveTimer! <= 0) {
+      room.wave!++;
 
-      if (room.wave > WAVES().length) {
+      if (room.wave! > WAVES().length) {
         room.winner = "green";
         setWaveBanner(room, "wave.complete", 0, 6000);
         return;
       }
 
-      spawnWave(room, room.wave);
+      spawnWave(room, room.wave!);
       room.waveState = "active";
 
       setWaveBanner(
         room,
-        WAVES()[room.wave - 1].boss ? "wave.boss" : "wave.start",
+        WAVES()[room.wave! - 1].boss ? "wave.boss" : "wave.start",
         room.wave
       );
     }

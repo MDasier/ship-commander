@@ -5,11 +5,11 @@
 
 const { FPS } = require("../constants.ts");
 const { rooms } = require("../state.ts");
-const { stepPlayers } = require("./movement");
-const { collideAsteroids, stepBullets, stepMissiles } = require("./collisions");
-const { stepEffects } = require("./effects");
-const { manageWaves } = require("../ai/waves");
-const { buildState } = require("../net/serialize");
+const { stepPlayers } = require("./movement.ts");
+const { collideAsteroids, stepBullets, stepMissiles } = require("./collisions.ts");
+const { stepEffects } = require("./effects.ts");
+const { manageWaves } = require("../ai/waves.ts");
+const { buildState } = require("../net/serialize.ts");
 const { broadcastRoom } = require("../net/broadcast.ts");
 
 // Resuelve el ganador (aniquilación total o tiempo agotado con cascada de criterios).

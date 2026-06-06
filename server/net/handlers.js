@@ -12,8 +12,8 @@ const {
 const { startGame, restartRoom } = require("../rooms/lifecycle");
 const { applyShipStats, killPlayer } = require("../entities/player.ts");
 const { spawnPos, spawnSafePos, createAsteroids } = require("../entities/spawn.ts");
-const { fireEmpPulse, dropMine, fireCapitalBeam } = require("../sim/weapons");
-const { setWaveBanner, TEAM_LIVES } = require("../ai/waves");
+const { fireEmpPulse, dropMine, fireCapitalBeam } = require("../sim/weapons.ts");
+const { setWaveBanner, TEAM_LIVES } = require("../ai/waves.ts");
 
 function handleMessage(ws, player, msg) {
   if (msg.type === "getRooms") {

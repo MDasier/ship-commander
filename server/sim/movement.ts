@@ -4,10 +4,10 @@
 // nave apagada por EMP queda a la deriva.
 
 const CFG = require("../config");
-const { computeBotAI, steerAroundAsteroids, applyWorldBoundaryAvoidance } = require("../ai/ai");
+const { computeBotAI, steerAroundAsteroids, applyWorldBoundaryAvoidance } = require("../ai/ai.ts");
 
-function stepPlayers(room) {
-  Object.values(room.players).forEach(p => {
+function stepPlayers(room: Room): void {
+  Object.values(room.players).forEach((p: Player) => {
     if (p.dead) return;
 
     // Artillero: sincronizar al piloto y procesar su turno
@@ -48,7 +48,7 @@ function stepPlayers(room) {
     if (p.missileCooldown > 0) p.missileCooldown--;
     if (p.bulletCooldown  > 0) p.bulletCooldown--;
     if (p.hitFlash        > 0) p.hitFlash--;
-    if ((p.beamHit ?? 0)  > 0) p.beamHit--;
+    if ((p.beamHit ?? 0)  > 0) p.beamHit!--;
     // Carga del rayo de la Capital (mantener pulsado)
     if (p.shipType === "capital") {
       if (p.beamCharging) {
@@ -57,25 +57,25 @@ function stepPlayers(room) {
       p.beamCharge = (p.beamChargeTicks ?? 0) / CFG.CAPITAL_BEAM_CHARGE_TIME; // 0..1 para el cliente
     }
     // EMP: chispas rojas (visual) y apagado (motor + armas)
-    if ((p.empTimer ?? 0) > 0) p.empTimer--; else p.empMax = 0;
-    p.emp = (p.empMax ?? 0) > 0 ? (p.empTimer ?? 0) / p.empMax : 0; // 0..1 para el cliente
-    if ((p.empDisableTicks ?? 0) > 0) p.empDisableTicks--;
+    if ((p.empTimer ?? 0) > 0) p.empTimer!--; else p.empMax = 0;
+    p.emp = (p.empMax ?? 0) > 0 ? (p.empTimer ?? 0) / p.empMax! : 0; // 0..1 para el cliente
+    if ((p.empDisableTicks ?? 0) > 0) p.empDisableTicks!--;
     p.empDisabled = (p.empDisableTicks ?? 0) > 0;
-    if ((p.empCooldown  ?? 0) > 0) p.empCooldown--;
-    if ((p.mineCooldown ?? 0) > 0) p.mineCooldown--;
-    if (p.shieldFlash     > 0) p.shieldFlash--;
+    if ((p.empCooldown  ?? 0) > 0) p.empCooldown!--;
+    if ((p.mineCooldown ?? 0) > 0) p.mineCooldown!--;
+    if ((p.shieldFlash ?? 0)    > 0) p.shieldFlash!--;
     if (p.flaredCooldown  > 0) p.flaredCooldown--;
     // Recarga de escudo (parada mientras la nave está apagada)
     if (!p.empDisabled) {
       if ((p.shieldHitTimer ?? 99999) < (p.shieldRegenDelayTicks ?? 99999)) {
-        p.shieldHitTimer++;
+        p.shieldHitTimer!++;
       } else if ((p.shield ?? 0) < (p.maxShield ?? 0)) {
-        p.shield = Math.min(p.maxShield, p.shield + p.shieldRegenPerTick);
+        p.shield = Math.min(p.maxShield!, p.shield! + p.shieldRegenPerTick!);
       }
     }
 
     // Nave apagada por EMP → sin propulsión ni giro (queda a la deriva)
-    const i = p.empDisabled ? { inertiaDamp: false } : (p.input || {});
+    const i: PlayerInput = p.empDisabled ? { inertiaDamp: false } : (p.input || {});
 
     // En DAMP con nave parada, giro hasta 1.5× más ágil
     const baseTurn = p.turnRateVal ?? CFG.TURN_RATE;

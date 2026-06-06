@@ -3,9 +3,9 @@
 // cambio aquí debe coordinarse con el receptor en client/game.js.
 
 const { FPS } = require("../constants.ts");
-const { WAVES } = require("../ai/waves");
+const { WAVES } = require("../ai/waves.ts");
 
-function buildState(room) {
+function buildState(room: Room): any {
   return {
     type:      "state",
     players:   room.players,
