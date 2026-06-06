@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { useI18n } from "../hooks/useI18n";
+import { bindingText, onBindingsChange } from "../game";
 
 // HUD en partida migrado a React (Fase 2). Caso especial: se actualiza a 60 fps.
 // React renderiza solo la ESTRUCTURA con los MISMOS id que game.js rellena cada
@@ -18,6 +21,58 @@ const ROWS: { label: string; id: string }[] = [
   { label: "hud.flight", id: "inertiaMode" },
   { label: "hud.cannon", id: "weaponHeatEl" },
 ];
+
+// Leyenda de controles en partida (abajo-izquierda). Solo acciones críticas; el
+// movimiento (propulsión/strafe/freno) se omite a propósito. Las acciones
+// reasignables muestran la tecla actual (bindingText) y se actualizan al
+// reasignar; las fijas llevan su tecla literal.
+const ACTION_LEGEND: { action: string; label: string }[] = [
+  { action: "special", label: "hud.legSpecial" },
+  { action: "missile", label: "hud.legMissile" },
+  { action: "flare", label: "controls.flare" },
+  { action: "scan", label: "hud.legScan" },
+  { action: "inertiaDamp", label: "hud.legInertia" },
+];
+const FIXED_LEGEND: { cap: string; label: string }[] = [
+  { cap: "Tab", label: "controls.fxScore" },
+  { cap: "F1", label: "controls.fxMobi" },
+  { cap: "Del", label: "controls.fxSelfDestruct" },
+];
+
+// Keycap compacto (acento oro), estilo del design system.
+function Cap({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex min-w-[28px] justify-center rounded border border-gs-gold-bright/30 bg-gs-gold-bright/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-gs-gold-bright">
+      {children}
+    </span>
+  );
+}
+
+function ControlLegend() {
+  const { t } = useI18n();
+  const [, bump] = useState(0);
+  // Re-render al reasignar una tecla (bindingText lee el binding vivo).
+  useEffect(() => onBindingsChange(() => bump((x) => x + 1)), []);
+  return (
+    <div className="absolute bottom-6 right-6 flex flex-col items-end gap-1.5 text-right">
+      <span className="gs-eyebrow text-gs-grey-3">{t("hud.legend")}</span>
+      <div className="flex flex-col items-end gap-1">
+        {ACTION_LEGEND.map((r) => (
+          <div key={r.action} className="flex items-center gap-2 text-[12px]">
+            <span className="text-gs-grey-2">{t(r.label)}</span>
+            <Cap>{bindingText(r.action)}</Cap>
+          </div>
+        ))}
+        {FIXED_LEGEND.map((r) => (
+          <div key={r.cap} className="flex items-center gap-2 text-[12px]">
+            <span className="text-gs-grey-2">{t(r.label)}</span>
+            <Cap>{r.cap}</Cap>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Hud() {
   const { t } = useI18n();
@@ -57,6 +112,9 @@ export default function Hud() {
           {t("hud.controlsLine")}
         </div>
       </div>
+
+      {/* Leyenda de controles críticos (abajo-izquierda) */}
+      <ControlLegend />
     </div>
   );
 }

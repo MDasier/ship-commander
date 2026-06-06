@@ -214,6 +214,12 @@ const I18N = {
     "game.chooseShip": "elige tu nave o torreta abajo",
     "game.chooseShipTurret": "o elige otra nave/torreta abajo",
     "hud.controlsLine": "[F1] MobiGlass · [Enter] Chat",
+    // Leyenda de controles en partida (etiquetas cortas)
+    "hud.legend": "Controles",
+    "hud.legSpecial": "Especial",
+    "hud.legMissile": "Misil",
+    "hud.legScan": "Escáner",
+    "hud.legInertia": "Inercia",
 
     // Banners de oleada (enviados por el servidor como clave)
     "wave.start": "OLEADA {n}",
@@ -413,6 +419,11 @@ const I18N = {
     "game.chooseShip": "choose your ship or turret below",
     "game.chooseShipTurret": "or choose another ship/turret below",
     "hud.controlsLine": "[F1] MobiGlass · [Enter] Chat",
+    "hud.legend": "Controls",
+    "hud.legSpecial": "Special",
+    "hud.legMissile": "Missile",
+    "hud.legScan": "Scan",
+    "hud.legInertia": "Inertia",
 
     "wave.start": "WAVE {n}",
     "wave.boss": "WAVE {n} — CAPITAL SHIP!",
