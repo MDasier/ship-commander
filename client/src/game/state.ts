@@ -107,4 +107,7 @@ export const S = {
   // ── Conexión / reconexión ──
   connLost: false,
   everConnected: false,
+
+  // Handle del timer que difiere el game over 2.5 s (compartido loop ↔ game.ts).
+  gameOverTimer: null as ReturnType<typeof setTimeout> | null,
 };
