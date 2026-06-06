@@ -33,15 +33,19 @@ export default function App() {
   const [chatOpen, setChatOpen] = useState(false);
   const [dead, setDead] = useState(false);
 
-  // game.js emite "menu-screen" al cambiar de pantalla → reflejamos en la URL.
-  // Al montar, sincronizamos la ruta con la pantalla actual de game.js: su
-  // primer evento "mainMenu" se dispara en el bootstrap ANTES de que React
-  // monte y escuche (main.tsx importa game.js antes de renderizar App), así que
-  // sin esto un refresco en /game se quedaría sin menú. getMenuScreen() ya
-  // refleja la pantalla real (mainMenu tras el arranque).
+  // Sincroniza la ruta con la pantalla actual de game.js SOLO al montar: su
+  // primer evento "mainMenu" se dispara en el bootstrap ANTES de que React monte
+  // (main.tsx importa game.js antes de renderizar App), así que sin esto un
+  // refresco en /game se quedaría sin menú. Debe correr UNA vez ([] deps): si
+  // dependiera de `navigate` (cuya identidad cambia al navegar en react-router),
+  // se re-ejecutaría al entrar en partida y rebotaría de /game a /room.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const initial = SCREEN_PATH[getMenuScreen()] || "/";
-    navigate(initial, { replace: true });
+    navigate(SCREEN_PATH[getMenuScreen()] || "/", { replace: true });
+  }, []);
+
+  // game.js emite "menu-screen" al cambiar de pantalla → reflejamos en la URL.
+  useEffect(() => {
     const onScreen = (e: Event) => {
       const name = (e as CustomEvent<string>).detail;
       const path = SCREEN_PATH[name];
