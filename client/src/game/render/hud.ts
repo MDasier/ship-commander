@@ -430,16 +430,24 @@ function updateHUD(me) {
 
   document.getElementById("alive").textContent = i18nt("hud.alive", { n: alive });
 
+  // Objetivo fijado: etiqueta centrada justo encima del radar (centro-abajo).
+  // Antes iba anclada arriba-izquierda (40,220) y se solapaba con la telemetría
+  // de la nave. Misma estética que el retículo sobre la nave (rojo hostil + ⊕).
   if (S.targetId) {
     const t = S.players[S.targetId];
     if (t) {
-      ctx.fillStyle = "yellow";
-      ctx.font = "20px Arial";
+      const pulse = 0.7 + 0.3 * Math.sin(performance.now() / 220);
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = "bold 15px 'Courier New', monospace";
+      ctx.fillStyle = `rgba(255,70,70,${pulse})`;
       ctx.fillText(
-        "LOCK: " + (t.name || t.id.slice(0, 6)),
-        40,
-        220
+        "⊕ LOCK: " + (t.name || t.id.slice(0, 6)),
+        canvas.width / 2,
+        canvas.height - 255
       );
+      ctx.restore();
+      ctx.textAlign = "left";
     }
   }
 }
