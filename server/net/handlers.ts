@@ -5,7 +5,7 @@
 const CFG = require("../config");
 const { WORLD_PRESETS, MAX_PLAYERS, FPS } = require("../constants.ts");
 const { rooms } = require("../state.ts");
-const { send, broadcastRoom, broadcastRoomList } = require("./broadcast.ts");
+const { send, broadcastRoom, broadcastRoomList, notifyPlayer } = require("./broadcast.ts");
 const {
   createRoom, joinRoom, removeFromRoom, roomList, detachGunner,
 } = require("../rooms/rooms.ts");
@@ -234,14 +234,20 @@ function handleMessage(ws: any, player: Player, msg: any): void {
     if (inLobby) {
       if (player.gunnerId && player.shipType === "gunship" && msg.shipType !== "gunship") {
         const gunner = room.players[player.gunnerId];
-        if (gunner) { gunner.pilotingFor = null; gunner.turretIndex = undefined; }
+        if (gunner) {
+          gunner.pilotingFor = null; gunner.turretIndex = undefined;
+          notifyPlayer(gunner.id, "notice.kickedFromTurret");   // Regla 5: avisar en lobby
+        }
         player.gunnerId = null;
       }
       if (player.gunnerIds && player.shipType === "capital" && msg.shipType !== "capital") {
         player.gunnerIds.forEach((gid: string | null, idx: number) => {
           if (!gid) return;
           const g = room.players[gid];
-          if (g) { g.pilotingFor = null; g.turretIndex = undefined; }
+          if (g) {
+            g.pilotingFor = null; g.turretIndex = undefined;
+            notifyPlayer(g.id, "notice.kickedFromTurret");      // Regla 5: avisar en lobby
+          }
           player.gunnerIds![idx] = null;
         });
         player.turretAngles = {};
@@ -366,6 +372,17 @@ function handleMessage(ws: any, player: Player, msg: any): void {
   if (msg.type === "selfDestruct") {
     const room = rooms[player.roomId];
     if (!room || room.status !== "playing" || player.dead) return;
+    killPlayer(player, null, "self", room);
+    return;
+  }
+
+  // Suicidio de torretero (Regla 3): a diferencia de la autodestrucción, libera
+  // su torreta (Regla 2/4) antes de morir, dejando la plaza libre en la nave
+  // aliada viva para que pueda reabordarla o salir como nave propia.
+  if (msg.type === "suicide") {
+    const room = rooms[player.roomId];
+    if (!room || room.status !== "playing" || player.dead) return;
+    detachGunner(room, player);
     killPlayer(player, null, "self", room);
     return;
   }

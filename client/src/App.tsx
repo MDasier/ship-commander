@@ -12,6 +12,7 @@ import DeadPanel from "./ui/DeadPanel";
 import ControlsScreen from "./ui/ControlsScreen";
 import Reconnect from "./ui/Reconnect";
 import Boot from "./ui/Boot";
+import Toast from "./ui/Toast";
 import { closeMobiglass, getMenuScreen, isEverConnected } from "./game";
 
 // Mapea cada pantalla del menú (emitida por game.js) a una ruta. Por ahora solo
@@ -126,6 +127,7 @@ export default function App() {
       {mobiOpen && <MobiGlass onClose={() => closeMobiglass()} />}
       {disconnected && <Reconnect onRetry={() => location.reload()} />}
       {boot && <Boot cold={boot.cold} />}
+      <Toast />
     </>
   );
 }

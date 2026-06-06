@@ -276,9 +276,10 @@ function loop() {
     ctx.textAlign = "left";
   }
 
-  // ── Self-destruct UI
+  // ── Self-destruct / suicidio UI (carga: 2s autodestrucción · 1.5s suicidio)
   if (S.sdState === "charging") {
-    const progress = Math.min(1, (Date.now() - S.sdHoldStart) / 2000);
+    const suicide = S.sdMode === "suicide";
+    const progress = Math.min(1, (Date.now() - S.sdHoldStart) / (suicide ? 1500 : 2000));
     const cx = canvas.width / 2;
     const cy = canvas.height / 2 + 80;
     ctx.save();
@@ -287,7 +288,7 @@ function loop() {
     ctx.fillRect(cx - 160, cy - 36, 320, 44);
     ctx.font = "12px 'Courier New', monospace";
     ctx.fillStyle = "#ff6666";
-    ctx.fillText(i18nt("game.selfDestructHold", { key: "DEL" }), cx, cy - 16);
+    ctx.fillText(i18nt(suicide ? "game.suicideHold" : "game.selfDestructHold", { key: "DEL" }), cx, cy - 16);
     ctx.fillStyle = "#222";
     ctx.fillRect(cx - 130, cy - 4, 260, 8);
     ctx.fillStyle = "#ff4444";

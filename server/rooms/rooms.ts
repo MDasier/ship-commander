@@ -4,6 +4,7 @@
 // ocurre en tiempo de llamada, no de carga.
 
 const crypto = require("crypto");
+const CFG = require("../config");
 const { WORLD_PRESETS } = require("../constants.ts");
 const { rooms } = require("../state.ts") as { rooms: Record<string, Room> };
 const { createAsteroids } = require("../entities/spawn.ts");
@@ -84,6 +85,21 @@ function removeFromRoom(player: Player): void {
 
   // Limpiar vínculos de tripulación (artillero y/o piloto, Gunship y Capital)
   detachGunner(room, player);     // si era artillero, libera su plaza
+  // Si pilotaba una nave con torretas y la partida está en curso, su tripulación
+  // muere con la nave (desaparece al irse/desconectar el piloto) y debe elegir
+  // nave para reaparecer (panel de muerte). En lobby solo se desvinculan.
+  if (room.status === "playing") {
+    const crewIds = player.gunnerIds ? player.gunnerIds.filter(Boolean) : (player.gunnerId ? [player.gunnerId] : []);
+    for (const gid of crewIds) {
+      const g = room.players[gid as string];
+      if (g && !g.dead) {
+        const now = Date.now();
+        g.hp = 0; g.dead = true; g.deaths++; g.deadAt = now;
+        g.respawnReadyAt = now + ((CFG.RESPAWN_DELAY ?? 5) * 1000);
+      }
+      broadcast.notifyPlayer(gid as string, "notice.carrierLost");
+    }
+  }
   clearCrewSeats(room, player);   // si pilotaba, desvincula a sus artilleros
 
   delete room.players[player.id];

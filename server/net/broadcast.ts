@@ -25,4 +25,10 @@ function broadcastRoomList(): void {
   }
 }
 
-module.exports = { send, broadcastRoom, broadcastRoomList };
+// Aviso puntual a UN jugador (toast en el cliente). `key` es una clave i18n.
+function notifyPlayer(playerId: string, key: string): void {
+  const ws = clients.get(playerId);
+  if (ws) send(ws, { type: "notice", key });
+}
+
+module.exports = { send, broadcastRoom, broadcastRoomList, notifyPlayer };

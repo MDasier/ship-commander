@@ -46,6 +46,7 @@ interface InputDeps {
   closeMobiglass: () => void;
   cancelSd: () => void;
   startSdCharge: () => void;
+  startSuicideCharge: () => void;
 }
 
 // Registra todos los listeners de input. Se llama una vez desde game.ts tras
@@ -55,7 +56,7 @@ export function installInput(deps: InputDeps) {
     canvas, getBindings, getSdState, getMe, isCapitalPilot,
     fireWeapon, stopAutoFire, startBeamCharge, releaseBeamCharge,
     cycleTargetByRadar, cycleSpectator, triggerPingEffect,
-    openChat, openMobiglass, closeMobiglass, cancelSd, startSdCharge,
+    openChat, openMobiglass, closeMobiglass, cancelSd, startSdCharge, startSuicideCharge,
   } = deps;
 
   // Si la ventana pierde el foco o se oculta la pestaña, soltamos todo.
@@ -212,8 +213,13 @@ export function installInput(deps: InputDeps) {
       if (S.chatInputOpen) return;
       const meNow = getMe();
       if (!meNow || meNow.dead) return;
-      if (getSdState() === "countdown") cancelSd();
-      else if (!getSdState()) startSdCharge();
+      // Torretero (pilotingFor): Del = suicidio (Regla 3), no autodestrucción.
+      if (meNow.pilotingFor) {
+        if (!getSdState()) startSuicideCharge();
+      } else {
+        if (getSdState() === "countdown") cancelSd();
+        else if (!getSdState()) startSdCharge();
+      }
     }
   });
 

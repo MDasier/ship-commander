@@ -68,9 +68,25 @@ export default function DeadPanel() {
       if (serverShip) setPicked(serverShip);
     }
   });
+  // Embarque optimista en torreta: al elegir una torreta para reaparecer se marca
+  // al instante y se DESELECCIONA cualquier nave del listado (son excluyentes).
+  const serverBoardedId = turrets.find((tt) => tt.reservedHere)?.id ?? null;
+  const [boardedId, setBoardedId] = useState<string | null>(serverBoardedId);
+  const prevBoarded = useRef(serverBoardedId);
+  useEffect(() => {
+    if (serverBoardedId !== prevBoarded.current) {
+      prevBoarded.current = serverBoardedId;
+      setBoardedId(serverBoardedId);
+    }
+  });
   const selectShip = (type: string) => {
     setPicked(type);
+    setBoardedId(null);                 // elegir nave deselecciona la torreta
     roomSend({ type: "selectShip", shipType: type });
+  };
+  const boardTurret = (id: string) => {
+    setBoardedId(id);
+    roomSend({ type: "boardShip", targetId: id });
   };
 
   // Equipo optimista: estando muerto el cambio no se refleja de inmediato en
@@ -140,7 +156,7 @@ export default function DeadPanel() {
         {/* Columna izquierda: selección de nave (filas de 3 cards) */}
         <div className="min-w-0">
           <ShipPicker
-            selected={picked}
+            selected={boardedId ? "" : picked}
             onSelect={selectShip}
             label={t("dead.selectShip")}
           />
@@ -210,14 +226,14 @@ export default function DeadPanel() {
                 <button
                   key={tt.id}
                   className={`gs-panel flex flex-col items-start gap-0.5 px-3.5 py-2.5 text-left transition-all duration-200 ease-gs hover:border-gs-gold ${
-                    tt.reservedHere ? "border-gs-gold-bright shadow-gs-glow" : ""
+                    tt.id === boardedId ? "border-gs-gold-bright shadow-gs-glow" : ""
                   }`}
-                  onClick={() => roomSend({ type: "boardShip", targetId: tt.id })}
+                  onClick={() => boardTurret(tt.id)}
                 >
                   <span className="font-bold text-white">{tt.name}</span>
                   <span className="font-mono text-[11px] tracking-wider text-gs-gold-bright">{tt.type.toUpperCase()}</span>
                   <span className="text-[11px] text-gs-grey-2">
-                    {tt.reservedHere ? t("dead.reserved") : t("dead.freeTurrets", { n: tt.free })}
+                    {tt.id === boardedId ? t("dead.reserved") : t("dead.freeTurrets", { n: tt.free })}
                   </span>
                 </button>
               ))}

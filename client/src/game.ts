@@ -41,7 +41,7 @@ import { triggerPingEffect } from "./game/render/world";
 import {
   fireWeapon, stopAutoFire, isCapitalPilot,
   startBeamCharge, releaseBeamCharge, cycleSpectator,
-  startSdCharge, cancelSd,
+  startSdCharge, startSuicideCharge, cancelSd,
 } from "./game/actions";
 
 // Controles/keybindings (getBindings, rebindKey, bindingText, renderControlesPane…)
@@ -338,6 +338,11 @@ ws.onmessage = e => {
   if (data.type === "chat") {
     S.chatLog.push({ name: data.name, team: data.team, text: data.text, ts: Date.now() });
     if (S.chatLog.length > 8) S.chatLog.shift();
+  }
+
+  // Aviso puntual dirigido a este jugador (toast en React). data.key es i18n.
+  if (data.type === "notice") {
+    window.dispatchEvent(new CustomEvent("game-notice", { detail: data.key }));
   }
 
   if (data.type === "roomRestarted") {
@@ -663,6 +668,7 @@ installInput({
   closeMobiglass,
   cancelSd,
   startSdCharge,
+  startSuicideCharge,
 });
 
 // Inyecta en el render loop las funciones del motor que necesita (bindings,

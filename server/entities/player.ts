@@ -4,7 +4,7 @@
 
 const CFG = require("../config");
 const { FPS } = require("../constants.ts");
-const { broadcastRoom } = require("../net/broadcast.ts");
+const { broadcastRoom, notifyPlayer } = require("../net/broadcast.ts");
 const { clearCrewSeats } = require("../rooms/rooms.ts");
 
 function createPlayer(id: string): Player {
@@ -249,6 +249,9 @@ function killPlayer(p: Player, killer: Player | null, weapon: string, room: Room
       gunner.deadAt = now;
       gunner.respawnReadyAt = now + ((CFG.RESPAWN_DELAY ?? 5) * 1000);
     }
+    // Regla 1: la nave nodriza ya no existe → el torretero debe elegir nave para
+    // reaparecer; se le avisa (en su DeadPanel ya puede elegir nave o torreta libre).
+    notifyPlayer(gid as string, "notice.carrierLost");
   }
 
   // ── Liberar tripulación

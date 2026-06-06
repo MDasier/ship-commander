@@ -119,8 +119,24 @@ export function startSdCharge() {
   const me = getMe();
   if (!me || me.dead || S.sdState) return;
   S.sdState = "charging";
+  S.sdMode = "selfdestruct";
   S.sdHoldStart = Date.now();
   sdHoldTimer = setTimeout(startSdCountdown, 2000);
+}
+
+// Suicidio del torretero (Regla 3): mantener Del ~1.5s → muere al instante (sin
+// la cuenta atrás de 5s de la autodestrucción). El server libera su torreta.
+export function startSuicideCharge() {
+  const me = getMe();
+  if (!me || me.dead || S.sdState) return;
+  S.sdState = "charging";
+  S.sdMode = "suicide";
+  S.sdHoldStart = Date.now();
+  sdHoldTimer = setTimeout(() => {
+    sdHoldTimer = null;
+    S.sdState = null;
+    ws.send(JSON.stringify({ type: "suicide" }));
+  }, 1500);
 }
 
 function startSdCountdown() {

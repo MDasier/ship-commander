@@ -114,6 +114,7 @@ export const S = {
 
   // ── Autodestrucción (compartido: lógica en game.ts, UI en render) ──
   sdState: null as null | "charging" | "countdown",
+  sdMode: "selfdestruct" as "selfdestruct" | "suicide",   // tipo de la carga activa
   sdCountdown: 0,
   sdHoldStart: 0,
 };
