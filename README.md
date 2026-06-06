@@ -89,7 +89,7 @@ La **firma radar** determina a qué distancia los enemigos pueden verte en el ra
 - **En partida**, un jugador muerto puede elegir **reaparecer directamente en una torreta** aliada libre desde el panel de muerte.
 - Al reaparecer (tecla `R`) sin torreta reservada, el artillero es eyectado como caza independiente.
 
-Cada nave tiene una geometría canvas distinta definida en `client/game.js` (`SHIP_SHAPES`): aguja (Interceptor), delta (L.Fighter), ala volante (Bomber), casco ancho (Gunship), silueta alargada tipo Idris (Capital) y triángulo ancho y corto con el pico en la proa (Disruptor).
+Cada nave tiene una geometría canvas distinta definida en `client/src/game.js` (`SHIP_SHAPES`): aguja (Interceptor), delta (L.Fighter), ala volante (Bomber), casco ancho (Gunship), silueta alargada tipo Idris (Capital) y triángulo ancho y corto con el pico en la proa (Disruptor).
 
 ### HUD y UI
 - HP / Escudo / Combustible / Velocidad / K/D / Cooldown de misil en tiempo real
@@ -294,7 +294,7 @@ const wss = new WebSocket.Server({ server: httpServer, path: "/ws" });
 wss.on("connection", ws => { /* nuevo jugador */ });
 ```
 
-El cliente (`client/game.js`) abre la conexión al cargar la página, eligiendo `ws://` o `wss://` según el protocolo:
+El cliente (`client/src/game.js`) abre la conexión al cargar la página, eligiendo `ws://` o `wss://` según el protocolo:
 
 ```js
 const _wsProto = location.protocol === "https:" ? "wss:" : "ws:";

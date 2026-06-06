@@ -1,4 +1,5 @@
 // ── Módulos del cliente (ES modules · empaquetados por Vite) ──
+import "./styles.css";
 import { i18nt, applyI18n, onLangChange, setLang, getLang } from "./i18n.js";
 import {
   spawnExplosion, spawnBeamImpact, spawnThrustParticle, spawnSmokeParticle,
@@ -113,6 +114,44 @@ function startRecording(action, keyEl) {
   };
 
   document.addEventListener("keydown", recordingHandler, true);
+}
+
+// ── Puente para la UI React (Fase 1) ──────────────────────────────────
+// `bindings` sigue siendo la única fuente de verdad que consume el input del
+// juego. React lee/escribe a través de esta API; la captura de tecla la hace
+// el componente React y llama rebindKey(). El render legacy (mobiglass) sigue
+// usando bindings directamente y se mantiene coherente al leer getBindings().
+const _bindingsListeners = [];
+function onBindingsChange(fn) {
+  _bindingsListeners.push(fn);
+  return () => {
+    const i = _bindingsListeners.indexOf(fn);
+    if (i >= 0) _bindingsListeners.splice(i, 1);
+  };
+}
+function _emitBindingsChange() {
+  const snap = getBindings();
+  _bindingsListeners.forEach(fn => { try { fn(snap); } catch (_) { } });
+}
+function getBindings() { return { ...bindings }; }
+// Reasigna `rawKey` a `action`. Devuelve "ok" | "reserved". Misma lógica que
+// startRecording pero sin DOM (normaliza, rechaza reservadas, desvincula
+// conflictos, persiste y notifica a React).
+function rebindKey(action, rawKey) {
+  const newKey = (rawKey || "").toLowerCase();
+  if (RESERVED_KEYS.has(newKey)) return "reserved";
+  for (const [k, v] of Object.entries(bindings)) {
+    if (k !== action && v === newKey) bindings[k] = null;
+  }
+  bindings[action] = newKey;
+  saveBindings();
+  _emitBindingsChange();
+  return "ok";
+}
+function resetBindings() {
+  bindings = { ...DEFAULT_BINDINGS };
+  saveBindings();
+  _emitBindingsChange();
 }
 
 function renderControlesPane(targetId = "pane-controles") {
@@ -1415,47 +1454,31 @@ function cancelSd() {
   sdCountdown = 0;
 }
 
-// ── Name input
-const nameInput = document.getElementById("nameInput");
+// ── Nombre del jugador ──────────────────────────────────────────────
+// Migrado a React (MainMenu): game.js ya no depende del DOM #nameInput.
+// El nombre vive en `playerName` + localStorage y se sincroniza vía GameAPI.
+let playerName = (localStorage.getItem("spacetactics_name") || "").trim();
 
-const savedName = localStorage.getItem("spacetactics_name");
-if (savedName) nameInput.value = savedName;
-
-let _nameSavedTimer = null;
-function applyName(showFeedback = false) {
-  const name = nameInput.value.trim() || "Pilot";
-  nameInput.value = name;
-  localStorage.setItem("spacetactics_name", name);
+function applyName(name) {
+  if (name != null) playerName = String(name).trim();
+  if (!playerName) playerName = "Pilot";
+  localStorage.setItem("spacetactics_name", playerName);
   if (ws.readyState === 1) {
-    ws.send(JSON.stringify({ type: "setName", name }));
+    ws.send(JSON.stringify({ type: "setName", name: playerName }));
   }
-  if (showFeedback) {
-    const msg = document.getElementById("nameSavedMsg");
-    if (msg) {
-      msg.classList.remove("hidden");
-      clearTimeout(_nameSavedTimer);
-      _nameSavedTimer = setTimeout(() => msg.classList.add("hidden"), 1800);
-    }
-  }
+  return playerName;
 }
 
-document.getElementById("setNameBtn").onclick = () => applyName(true);
-
-nameInput.addEventListener("keydown", e => {
-  if (e.key === "Enter") applyName(true);
-});
-
+// Valida que haya un nombre escrito (el menú React lo exige antes de COOP).
 function requireName() {
-  const name = nameInput.value.trim();
-  if (!name) {
-    nameInput.focus();
-    nameInput.classList.add("nameRequired");
-    setTimeout(() => nameInput.classList.remove("nameRequired"), 1500);
-    return false;
-  }
+  if (!playerName.trim()) return false;
   applyName();
   return true;
 }
+
+// Getters/setters para la UI React.
+function getPlayerName() { return playerName; }
+function setPlayerName(name) { return applyName(name); }
 
 document.getElementById("createRoom").onclick = () => {
   if (!requireName()) return;
@@ -1498,33 +1521,40 @@ document.getElementById("switchTeam").onclick = () => {
 const SUPPORT_URL = "https://www.paypal.com/paypalme/mdasier";
 
 const MENU_SCREENS = ["mainMenu", "lobby", "soloSetup", "controlsScreen", "room"];
+let _menuScreen = "mainMenu";
 function showMenuScreen(name) {
+  _menuScreen = name;
   MENU_SCREENS.forEach(s => {
     const el = document.getElementById(s);
     if (el) el.classList.toggle("hidden", s !== name);
   });
+  // El MainMenu vive en React (overlay en la ruta "/"). Ocultamos el contenedor
+  // legacy #menu cuando la pantalla activa es mainMenu para que su chrome (título
+  // y selector de idioma antiguos) no se vea de fondo. En el resto de pantallas
+  // (lobby/solo/room, aún legacy) #menu debe estar visible.
+  const menuEl = document.getElementById("menu");
+  if (menuEl) menuEl.style.display = (name === "mainMenu") ? "none" : "";
+  // Notifica a React la pantalla activa (para reflejarla en la ruta).
+  window.dispatchEvent(new CustomEvent("menu-screen", { detail: name }));
 }
+function getMenuScreen() { return _menuScreen; }
 
-document.getElementById("menuPlayOnline").onclick = () => {
-  if (!requireName()) return;
+// Acciones del menú principal, disparadas desde React (MainMenu.tsx).
+// COOP: exige nombre, abre el lobby legacy y pide la lista de salas.
+function menuPlayOnline() {
+  if (!requireName()) return false;
   showMenuScreen("lobby");
   ws.send(JSON.stringify({ type: "getRooms" }));
-};
-
-document.getElementById("menuSolo").onclick = () => showMenuScreen("soloSetup");
-
-document.getElementById("menuControls").onclick = () => {
-  renderControlesPane("menuControlsBody");
-  showMenuScreen("controlsScreen");
-};
-
-document.getElementById("menuSupport").onclick = () => {
-  window.open(SUPPORT_URL, "_blank", "noopener");
-};
+  return true;
+}
+function menuSolo() { showMenuScreen("soloSetup"); }
 
 document.querySelectorAll("[data-back]").forEach(btn => {
   btn.onclick = () => showMenuScreen("mainMenu");
 });
+
+// Arrancamos en el MainMenu React (ruta "/"): ocultamos el chrome legacy de #menu.
+showMenuScreen("mainMenu");
 
 // Grupos de opción (duración / tamaño) de la práctica solo
 function wireChoiceGroup(groupId) {
@@ -4490,5 +4520,14 @@ function loop() {
   requestAnimationFrame(loop);
 
 }
+
+// ── Superficie pública para la UI React ──────────────────────────────
+export {
+  // Controles / bindings
+  getBindings, rebindKey, resetBindings, onBindingsChange,
+  BINDING_LABELS, RESERVED_KEYS, DEFAULT_BINDINGS, displayKey, bindingText,
+  // Menú principal
+  getPlayerName, setPlayerName, menuPlayOnline, menuSolo, getMenuScreen, SUPPORT_URL,
+};
 
 loop();

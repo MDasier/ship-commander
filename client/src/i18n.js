@@ -391,7 +391,15 @@ function applyI18n(root = document) {
 }
 
 const _langListeners = [];
-function onLangChange(fn) { _langListeners.push(fn); }
+// Registra un listener de cambio de idioma y devuelve una función para
+// desuscribirlo (necesario para useSyncExternalStore en React).
+function onLangChange(fn) {
+  _langListeners.push(fn);
+  return () => {
+    const i = _langListeners.indexOf(fn);
+    if (i >= 0) _langListeners.splice(i, 1);
+  };
+}
 
 function setLang(l) {
   if (l !== "es" && l !== "en") return;

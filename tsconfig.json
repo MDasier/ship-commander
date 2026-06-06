@@ -15,5 +15,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["server/**/*.ts", "server/**/*.d.ts"]
+  "include": ["server/**/*.ts", "server/**/*.d.ts"],
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
 }

@@ -4,7 +4,6 @@
 <head>
   <meta charset="UTF-8">
   <title>Ship Commander</title>
-  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
@@ -20,23 +19,8 @@
       <button data-lang="en">EN</button>
     </div>
 
-    <!-- ── MENÚ PRINCIPAL ── -->
-    <div id="mainMenu">
-      <div id="nameSection">
-        <span data-i18n="menu.tag">Tag</span>
-        <input id="nameInput" type="text" maxlength="16" data-i18n-ph="menu.namePlaceholder"
-          placeholder="Escribe tu nombre..." autocomplete="off" spellcheck="false">
-        <button id="setNameBtn" data-i18n="common.save">Guardar</button>
-        <span id="nameSavedMsg" class="hidden" data-i18n="menu.saved">✓ Guardado</span>
-      </div>
-
-      <div id="mainMenuActions">
-        <button id="menuPlayOnline" class="menuBigBtn" data-i18n="menu.playOnline">COOP</button>
-        <button id="menuSolo" class="menuBigBtn" data-i18n="menu.solo">VUELA SÓLO</button>
-        <button id="menuControls" class="menuBigBtn" data-i18n="menu.controls">VER CONTROLES</button>
-        <button id="menuSupport" class="menuBigBtn support" data-i18n="menu.support">❤ APOYA EL PROYECTO</button>
-      </div>
-    </div>
+    <!-- ── MENÚ PRINCIPAL ── (migrado a React: client/src/ui/MainMenu.tsx,
+         renderizado en la ruta "/" por App.tsx) -->
 
     <!-- ── BUSCAR PARTIDAS ── -->
     <div id="lobby" class="hidden">
@@ -93,12 +77,8 @@
       <div class="soloHint" data-i18n="solo.hint">Vuela libre para practicar controles y armas. Sal con [F1] → Salir al lobby.</div>
     </div>
 
-    <!-- ── CONTROLES ── -->
-    <div id="controlsScreen" class="hidden">
-      <button class="menuBackBtn" data-back data-i18n="common.backMenu">← Menú</button>
-      <h2 data-i18n="controls.title">Controles</h2>
-      <div id="menuControlsBody"></div>
-    </div>
+    <!-- ── CONTROLES ── (migrada a React: client/src/ui/ControlsScreen.tsx,
+         abierta vía CustomEvent "open-controls" emitido por game.js) -->
 
     <div id="room" class="hidden">
       <div class="roomHeader">
@@ -297,8 +277,13 @@
   <!-- ── CANVAS ── -->
   <canvas id="c"></canvas>
 
-  <!-- Punto de entrada ES module · game.js importa i18n/particles/sounds. Vite lo empaqueta. -->
-  <script type="module" src="/game.js"></script>
+  <!-- Raíz de React. El markup del juego (arriba) se migra a componentes React
+       de forma incremental (strangler); por ahora React monta aquí su UI propia,
+       todavía vacía, mientras game.js sigue usando el markup existente. -->
+  <div id="root"></div>
+
+  <!-- Punto de entrada: React monta en #root y arranca el juego (importa game.js). -->
+  <script type="module" src="/src/main.tsx"></script>
 
 </body>
 
