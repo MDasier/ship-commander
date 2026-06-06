@@ -30,7 +30,7 @@ import { S } from "./game/state";
 import { ws } from "./game/net";
 import { canvas, getMe } from "./game/render/canvas";
 import {
-  initRender, startRenderLoop,
+  initRender, startRenderLoop, clearAsteroidCache,
   updateUI, updateTimer,
 } from "./game/render/draw";
 import { cycleTargetByRadar } from "./game/render/sensors";
@@ -304,7 +304,7 @@ function resetClientState() {
   S.stateBuffer = [];
   S.specTargetId = null; S.deadIds = new Set(); S.killFeed = []; S.chatLog = [];
   S.shakeMag = 0;
-  asteroidCache.clear();
+  clearAsteroidCache();
   cancelSd();
   hideDeadPanel();
   S.soloMode = false; S.waveMode = false; S.waveNum = 0; S.enemiesLeft = 0; S.waveBanner = null; S.teamLives = null;

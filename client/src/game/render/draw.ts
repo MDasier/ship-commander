@@ -42,6 +42,9 @@ export function initRender(deps) {
 // Arranca el bucle de render (RAF).
 export function startRenderLoop() { loop(); }
 
+// Limpia la caché de formas de asteroide (la llama game.ts al resetear la sala).
+export function clearAsteroidCache() { asteroidCache.clear(); }
+
 function applyInterpolatedState() {
   if (S.stateBuffer.length === 0) return;
 
