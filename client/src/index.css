@@ -135,8 +135,11 @@
   --animate-gs-spin: gs-spin 1s linear infinite;
 
   @keyframes gs-fade-up {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
+    /* Solo opacidad: un translateY hacia abajo desbordaba el contenedor
+       overflow-y-auto y mostraba la barra de scroll un instante al cambiar de
+       pantalla. El fade es el efecto dominante; el desplazamiento sobraba. */
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
   @keyframes gs-pulse {
     0%, 100% { opacity: 1; }
