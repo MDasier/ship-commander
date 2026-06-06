@@ -9,10 +9,10 @@ const http      = require("http");
 const fs        = require("fs");
 const path      = require("path");
 const CFG       = require("../config");
-const { clients } = require("../state");
-const { send, broadcastRoomList } = require("./broadcast");
-const { createPlayer } = require("../entities/player");
-const { removeFromRoom, roomList } = require("../rooms/rooms");
+const { clients } = require("../state.ts");
+const { send, broadcastRoomList } = require("./broadcast.ts");
+const { createPlayer } = require("../entities/player.ts");
+const { removeFromRoom, roomList } = require("../rooms/rooms.ts");
 const { handleMessage } = require("./handlers");
 
 // dist/ está dos niveles por encima de server/net/

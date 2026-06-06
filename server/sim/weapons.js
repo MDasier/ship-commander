@@ -3,7 +3,7 @@
 
 const CFG = require("../config");
 const { shipCapsule, segToSegDist, isSheltered } = require("./physics.ts");
-const { applyDamage, updateDamageLog, killPlayer } = require("../entities/player");
+const { applyDamage, updateDamageLog, killPlayer } = require("../entities/player.ts");
 
 // Aplica el efecto EMP a una nave. `ticks` = duración; `disable` = si además la "apaga".
 function applyEmp(target, ticks, disable) {

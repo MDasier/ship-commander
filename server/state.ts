@@ -6,7 +6,7 @@
 //   rooms   — { roomId → room }           salas activas
 //   clients — Map<playerId, WebSocket>    sockets conectados
 
-const rooms   = {};
-const clients = new Map();
+const rooms: Record<string, Room> = {};
+const clients: Map<string, any> = new Map();
 
 module.exports = { rooms, clients };

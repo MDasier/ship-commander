@@ -5,7 +5,7 @@
 
 const CFG = require("../config");
 const { segmentHitsAsteroid, shipCapsule, segToSegDist, isSheltered } = require("./physics.ts");
-const { applyDamage, registerCrewDamage, killPlayer } = require("../entities/player");
+const { applyDamage, registerCrewDamage, killPlayer } = require("../entities/player.ts");
 const { steerMissile } = require("./weapons");
 
 function collideAsteroids(room) {

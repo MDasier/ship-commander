@@ -3,7 +3,7 @@
 // co-op multijugador y en práctica en solitario.
 
 const CFG = require("../config");
-const { FPS } = require("../constants");
+const { FPS } = require("../constants.ts");
 const { makeBot } = require("./ai");
 
 // Oleadas escaladas: cada vez más naves/dureza hasta el jefe (Capital).

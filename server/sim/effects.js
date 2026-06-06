@@ -3,7 +3,7 @@
 // en área al pasar un enemigo. Las bengalas decaen.
 
 const CFG = require("../config");
-const { applyDamage, registerCrewDamage, killPlayer } = require("../entities/player");
+const { applyDamage, registerCrewDamage, killPlayer } = require("../entities/player.ts");
 
 function stepEffects(room) {
   // ── Beams (rayo de la Capital): solo efecto visual, el daño ya se aplicó al disparar

@@ -2,7 +2,7 @@
 
 const CFG = require("../config");
 
-function spawnSafePos(team, room) {
+function spawnSafePos(team: Team | null, room: Room): Vec2 {
   const W = room.worldW;
   const H = room.worldH;
 
@@ -42,7 +42,7 @@ function spawnSafePos(team, room) {
   };
 }
 
-function spawnPos(team, room) {
+function spawnPos(team: Team | null, room: Room): Vec2 {
   const W = room.worldW;
   const H = room.worldH;
 
@@ -54,11 +54,11 @@ function spawnPos(team, room) {
   };
 }
 
-function createAsteroids(count, W, H) {
-  const arr = [];
+function createAsteroids(count: number, W: number, H: number): Asteroid[] {
+  const arr: Asteroid[] = [];
   for (let i = 0; i < count; i++) {
     const roll = Math.random();
-    const z = roll < 0.5 ? 0 : roll < 0.75 ? 1 : -1;
+    const z: -1 | 0 | 1 = roll < 0.5 ? 0 : roll < 0.75 ? 1 : -1;
     arr.push({
       x: Math.random() * W,
       y: Math.random() * H,

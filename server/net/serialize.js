@@ -2,7 +2,7 @@
 // El contenido de este objeto es parte del protocolo cliente↔servidor: cualquier
 // cambio aquí debe coordinarse con el receptor en client/game.js.
 
-const { FPS } = require("../constants");
+const { FPS } = require("../constants.ts");
 const { WAVES } = require("../ai/waves");
 
 function buildState(room) {

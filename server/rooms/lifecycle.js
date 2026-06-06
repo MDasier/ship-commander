@@ -2,11 +2,11 @@
 // validez de la partida, modo oleadas) y reinicio manteniendo a los jugadores.
 
 const CFG = require("../config");
-const { FPS } = require("../constants");
-const { applyShipStats } = require("../entities/player");
-const { spawnPos } = require("../entities/spawn");
+const { FPS } = require("../constants.ts");
+const { applyShipStats } = require("../entities/player.ts");
+const { spawnPos } = require("../entities/spawn.ts");
 const { setWaveBanner, TEAM_LIVES } = require("../ai/waves");
-const { broadcastRoom } = require("../net/broadcast");
+const { broadcastRoom } = require("../net/broadcast.ts");
 
 function startGame(room) {
   room.status = "playing";

@@ -4,13 +4,13 @@
 // ocurre en tiempo de llamada, no de carga.
 
 const crypto = require("crypto");
-const { WORLD_PRESETS } = require("../constants");
-const { rooms } = require("../state");
-const { createAsteroids } = require("../entities/spawn");
-const broadcast = require("../net/broadcast");
+const { WORLD_PRESETS } = require("../constants.ts");
+const { rooms } = require("../state.ts") as { rooms: Record<string, Room> };
+const { createAsteroids } = require("../entities/spawn.ts");
+const broadcast = require("../net/broadcast.ts");
 
 // Desvincula a un artillero de su nave, liberando la plaza en el piloto.
-function detachGunner(room, gunner) {
+function detachGunner(room: Room, gunner: Player): void {
   if (!gunner || !gunner.pilotingFor) return;
   const pilot = room.players[gunner.pilotingFor];
   if (pilot) {
@@ -27,10 +27,10 @@ function detachGunner(room, gunner) {
 
 // Libera todas las plazas de una nave y desvincula a su tripulación
 // (al destruirse la nave o al salir/desconectarse el piloto).
-function clearCrewSeats(room, pilot) {
+function clearCrewSeats(room: Room, pilot: Player): void {
   const crewIds = pilot.gunnerIds ? pilot.gunnerIds.filter(Boolean) : (pilot.gunnerId ? [pilot.gunnerId] : []);
   for (const gid of crewIds) {
-    const g = room.players[gid];
+    const g = room.players[gid as string];
     if (g) { g.pilotingFor = null; g.turretIndex = undefined; }
   }
   if (pilot.gunnerIds) pilot.gunnerIds = [null, null, null];
@@ -38,7 +38,7 @@ function clearCrewSeats(room, pilot) {
   if (pilot.turretAngles) pilot.turretAngles = {};
 }
 
-function createRoom(ownerId, ownerName) {
+function createRoom(ownerId: string, ownerName: string): Room {
   const id     = crypto.randomUUID();
   const preset = WORLD_PRESETS.medium;
   const W = preset.w, H = preset.h;
@@ -67,13 +67,13 @@ function createRoom(ownerId, ownerName) {
   return rooms[id];
 }
 
-function joinRoom(player, room) {
+function joinRoom(player: Player, room: Room): void {
   player.roomId = room.id;
   room.players[player.id] = player;
   if (room.coopMode) player.team = "green";   // co-op: todos en el mismo equipo
 }
 
-function removeFromRoom(player) {
+function removeFromRoom(player: Player): void {
   if (!player.roomId) return;
   const room = rooms[player.roomId];
   if (!room) return;
@@ -92,7 +92,7 @@ function removeFromRoom(player) {
   }
 }
 
-function roomList() {
+function roomList(): any[] {
   return Object.values(rooms).filter(r => !r.solo).map(r => ({
     id:               r.id,
     name:             r.name || "Nueva sala",

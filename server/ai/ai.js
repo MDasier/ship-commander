@@ -4,8 +4,8 @@
 
 const crypto = require("crypto");
 const CFG = require("../config");
-const { BOT_NAMES } = require("../constants");
-const { createPlayer, applyShipStats } = require("../entities/player");
+const { BOT_NAMES } = require("../constants.ts");
+const { createPlayer, applyShipStats } = require("../entities/player.ts");
 const { fireCapitalBeam } = require("../sim/weapons");
 
 // Posición de aparición de un bot: dentro del mundo y lejos de los humanos vivos.

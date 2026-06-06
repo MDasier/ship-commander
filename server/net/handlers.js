@@ -3,15 +3,15 @@
 // El ciclo de conexión (alta/baja del socket) vive en wsServer.js.
 
 const CFG = require("../config");
-const { WORLD_PRESETS, MAX_PLAYERS, FPS } = require("../constants");
-const { rooms } = require("../state");
-const { send, broadcastRoom, broadcastRoomList } = require("./broadcast");
+const { WORLD_PRESETS, MAX_PLAYERS, FPS } = require("../constants.ts");
+const { rooms } = require("../state.ts");
+const { send, broadcastRoom, broadcastRoomList } = require("./broadcast.ts");
 const {
   createRoom, joinRoom, removeFromRoom, roomList, detachGunner,
-} = require("../rooms/rooms");
+} = require("../rooms/rooms.ts");
 const { startGame, restartRoom } = require("../rooms/lifecycle");
-const { applyShipStats, killPlayer } = require("../entities/player");
-const { spawnPos, spawnSafePos, createAsteroids } = require("../entities/spawn");
+const { applyShipStats, killPlayer } = require("../entities/player.ts");
+const { spawnPos, spawnSafePos, createAsteroids } = require("../entities/spawn.ts");
 const { fireEmpPulse, dropMine, fireCapitalBeam } = require("../sim/weapons");
 const { setWaveBanner, TEAM_LIVES } = require("../ai/waves");
 

@@ -3,11 +3,11 @@
 // liberación de plazas).
 
 const CFG = require("../config");
-const { FPS } = require("../constants");
-const { broadcastRoom } = require("../net/broadcast");
-const { clearCrewSeats } = require("../rooms/rooms");
+const { FPS } = require("../constants.ts");
+const { broadcastRoom } = require("../net/broadcast.ts");
+const { clearCrewSeats } = require("../rooms/rooms.ts");
 
-function createPlayer(id) {
+function createPlayer(id: string): Player {
   return {
     id,
     roomId: null,
@@ -46,7 +46,7 @@ function createPlayer(id) {
   };
 }
 
-function applyShipStats(p) {
+function applyShipStats(p: Player): void {
   const ship = CFG.SHIP_TYPES[p.shipType] || CFG.SHIP_TYPES.fighter;
   p.maxHp               = ship.maxHp;
   p.hp                  = ship.maxHp;
@@ -93,11 +93,11 @@ function applyShipStats(p) {
 
 // Aplica daño al escudo primero; el excedente va al HP.
 // hitAngle: ángulo (rad) desde la posición del objetivo hacia el origen del impacto (coord mundo).
-function applyDamage(room, target, dmg, attacker, hitAngle = null) {
+function applyDamage(room: Room, target: Player, dmg: number, attacker: Player | null, hitAngle: number | null = null): number {
   let dealt = 0;
-  if (target.shield > 0 && dmg > 0) {
-    const absorbed = Math.min(target.shield, dmg);
-    target.shield  = Math.max(0, target.shield - absorbed);
+  if ((target.shield ?? 0) > 0 && dmg > 0) {
+    const absorbed = Math.min(target.shield as number, dmg);
+    target.shield  = Math.max(0, (target.shield as number) - absorbed);
     dmg            -= absorbed;
     dealt          += absorbed;
     target.shieldFlash    = 12;
@@ -122,7 +122,7 @@ function applyDamage(room, target, dmg, attacker, hitAngle = null) {
   return dealt;
 }
 
-function updateDamageLog(victim, attackerId) {
+function updateDamageLog(victim: Player, attackerId: string): void {
   const now = Date.now();
   victim.recentDamageFrom = (victim.recentDamageFrom || []).filter(e => now - e.time < 10000);
   const existing = victim.recentDamageFrom.find(e => e.attackerId === attackerId);
@@ -130,7 +130,7 @@ function updateDamageLog(victim, attackerId) {
   else victim.recentDamageFrom.push({ attackerId, time: now });
 }
 
-function registerCrewDamage(victim, attacker, room) {
+function registerCrewDamage(victim: Player, attacker: Player, room: Room): void {
   updateDamageLog(victim, attacker.id);
 
   if (attacker.pilotingFor != null) {
@@ -147,11 +147,11 @@ function registerCrewDamage(victim, attacker, room) {
   if (attacker.gunnerIds) {
     attacker.gunnerIds
       .filter(Boolean)
-      .forEach(id => updateDamageLog(victim, id));
+      .forEach(id => updateDamageLog(victim, id as string));
   }
 }
 
-function serverChat(room, text, team = null, name = "Enemigo") {
+function serverChat(room: Room, text: string, team: Team | null = null, name: string = "Enemigo"): void {
   broadcastRoom(room, {
     type: "chat",
     name,
@@ -161,7 +161,7 @@ function serverChat(room, text, team = null, name = "Enemigo") {
   });
 }
 
-function killPlayer(p, killer, weapon, room) {
+function killPlayer(p: Player, killer: Player | null, weapon: string, room: Room): void {
   const now = Date.now();
 
   // ── Assists
@@ -241,7 +241,7 @@ function killPlayer(p, killer, weapon, room) {
     : (p.gunnerId ? [p.gunnerId] : []);
 
   for (const gid of crewIds) {
-    const gunner = room.players[gid];
+    const gunner = room.players[gid as string];
     if (gunner && !gunner.dead) {
       gunner.hp = 0;
       gunner.dead = true;
@@ -255,7 +255,7 @@ function killPlayer(p, killer, weapon, room) {
   clearCrewSeats(room, p);
 }
 
-function pushKill(room, killer, victim, weapon) {
+function pushKill(room: Room, killer: Player | null, victim: Player, weapon: string): void {
   room.killFeed.unshift({
     killerName: killer ? killer.name : null,
     killerTeam: killer ? killer.team : null,
