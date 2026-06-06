@@ -97,6 +97,9 @@ export default function App() {
     window.addEventListener("chat", onChat as EventListener);
     window.addEventListener("dead", onDead as EventListener);
     window.addEventListener("boot", onBoot as EventListener);
+    // Por si el "open" del WS (hideBoot) ocurrió entre el render y este efecto:
+    // re-chequeamos y ocultamos el overlay de arranque si ya estamos conectados.
+    if (isEverConnected()) setBoot(null);
     return () => {
       window.removeEventListener("gameover", onGameOver as EventListener);
       window.removeEventListener("chat", onChat as EventListener);
