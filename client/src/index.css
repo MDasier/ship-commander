@@ -1,0 +1,340 @@
+/* Tailwind CSS v4 SIN Preflight: importamos solo las capas theme + utilities y
+   aportamos nuestra propia base (abajo). Ya no hay CSS legacy (styles.css se
+   eliminó); todo el estilo es Tailwind (tokens @theme + utilidades + clases .gs-*).
+   Doc oficial: https://tailwindcss.com/docs/preflight */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* ============================================================
+   Base (sustituye al antiguo styles.css). Look del handoff:
+   fondo void, Nunito Sans, border-box global (como game.css del handoff).
+   ============================================================ */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+  /* Reset de botón (preflight está desactivado): sin apariencia nativa
+     (fondo claro + borde biselado). Las utilidades/clases .gs-* aportan el
+     estilo real; border-style queda solid para que las utilidades de borde
+     se rendericen bien. */
+  button {
+    appearance: none;
+    background-color: transparent;
+    border: 0 solid transparent;
+    color: inherit;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--color-gs-void);
+    color: #fff;
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  #root {
+    height: 100%;
+  }
+  /* Canvas del juego: ocupa la ventana, por detrás de los overlays React. */
+  #c {
+    position: fixed;
+    inset: 0;
+  }
+}
+
+/* ============================================================
+   Fuentes del design system (GuildSwarm × Ship Commander).
+   Variables self-hosted (Nunito Sans + Roboto). Las TTF viven
+   en client/src/fonts/ y Vite las versiona en el build.
+   ============================================================ */
+@font-face {
+  font-family: "Nunito Sans";
+  src: url("./fonts/NunitoSans-VariableFont_YTLC_opsz_wdth_wght.ttf") format("truetype-variations");
+  font-weight: 200 1000;
+  font-stretch: 75% 125%;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Nunito Sans";
+  src: url("./fonts/NunitoSans-Italic-VariableFont_YTLC_opsz_wdth_wght.ttf") format("truetype-variations");
+  font-weight: 200 1000;
+  font-stretch: 75% 125%;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./fonts/Roboto-VariableFont_wdth_wght.ttf") format("truetype-variations");
+  font-weight: 100 900;
+  font-stretch: 75% 125%;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("./fonts/Roboto-Italic-VariableFont_wdth_wght.ttf") format("truetype-variations");
+  font-weight: 100 900;
+  font-stretch: 75% 125%;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ============================================================
+   Design tokens → @theme (Tailwind v4). Cada variable genera
+   utilidades: --color-gs-void → bg-gs-void/text-gs-void/…,
+   --font-display → font-display, --shadow-gs-glow → shadow-gs-glow,
+   --radius-gs → rounded-gs, --ease-gs → ease-gs, --animate-* → animate-*.
+   Doc: https://tailwindcss.com/docs/theme
+   ============================================================ */
+@theme {
+  /* ── Color: void / cockpit ── */
+  --color-gs-void: #171227;
+  --color-gs-void-soft: #201e2f;
+  --color-gs-ink: #232323;
+  --color-gs-ink-2: #020202;
+
+  /* ── Color: hive / signal gold ── */
+  --color-gs-gold: #908d48;
+  --color-gs-gold-deep: #89842d;
+  --color-gs-gold-bright: #ffc619;
+  --color-gs-gold-soft: #ffe75c;
+
+  /* ── Color: status ramp ── */
+  --color-gs-green: #29cc7a;
+  --color-gs-green-deep: #749e42;
+  --color-gs-red: #9b3935;
+  --color-gs-red-bright: #ff0000;
+  --color-gs-purple: #9747ff;
+  --color-gs-discord: #5865f2;
+  --color-gs-blue: #3543dd;
+  --color-gs-blue-soft: #66bcff;
+  --color-gs-pink: #ff78b9;
+
+  /* ── Color: neutrals ── */
+  --color-gs-rule: #d9d9d9;
+  --color-gs-grey-2: #b9bbbe;
+  --color-gs-grey-3: #74767d;
+
+  /* ── Type families ── */
+  --font-display: "Nunito Sans", "Helvetica Neue", system-ui, sans-serif;
+  --font-body: "Nunito Sans", "Helvetica Neue", system-ui, sans-serif;
+  --font-mark: "Roboto", "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "SF Mono", monospace;
+
+  /* ── Radii ── */
+  --radius-gs: 7px;
+  --radius-gs-lg: 10px;
+
+  /* ── Shadows ── */
+  --shadow-gs-card: 0 4px 4px rgba(0, 0, 0, 0.25);
+  --shadow-gs-glow: 0 0 16px var(--color-gs-gold);
+  --shadow-gs-glow-strong: 0 0 24px var(--color-gs-gold-bright);
+
+  /* ── Motion ── */
+  --ease-gs: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* ── Animations (keyframes inline para --animate-*) ── */
+  --animate-gs-fade: gs-fade-up 0.36s var(--ease-gs);
+  --animate-gs-pulse: gs-pulse 1.6s ease-in-out infinite;
+  --animate-gs-spin: gs-spin 1s linear infinite;
+
+  @keyframes gs-fade-up {
+    /* Solo opacidad: un translateY hacia abajo desbordaba el contenedor
+       overflow-y-auto y mostraba la barra de scroll un instante al cambiar de
+       pantalla. El fade es el efecto dominante; el desplazamiento sobraba. */
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes gs-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+  @keyframes gs-spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes gs-drift {
+    from { transform: translateY(0); }
+    to { transform: translateY(-400px); }
+  }
+  @keyframes gs-saved-pop {
+    0% { opacity: 0; transform: scale(0.8); }
+    20% { opacity: 1; transform: scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0.85; }
+  }
+}
+
+/* ============================================================
+   Primitivas reutilizables del design system, vía @apply sobre
+   los tokens de arriba. Las pantallas componen estas clases con
+   utilidades de Tailwind para el layout. (Solo lo que se repite.)
+   ============================================================ */
+@layer components {
+  /* ── Botones ── */
+  .gs-btn {
+    @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2.5
+      rounded-gs border border-gs-rule/20 bg-gs-ink/55 px-5 py-3 font-body
+      font-bold tracking-wide text-gs-rule transition-all duration-200 ease-gs;
+  }
+  .gs-btn:hover {
+    @apply border-gs-gold bg-gs-ink/75 text-white shadow-gs-glow;
+  }
+  .gs-btn:active { @apply scale-[0.985]; }
+  .gs-btn:focus-visible { @apply outline-2 outline-offset-2 outline-gs-gold-bright; }
+  .gs-btn:disabled {
+    @apply cursor-not-allowed border-gs-rule/20 bg-gs-ink/55 text-gs-rule opacity-40 shadow-none;
+  }
+
+  .gs-btn-primary {
+    @apply border-gs-gold-bright bg-gs-gold-bright font-extrabold text-gs-void;
+  }
+  .gs-btn-primary:hover {
+    @apply border-gs-gold-soft bg-gs-gold-soft text-gs-void shadow-gs-glow-strong;
+  }
+  .gs-btn-ghost { @apply border-gs-rule/20 bg-transparent; }
+  .gs-btn-danger { @apply border-gs-red/50 text-gs-red; }
+  .gs-btn-danger:hover {
+    @apply border-gs-red bg-gs-red/10 text-[#ff6a64] shadow-[0_0_16px_rgba(155,57,53,0.5)];
+  }
+
+  /* ── Acción grande del menú (fila icono + título + meta) ──
+     Gradiente y borde-izq se escriben crudos sobre los tokens (más robusto
+     que las utilidades por-lado/gradiente de v4); el resto vía @apply. */
+  .gs-action {
+    @apply flex w-full cursor-pointer items-center gap-4 rounded-gs border border-gs-rule/15
+      px-7 py-6 text-left font-display text-[22px] font-extrabold uppercase tracking-[0.18em]
+      text-gs-rule transition-all duration-200 ease-gs;
+    background: linear-gradient(180deg, rgba(35, 35, 35, 0.55), rgba(35, 35, 35, 0.35));
+    border-left: 3px solid rgba(144, 141, 72, 0.4);
+  }
+  .gs-action:hover {
+    @apply translate-x-1 border-gs-gold text-white shadow-gs-glow;
+    border-left-color: var(--color-gs-gold-bright);
+  }
+  .gs-action:focus-visible { @apply outline-2 outline-offset-[3px] outline-gs-gold-bright; }
+
+  /* Variante "apoyo" (acento rosa en el borde-izq) */
+  .gs-action-support { border-left-color: var(--color-gs-pink); }
+  .gs-action-support:hover {
+    @apply border-gs-pink shadow-[0_0_16px_rgba(255,120,185,0.4)];
+    border-left-color: var(--color-gs-pink);
+  }
+
+  /* ── Panel / tarjeta ── */
+  .gs-panel {
+    @apply rounded-gs border border-gs-rule/12 bg-gs-ink/60 shadow-gs-card;
+  }
+
+  /* ── Input ── */
+  .gs-input {
+    @apply min-h-11 w-full rounded-gs border border-gs-rule/20 bg-black/45 px-3.5 py-3
+      font-body text-[15px] font-semibold text-white transition-all duration-200 ease-gs;
+  }
+  .gs-input::placeholder { @apply text-gs-grey-3; }
+  .gs-input:focus {
+    @apply border-gs-gold outline-none;
+    box-shadow: 0 0 0 1px var(--color-gs-gold), var(--shadow-gs-glow);
+  }
+
+  /* ── Tecla (keycap mono) de controles ── */
+  .gs-key {
+    @apply inline-block min-w-[54px] rounded-[5px] border border-gs-gold-bright/35
+      bg-gs-gold-bright/8 px-3 py-1.5 text-center font-mono text-[13px] font-semibold
+      text-gs-gold-bright;
+  }
+
+  /* ── Eyebrow / etiqueta de sección ── */
+  .gs-eyebrow {
+    @apply font-body text-[12px] font-extrabold uppercase tracking-[0.34em] text-gs-gold;
+  }
+
+  /* ── Opción segmentada (modo / duración / tamaño) ── */
+  .gs-seg {
+    @apply min-h-11 cursor-pointer rounded-gs border border-gs-rule/15 bg-black/35 px-4 py-3
+      text-center font-body font-bold tracking-wide text-gs-grey-2 transition-all duration-200 ease-gs;
+  }
+  .gs-seg:hover:not(:disabled) { @apply border-gs-gold text-white; }
+  .gs-seg:focus-visible { @apply outline-2 outline-offset-2 outline-gs-gold-bright; }
+  .gs-seg.is-active {
+    @apply border-gs-gold-bright bg-gs-gold-bright/8 text-gs-gold-bright shadow-[0_0_14px_rgba(255,198,25,0.25)];
+  }
+  .gs-seg:disabled { @apply cursor-not-allowed opacity-35; }
+  .gs-seg-sub { @apply mt-1 block text-[11px] font-medium text-gs-grey-3; }
+
+  /* ── Barra de stat (tarjetas de nave / HUD) ── */
+  .gs-statbar { @apply h-[7px] overflow-hidden rounded-[3px] bg-white/10; }
+  .gs-statbar > span {
+    @apply block h-full rounded-[3px];
+    background: linear-gradient(90deg, var(--color-gs-gold-deep), var(--color-gs-gold-bright));
+    transition: width 0.36s var(--ease-gs);
+  }
+  .gs-statbar.is-shd > span { background: #aaddff; }
+  .gs-statbar.is-hp > span { background: linear-gradient(90deg, var(--color-gs-green-deep), var(--color-gs-green)); }
+
+  /* ── Telemetría mono (tabular) ── */
+  .gs-hud-mono { @apply font-mono tabular-nums; }
+}
+
+/* ============================================================
+   Fondo cockpit (wash dorado + starfield a la deriva) para las
+   pantallas React de menú. Decorativo → CSS plano.
+   ============================================================ */
+.gs-bg-wash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(144, 141, 72, 0.18) 0%, rgba(144, 141, 72, 0) 55%),
+    radial-gradient(100% 60% at 50% 120%, rgba(23, 18, 39, 0.9) 0%, rgba(23, 18, 39, 0) 60%);
+}
+.gs-stars {
+  position: fixed;
+  inset: -10%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.55;
+}
+.gs-stars::before,
+.gs-stars::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat;
+}
+.gs-stars::before {
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.7) 50%, transparent),
+    radial-gradient(1px 1px at 70% 60%, rgba(255, 255, 255, 0.5) 50%, transparent),
+    radial-gradient(1.5px 1.5px at 40% 80%, rgba(255, 255, 255, 0.6) 50%, transparent),
+    radial-gradient(1px 1px at 85% 20%, rgba(255, 255, 255, 0.5) 50%, transparent),
+    radial-gradient(1px 1px at 12% 75%, rgba(255, 231, 92, 0.5) 50%, transparent);
+  background-size: 400px 400px;
+  animation: gs-drift 120s linear infinite;
+}
+.gs-stars::after {
+  background-image:
+    radial-gradient(1px 1px at 55% 15%, rgba(255, 255, 255, 0.4) 50%, transparent),
+    radial-gradient(1px 1px at 30% 50%, rgba(255, 255, 255, 0.35) 50%, transparent),
+    radial-gradient(1px 1px at 90% 85%, rgba(255, 255, 255, 0.4) 50%, transparent);
+  background-size: 260px 260px;
+  animation: gs-drift 200s linear infinite reverse;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gs-stars::before,
+  .gs-stars::after { animation: none; }
+}
+
+/* Scrollbar con acento oro (paneles desplazables). */
+.gs-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.gs-scroll::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
+.gs-scroll::-webkit-scrollbar-thumb { background: rgba(144, 141, 72, 0.5); border-radius: 6px; }
+.gs-scroll::-webkit-scrollbar-thumb:hover { background: var(--color-gs-gold); }

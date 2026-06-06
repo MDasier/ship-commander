@@ -4,43 +4,115 @@
 <meta charset="UTF-8">
 <title>Ship Commander · Admin</title>
 <style>
+/* Estética GuildSwarm × Ship Commander (handoff): tokens replicados inline
+   porque admin.html es autocontenido (sin importar index.css ni assets). */
+:root{
+  --void:#171227; --void-soft:#201e2f;
+  --gold:#908d48; --gold-deep:#89842d; --gold-bright:#ffc619; --gold-soft:#ffe75c;
+  --green:#29cc7a; --red:#9b3935; --red-bright:#ff5a55; --blue-soft:#66bcff;
+  --rule:#d9d9d9; --grey-2:#b9bbbe; --grey-3:#74767d;
+  --radius:7px;
+  --ease:cubic-bezier(0.2,0.7,0.2,1);
+  --panel-bg:rgba(35,35,35,.6); --panel-border:rgba(217,217,217,.12);
+  --shadow-card:0 4px 4px rgba(0,0,0,.25);
+  --font-body:"Nunito Sans","Helvetica Neue",system-ui,sans-serif;
+  --font-mono:ui-monospace,"JetBrains Mono","SF Mono",monospace;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#080c18;color:#c8d8f0;font-family:'Courier New',monospace;padding:28px 36px;max-width:1100px}
-h1{color:#00d4ff;font-size:1.25em;letter-spacing:3px;margin-bottom:18px;border-bottom:1px solid #00d4ff33;padding-bottom:10px}
-h1 span{color:#334;font-size:.7em;margin-left:8px}
-.tabbar{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
-.tabbar button{background:#0d1526;border:1px solid #1e2d4a;color:#7a8cb0;padding:8px 18px;font-size:.8em}
-.tabbar button.active{background:#00d4ff15;border-color:#00d4ff;color:#00d4ff}
+body{
+  background:
+    radial-gradient(1200px 620px at 50% -10%, rgba(255,198,25,.06), transparent 60%),
+    var(--void);
+  color:#fff; font-family:var(--font-body);
+  padding:34px clamp(20px,4vw,56px) 0; max-width:1300px; margin:0 auto;
+  min-height:100vh; -webkit-font-smoothing:antialiased;
+}
+header{margin-bottom:24px}
+h1{font-weight:900;font-size:1.7rem;letter-spacing:.04em;color:var(--gold-bright);
+  text-shadow:0 0 24px rgba(255,198,25,.4),0 0 2px rgba(255,198,25,.6)}
+.sub{margin-top:6px;color:var(--grey-3);font-size:.72rem;font-weight:800;
+  text-transform:uppercase;letter-spacing:.26em}
+
+/* Tabs */
+.tabbar{display:flex;gap:10px;margin-bottom:26px;flex-wrap:wrap}
+.tabbar button{background:rgba(0,0,0,.4);border:1px solid rgba(217,217,217,.15);
+  color:var(--grey-2);padding:10px 22px;border-radius:var(--radius);
+  font-weight:700;letter-spacing:.04em;transition:.2s var(--ease)}
+.tabbar button:hover{border-color:var(--gold);color:#fff}
+.tabbar button.active{border-color:var(--gold-bright);background:rgba(255,198,25,.08);
+  color:var(--gold-bright);box-shadow:0 0 14px rgba(255,198,25,.2)}
+
 .tab{display:none}
 .tab.active{display:block}
-.group{margin-bottom:24px}
-.group h2{color:#00d4ffaa;font-size:.72em;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid #1a2540}
-.field{display:flex;align-items:center;gap:10px;margin-bottom:6px}
-.field label{width:230px;font-size:.8em;color:#7a8cb0}
-.field input[type=number],.field input[type=text]{background:#0d1526;border:1px solid #1e2d4a;color:#c8d8f0;padding:4px 10px;width:120px;font-family:inherit;font-size:.85em;border-radius:2px}
-.field input[type=text].wide{width:340px}
-.field input:focus{outline:none;border-color:#00d4ff55;background:#0f1a30}
-.field .unit{color:#3a4a6a;font-size:.72em;width:140px}
-.shipcard{border:1px solid #1a2540;border-radius:4px;padding:14px 18px;margin-bottom:18px;background:#0a1020}
-.shipcard h3{color:#00ffaa;font-size:.9em;letter-spacing:2px;margin-bottom:10px}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:0 36px}
-.wave{display:flex;align-items:center;gap:12px;margin-bottom:10px;border:1px solid #1a2540;padding:8px 12px;border-radius:3px;background:#0a1020}
-.wave .wlabel{color:#00d4ffaa;width:90px;font-size:.8em}
-.wave input[type=text]{flex:1;background:#0d1526;border:1px solid #1e2d4a;color:#c8d8f0;padding:5px 10px;font-family:inherit;font-size:.85em}
-.wave label.boss{font-size:.78em;color:#ffaa44;display:flex;align-items:center;gap:5px}
-.wave button.del{background:transparent;border:1px solid #553;color:#a55;padding:4px 10px;font-size:.78em}
-.note{color:#566;font-size:.74em;margin:6px 0 12px}
-.actions{position:sticky;bottom:0;background:#080c18ee;padding:16px 0;margin-top:20px;display:flex;gap:12px;align-items:center;border-top:1px solid #1a2540}
-button{background:#00d4ff15;border:1px solid #00d4ff55;color:#00d4ff;padding:9px 24px;cursor:pointer;font-family:inherit;font-size:.85em;letter-spacing:1px;border-radius:2px;transition:.15s}
-button:hover{background:#00d4ff30;border-color:#00d4ff}
-button.secondary{border-color:#334;color:#778;background:transparent}
-button.secondary:hover{color:#c8d8f0;border-color:#556}
-#status{font-size:.82em;height:1.2em;transition:.3s}
-.ok{color:#00ff88}.err{color:#ff3355}
+/* General: dos columnas de parámetros (cada grupo se mantiene íntegro) */
+#tabGeneral.active{columns:2;column-gap:28px}
+@media(max-width:900px){#tabGeneral.active{columns:1}}
+
+/* Panel / grupo */
+.group{background:var(--panel-bg);border:1px solid var(--panel-border);
+  border-radius:var(--radius);box-shadow:var(--shadow-card);
+  padding:18px 20px;margin-bottom:24px;break-inside:avoid}
+.group h2{color:var(--gold);font-size:.72rem;font-weight:800;letter-spacing:.28em;
+  text-transform:uppercase;margin-bottom:14px;padding-bottom:10px;
+  border-bottom:1px solid rgba(217,217,217,.1)}
+
+/* Campo */
+.field{display:flex;align-items:center;gap:12px;margin-bottom:9px}
+.field label{flex:1;min-width:0;font-size:.84rem;color:var(--grey-2)}
+.field input[type=number],.field input[type=text]{background:rgba(0,0,0,.45);
+  border:1px solid rgba(217,217,217,.2);color:#fff;padding:7px 10px;width:110px;
+  font:inherit;font-size:.85rem;border-radius:var(--radius);transition:.2s var(--ease)}
+.field input[type=text].wide{flex:2;width:auto;min-width:0}
+.field input:focus{outline:none;border-color:var(--gold-bright);
+  box-shadow:0 0 0 1px var(--gold-bright)}
+.field input[type=checkbox]{width:18px;height:18px;accent-color:var(--gold-bright);cursor:pointer}
+.field .unit{color:var(--grey-3);font-size:.72rem;width:120px;flex:none}
+
+/* Naves */
+.shipcard{background:var(--panel-bg);border:1px solid var(--panel-border);
+  border-radius:var(--radius);box-shadow:var(--shadow-card);padding:18px 22px;margin-bottom:18px}
+.shipcard h3{color:var(--gold-bright);font-size:1rem;font-weight:800;letter-spacing:.04em;margin-bottom:14px}
+.shipcard h3 span{color:var(--grey-3);font-weight:600}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}
+@media(max-width:900px){.cols{grid-template-columns:1fr}}
+
+/* Oleadas */
+.wave{display:flex;align-items:center;gap:14px;margin-bottom:10px;
+  background:var(--panel-bg);border:1px solid var(--panel-border);
+  border-radius:var(--radius);padding:10px 14px}
+.wave .wlabel{color:var(--gold);width:96px;font-size:.78rem;font-weight:700;letter-spacing:.1em}
+.wave input[type=text]{flex:1;background:rgba(0,0,0,.45);border:1px solid rgba(217,217,217,.2);
+  color:#fff;padding:7px 10px;font:inherit;font-size:.85rem;border-radius:var(--radius);transition:.2s var(--ease)}
+.wave input:focus{outline:none;border-color:var(--gold-bright);box-shadow:0 0 0 1px var(--gold-bright)}
+.wave label.boss{font-size:.8rem;color:var(--gold-soft);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.wave label.boss input{accent-color:var(--gold-soft);width:16px;height:16px}
+.wave button.del{background:transparent;border:1px solid rgba(155,57,53,.5);color:var(--red-bright);
+  padding:6px 12px;border-radius:var(--radius)}
+.wave button.del:hover{background:rgba(155,57,53,.12);border-color:var(--red)}
+
+.note{color:var(--grey-3);font-size:.78rem;line-height:1.5;margin:0 0 16px}
+
+/* Acciones (barra fija inferior) */
+.actions{position:sticky;bottom:0;display:flex;gap:14px;align-items:center;
+  padding:18px 0;margin-top:8px;border-top:1px solid rgba(217,217,217,.1);
+  background:linear-gradient(0deg,var(--void) 72%,transparent)}
+
+button{font:inherit;cursor:pointer;border-radius:var(--radius);transition:.2s var(--ease)}
+#save{background:var(--gold-bright);border:1px solid var(--gold-bright);color:var(--void);
+  font-weight:800;letter-spacing:.04em;padding:11px 28px}
+#save:hover{background:var(--gold-soft);border-color:var(--gold-soft);box-shadow:0 0 24px var(--gold-bright)}
+button.secondary{background:transparent;border:1px solid rgba(217,217,217,.2);color:var(--grey-2);padding:11px 22px}
+button.secondary:hover{color:#fff;border-color:var(--gold)}
+
+#status{font-size:.84rem;height:1.2em;font-weight:700}
+.ok{color:var(--green)}.err{color:var(--red-bright)}
 </style>
 </head>
 <body>
-<h1>◈ SHIP COMMANDER <span>— PANEL ADMIN · TODAS LAS VARIABLES</span></h1>
+<header>
+  <h1>Ship Commander</h1>
+  <div class="sub">Panel Admin · todas las variables</div>
+</header>
 
 <div class="tabbar" id="tabbar"></div>
 <div id="tabGeneral" class="tab active"></div>
@@ -48,7 +120,7 @@ button.secondary:hover{color:#c8d8f0;border-color:#556}
 <div id="tabWaves"   class="tab"></div>
 
 <div class="actions">
-  <button id="save">GUARDAR TODO</button>
+  <button id="save">Guardar todo</button>
   <button class="secondary" id="reset">Resetear defaults</button>
   <div id="status"></div>
 </div>

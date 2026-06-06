@@ -1,4 +1,5 @@
 node_modules/
 .idea/
 dist/
-BUGS.md
+/Ship Commander-handoff.zip
+/.design-handoff/

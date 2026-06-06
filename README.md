@@ -89,7 +89,7 @@ La **firma radar** determina a qué distancia los enemigos pueden verte en el ra
 - **En partida**, un jugador muerto puede elegir **reaparecer directamente en una torreta** aliada libre desde el panel de muerte.
 - Al reaparecer (tecla `R`) sin torreta reservada, el artillero es eyectado como caza independiente.
 
-Cada nave tiene una geometría canvas distinta definida en `client/game.js` (`SHIP_SHAPES`): aguja (Interceptor), delta (L.Fighter), ala volante (Bomber), casco ancho (Gunship), silueta alargada tipo Idris (Capital) y triángulo ancho y corto con el pico en la proa (Disruptor).
+Cada nave tiene una geometría canvas distinta definida en `client/src/game.js` (`SHIP_SHAPES`): aguja (Interceptor), delta (L.Fighter), ala volante (Bomber), casco ancho (Gunship), silueta alargada tipo Idris (Capital) y triángulo ancho y corto con el pico en la proa (Disruptor).
 
 ### HUD y UI
 - HP / Escudo / Combustible / Velocidad / K/D / Cooldown de misil en tiempo real
@@ -144,14 +144,14 @@ Los cambios se aplican **inmediatamente** a las partidas en curso y se persisten
 
 | Capa | Tecnología |
 |---|---|
-| Servidor | Node.js + librería WebSocket [`ws`](https://github.com/websockets/ws) |
-| Cliente | JS vanilla, Canvas HTML5 |
+| Servidor | Node.js + TypeScript (type-stripping nativo) + librería WebSocket [`ws`](https://github.com/websockets/ws) |
+| Cliente | React 19 + TypeScript (`react-router`), Canvas HTML5 |
 | Renderizado | Canvas 2D API |
 | Audio | Web Audio API |
-| Estilos | CSS (sin frameworks) |
-| Build | [Vite 8](https://vite.dev) (bundler Rolldown) — empaqueta el cliente |
+| Estilos | [Tailwind CSS v4](https://tailwindcss.com) + CSS |
+| Build | [Vite 8](https://vite.dev) (bundler Rolldown, compiler Oxc) + React Compiler — empaqueta el cliente |
 
-Sin librerías de terceros **en tiempo de ejecución** en el cliente (el bundle es JS vanilla). La única dependencia de runtime es `ws` en el servidor; Vite es solo una `devDependency` de build.
+El cliente está **migrando de JS vanilla a React** de forma incremental (*strangler*): React 19 + `react-router` conviven con el motor de juego legacy (`game.js`, canvas imperativo) durante la transición. El render del juego y el audio siguen sin assets externos (Canvas 2D + Web Audio procedural). En el servidor, la única dependencia de runtime es `ws`.
 
 ---
 
@@ -226,20 +226,34 @@ Panel admin para modificar cualquier variable de juego en tiempo real (los cambi
 
 ```
 ship-commander/
-├── vite.config.mjs     # Config de Vite 8 (root: client, multi-page, proxy /ws y /config)
+├── vite.config.ts      # Config de Vite 8 (root: client, React + Tailwind, multi-page, proxy /ws y /config)
+├── tsconfig*.json      # Solution tsconfig (raíz) + proyectos app (cliente) / node (vite.config) / server
 ├── package.json        # Único: cliente (vite) + servidor (ws); scripts, engines, packageManager (pnpm)
 ├── pnpm-lock.yaml      # Lockfile (commiteado)
-├── client/             # ← empaquetado por Vite (ES modules)
-│   ├── index.html      # Entrada principal: menú, lobby, práctica, HUD, MobiGlass… carga /game.js como módulo
+├── client/             # ← empaquetado por Vite
+│   ├── index.html      # Entrada principal: markup del menú/HUD/MobiGlass… carga /src/main.tsx como módulo
 │   ├── admin.html      # Panel admin (2.ª entrada Vite); autocontenido, fetch("/config")
-│   ├── game.js         # Entrada ES module: WebSocket, render loop, input, menús; importa i18n/particles/sounds
-│   ├── i18n.js         # Traducciones ES/EN (módulo)
-│   ├── particles.js    # Campo de estrellas, sistema de partículas (módulo)
-│   ├── sounds.js       # Música y SFX procedurales — Web Audio API (módulo)
-│   └── styles.css      # Todos los estilos UI (convención: unidades rem, texto ≥ 16px)
-├── server/             # ← Node + ws (sin package.json propio; usa el de la raíz)
-│   ├── server.js       # Servidor autoritativo — física, colisiones, salas, timer, IA, oleadas. Sirve dist/ en prod
-│   ├── config.js       # Carga y exporta la configuración (con defaults y persistencia)
+│   └── src/            # ← React 19 + TS, conviviendo con el motor legacy (strangler)
+│       ├── main.tsx        # Entrada: monta React (BrowserRouter) en #root e importa game.js
+│       ├── App.tsx         # Router: mapea pantallas (menu-screen) a rutas; overlay de controles
+│       ├── ui/             # Componentes React migrados (MainMenu, ControlsScreen)
+│       ├── hooks/          # useI18n (suscribe React al idioma de i18n.js)
+│       ├── index.css       # Tailwind v4 sin preflight (convive con styles.css legacy)
+│       ├── game.js         # Motor legacy: WebSocket, render loop, input, menús; importa i18n/particles/sounds
+│       ├── i18n.js         # Traducciones ES/EN (módulo)
+│       ├── particles.js    # Campo de estrellas, sistema de partículas (módulo)
+│       ├── sounds.js       # Música y SFX procedurales — Web Audio API (módulo)
+│       └── styles.css      # Estilos UI legacy (convención: unidades rem, texto ≥ 16px)
+├── server/             # ← Node + ws en TypeScript (Node 24 type-stripping, sin build; usa el package.json de la raíz)
+│   ├── server.js       # Entry / composition root: arranca admin + juego/WS + game loop (.js)
+│   ├── config.js       # Carga y exporta CFG (defaults + persistencia) (.js)
+│   ├── types.d.ts      # Tipos de dominio ambiente (Player, Room, Bullet, Missile…)
+│   ├── net/            # wsServer (HTTP+WS), handlers (mensajes), serialize (state), broadcast
+│   ├── sim/            # loop, physics, movement, collisions, effects, weapons
+│   ├── rooms/          # rooms (salas + tripulación), lifecycle (start/restart)
+│   ├── entities/       # player, spawn
+│   ├── ai/             # ai (bots), waves (oleadas)
+│   ├── admin/          # adminServer (panel :8081, API /config)
 │   └── config.json     # Valores personalizados (generado automáticamente al guardar)
 ├── tools/              # Utilidades CommonJS (editor de naves, generador de presets)
 └── dist/               # Salida de `vite build` (gitignored)
@@ -280,14 +294,14 @@ Esta sección explica cómo fluye la información entre cliente y servidor para 
 
 ### Conexión WebSocket
 
-El servidor (`server/server.js`) inicia un servidor HTTP en el puerto **8080** que también sirve los archivos estáticos del cliente. Encima de ese mismo servidor HTTP se monta el servidor WebSocket (`ws`):
+El servidor (`server/net/wsServer.ts`, arrancado desde el entry `server/server.js`) inicia un servidor HTTP en el puerto **8080** que también sirve los archivos estáticos del cliente. Encima de ese mismo servidor HTTP se monta el servidor WebSocket (`ws`) en el path `/ws`:
 
 ```js
-const wss = new WebSocketServer({ server: httpServer });
+const wss = new WebSocket.Server({ server: httpServer, path: "/ws" });
 wss.on("connection", ws => { /* nuevo jugador */ });
 ```
 
-El cliente (`client/game.js`) abre la conexión al cargar la página, eligiendo `ws://` o `wss://` según el protocolo:
+El cliente (`client/src/game.js`) abre la conexión al cargar la página, eligiendo `ws://` o `wss://` según el protocolo:
 
 ```js
 const _wsProto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -391,6 +405,6 @@ En cambio, `asteroids`, `beams`, `empPulses` y `mines` se aplican de forma **inm
 
 ### Panel admin (puerto 8081)
 
-Un servidor HTTP independiente en `server.js` sirve `admin.html` en el puerto 8081. El panel hace `GET /config` al cargar y `POST /config` al guardar. El servidor escribe los cambios en `server/config.json` y los aplica en el mismo objeto `CFG` que usa el game loop; los cambios son inmediatos.
+Un servidor HTTP independiente (`server/admin/adminServer.ts`) sirve `admin.html` en el puerto 8081. El panel hace `GET /config` al cargar y `POST /config` al guardar. El servidor escribe los cambios en `server/config.json` y los aplica en el mismo objeto `CFG` que usa el game loop; los cambios son inmediatos.
 
 ---
