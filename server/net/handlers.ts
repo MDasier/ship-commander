@@ -357,8 +357,10 @@ function handleMessage(ws: any, player: Player, msg: any): void {
     room.missiles.push({
       x:        mox,
       y:        moy,
-      vx:       Math.cos(fireAngle) * CFG.MISSILE_SPEED_INIT,
-      vy:       Math.sin(fireAngle) * CFG.MISSILE_SPEED_INIT,
+      // Hereda la velocidad de la nave lanzadora (origin) para no salir "atrás"
+      // cuando la nave va rápida; luego el guiado lo acelera hasta su máximo.
+      vx:       Math.cos(fireAngle) * CFG.MISSILE_SPEED_INIT + (origin.vx ?? 0),
+      vy:       Math.sin(fireAngle) * CFG.MISSILE_SPEED_INIT + (origin.vy ?? 0),
       team:     player.team,
       targetId: msg.targetId,
       ownerId:  player.id,
@@ -481,8 +483,9 @@ function handleMessage(ws: any, player: Player, msg: any): void {
       }
       room.bullets.push({
         x: ox, y: oy,
-        vx: Math.cos(fireAngle) * CFG.TURRET_BULLET_SPEED,
-        vy: Math.sin(fireAngle) * CFG.TURRET_BULLET_SPEED,
+        // Hereda la velocidad del carrier (pilot) para que la bala no se quede atrás.
+        vx: Math.cos(fireAngle) * CFG.TURRET_BULLET_SPEED + (pilot.vx ?? 0),
+        vy: Math.sin(fireAngle) * CFG.TURRET_BULLET_SPEED + (pilot.vy ?? 0),
         team: player.team, ownerId: player.id,
         damage: CFG.TURRET_DAMAGE,
       });
@@ -497,8 +500,9 @@ function handleMessage(ws: any, player: Player, msg: any): void {
       player.bulletCooldown = CFG.BULLET_COOLDOWN;
       room.bullets.push({
         x: player.x, y: player.y,
-        vx: Math.cos(player.angle) * CFG.BULLET_SPEED,
-        vy: Math.sin(player.angle) * CFG.BULLET_SPEED,
+        // Hereda la velocidad de la nave para que no la adelante al ir rápido.
+        vx: Math.cos(player.angle) * CFG.BULLET_SPEED + (player.vx ?? 0),
+        vy: Math.sin(player.angle) * CFG.BULLET_SPEED + (player.vy ?? 0),
         team: player.team, ownerId: player.id,
         damage: player.bulletDamage ?? CFG.BULLET_DAMAGE,
       });
