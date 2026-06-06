@@ -8,7 +8,7 @@ import {
   roomSwitchTeam,
   roomLeave,
 } from "../game";
-import { Backdrop, BackBtn, BrandTitle, GoldToggle, LangToggle, SegOption, useWorldPresets, presetKm } from "./ds";
+import { Backdrop, BackBtn, BrandTitle, GoldToggle, Icon, LangToggle, SegOption, useWorldPresets, presetKm } from "./ds";
 import ShipPicker from "./ShipPicker";
 
 // Sala / lobby con equipos, migrada a React (Fase 2). Reproduce el flujo real
@@ -93,26 +93,36 @@ function CrewSlot({
   mine: boolean;
 }) {
   const { t } = useI18n();
+  const occupied = !!gunner;
   return (
-    <div className="flex items-center gap-2 border-t border-gs-green-deep/15 bg-gs-green-deep/[0.05] py-2.5 pl-9 pr-4 font-mono text-[11px]">
-      <span className="text-gs-green-deep">↳ {role}</span>
-      {gunner ? (
+    <div
+      className={`flex items-center gap-2.5 border-t border-gs-rule/8 py-2.5 pl-9 pr-4 ${
+        occupied ? "bg-gs-gold-bright/[0.05]" : ""
+      }`}
+    >
+      <span className="gs-hud-mono text-[10px] font-semibold uppercase tracking-wider text-gs-grey-3">↳ {role}</span>
+      {occupied ? (
         <>
-          <span className="ml-1.5 text-gs-rule">
-            {gunner.name || "Pilot"} {mine && <span className="text-gs-grey-3">{t("room.you")}</span>}
+          <Icon name="pilot" size={13} style={{ color: "var(--color-gs-gold-bright)" }} />
+          <span className="min-w-0 truncate text-[13px] font-semibold text-white">
+            {gunner!.name || "Pilot"}
+            {mine && <span className="ml-1 font-normal text-gs-grey-3">{t("room.you")}</span>}
+          </span>
+          <span className="rounded border border-gs-gold-bright/40 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-gs-gold-bright">
+            {t("room.gunner")}
           </span>
           {mine && (
-            <button className="ml-auto text-gs-red hover:underline" onClick={() => roomSend({ type: "leaveShip" })}>
+            <button className="ml-auto text-[12px] font-semibold text-gs-red hover:underline" onClick={() => roomSend({ type: "leaveShip" })}>
               {t("room.leaveShip")}
             </button>
           )}
         </>
       ) : (
         <>
-          <span className="ml-1.5 text-gs-grey-3">{t("room.emptySlot")}</span>
+          <span className="text-[13px] italic text-gs-grey-3">{t("room.emptySlot")}</span>
           {canBoard && (
             <button
-              className="ml-auto text-gs-gold-bright hover:underline"
+              className="ml-auto text-[12px] font-semibold text-gs-gold-bright hover:underline"
               onClick={() => roomSend({ type: "boardShip", targetId: pilotId })}
             >
               {t("room.board")}
@@ -157,7 +167,9 @@ function TeamColumn({
           {t("room.emptyTeam")}
         </div>
       ) : (
-        players.map((p) => {
+        // Los artilleros (pilotingFor) NO se listan como piloto top-level: solo
+        // aparecen bajo la torreta de su nave (evita la fila duplicada "FIGHTER").
+        players.filter((p) => !p.pilotingFor).map((p) => {
           const shipLabel = (p.shipType || "fighter").slice(0, 7).toUpperCase();
           const slots: { role: string; gid: string | null }[] = [];
           if (p.shipType === "gunship") slots.push({ role: t("room.gunner").toUpperCase(), gid: p.gunnerId ?? null });
