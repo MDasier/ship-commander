@@ -55,15 +55,21 @@ function applyInterpolatedState() {
   const s0 = S.stateBuffer[idx];
   const s1 = S.stateBuffer[idx + 1];
 
-  // Ticks elapsed since the latest state we have (for bullet/missile extrapolation)
+  // Proyectamos balas/misiles al MISMO instante que las naves (renderTime),
+  // no a "ahora". Las naves se dibujan interpoladas a renderTime (= now - 80ms);
+  // si las balas se extrapolasen a now quedarían ~INTERP_DELAY adelantadas, y
+  // como heredan la velocidad de la nave (server), a alta velocidad se separan
+  // visualmente del morro. Con renderTime, el disparo nace alineado con la nave.
+  // projTicks suele ser negativo (retropola el último estado hacia atrás); la
+  // extrapolación lineal funciona igual con ticks negativos.
   const latest = s1 || s0;
-  const ticksSince = Math.max(0, (Date.now() - latest.time) / (1000 / 30));
+  const projTicks = (renderTime - latest.time) / (1000 / 30);
 
   if (!s1) {
-    // Only one state available — use it directly, extrapolate projectiles
+    // Only one state available — use it directly, project projectiles to renderTime
     S.players = s0.players;
-    S.bullets = extrapolateArr(s0.bullets, ticksSince);
-    S.missiles = extrapolateArr(s0.missiles, ticksSince);
+    S.bullets = extrapolateArr(s0.bullets, projTicks);
+    S.missiles = extrapolateArr(s0.missiles, projTicks);
     S.flares = s0.flares;
     return;
   }
@@ -85,8 +91,8 @@ function applyInterpolatedState() {
     };
   }
   S.players = interped;
-  S.bullets = extrapolateArr(s1.bullets, ticksSince);
-  S.missiles = extrapolateArr(s1.missiles, ticksSince);
+  S.bullets = extrapolateArr(s1.bullets, projTicks);
+  S.missiles = extrapolateArr(s1.missiles, projTicks);
   S.flares = s1.flares;
 
   // Trim buffer — keep only the last MAX_BUFFER entries
