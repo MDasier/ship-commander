@@ -22,8 +22,12 @@ import { isSheltered, losBlocked } from "./sensors";
 export { clearAsteroidCache, updateUI, updateTimer };
 
 // ── Client-side interpolation ──────────────────
-const INTERP_DELAY = 80;  // ms behind server time (~2.5 ticks at 30fps)
+const INTERP_DELAY = 80;  // ms behind server time (~5 ticks @ 60fps)
 const MAX_BUFFER = 12;
+// El servidor simula y difunde a 60 fps (un broadcast por tick), así que vx/vy de
+// balas y misiles están en unidades "por tick de servidor". Fallback cuando solo
+// hay un snapshot y no se puede medir el intervalo real entre estados.
+const SERVER_TICK_MS = 1000 / 60;
 
 // ── Dependencias inyectadas desde game.ts ──
 let getBindings = () => ({});
@@ -55,19 +59,10 @@ function applyInterpolatedState() {
   const s0 = S.stateBuffer[idx];
   const s1 = S.stateBuffer[idx + 1];
 
-  // Proyectamos balas/misiles al MISMO instante que las naves (renderTime),
-  // no a "ahora". Las naves se dibujan interpoladas a renderTime (= now - 80ms);
-  // si las balas se extrapolasen a now quedarían ~INTERP_DELAY adelantadas, y
-  // como heredan la velocidad de la nave (server), a alta velocidad se separan
-  // visualmente del morro. Con renderTime, el disparo nace alineado con la nave.
-  // projTicks suele ser negativo (retropola el último estado hacia atrás); la
-  // extrapolación lineal funciona igual con ticks negativos.
-  const latest = s1 || s0;
-  const projTicks = (renderTime - latest.time) / (1000 / 30);
-
   if (!s1) {
-    // Only one state available — use it directly, project projectiles to renderTime
+    // Solo un snapshot: proyectar al renderTime con el período nominal del server.
     S.players = s0.players;
+    const projTicks = (renderTime - s0.time) / SERVER_TICK_MS;
     S.bullets = extrapolateArr(s0.bullets, projTicks);
     S.missiles = extrapolateArr(s0.missiles, projTicks);
     S.flares = s0.flares;
@@ -91,6 +86,17 @@ function applyInterpolatedState() {
     };
   }
   S.players = interped;
+
+  // Proyectamos balas/misiles al MISMO instante que las naves (renderTime), no a
+  // "ahora": si se extrapolasen a now quedarían ~INTERP_DELAY adelantadas y, como
+  // heredan la velocidad de la nave (server), a alta velocidad se separan del morro.
+  // El divisor es el intervalo REAL medido entre snapshots (igual que el factor `t`
+  // de las naves), no una constante: así la proyección casa con el avance del server
+  // y absorbe el jitter de red, evitando los saltos de sierra al cambiar de bracket.
+  // projTicks suele ser negativo (retropola s1 hacia atrás); la extrapolación lineal
+  // funciona igual con ticks negativos.
+  const snapInterval = s1.time - s0.time;
+  const projTicks = snapInterval > 0 ? (renderTime - s1.time) / snapInterval : 0;
   S.bullets = extrapolateArr(s1.bullets, projTicks);
   S.missiles = extrapolateArr(s1.missiles, projTicks);
   S.flares = s1.flares;
