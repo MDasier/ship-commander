@@ -1,6 +1,6 @@
 {
   "name": "ship-commander",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Multiplayer browser space dogfighting game",
   "scripts": {
     "dev:client": "vite",
@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server/server.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b",
     "lint": "eslint ."
   },
   "dependencies": {

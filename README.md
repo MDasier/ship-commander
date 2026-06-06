@@ -144,14 +144,14 @@ Los cambios se aplican **inmediatamente** a las partidas en curso y se persisten
 
 | Capa | Tecnología |
 |---|---|
-| Servidor | Node.js + librería WebSocket [`ws`](https://github.com/websockets/ws) |
-| Cliente | JS vanilla, Canvas HTML5 |
+| Servidor | Node.js + TypeScript (type-stripping nativo) + librería WebSocket [`ws`](https://github.com/websockets/ws) |
+| Cliente | React 19 + TypeScript (`react-router`), Canvas HTML5 |
 | Renderizado | Canvas 2D API |
 | Audio | Web Audio API |
-| Estilos | CSS (sin frameworks) |
-| Build | [Vite 8](https://vite.dev) (bundler Rolldown) — empaqueta el cliente |
+| Estilos | [Tailwind CSS v4](https://tailwindcss.com) + CSS |
+| Build | [Vite 8](https://vite.dev) (bundler Rolldown, compiler Oxc) + React Compiler — empaqueta el cliente |
 
-Sin librerías de terceros **en tiempo de ejecución** en el cliente (el bundle es JS vanilla). La única dependencia de runtime es `ws` en el servidor; Vite es solo una `devDependency` de build.
+El cliente está **migrando de JS vanilla a React** de forma incremental (*strangler*): React 19 + `react-router` conviven con el motor de juego legacy (`game.js`, canvas imperativo) durante la transición. El render del juego y el audio siguen sin assets externos (Canvas 2D + Web Audio procedural). En el servidor, la única dependencia de runtime es `ws`.
 
 ---
 
@@ -226,17 +226,24 @@ Panel admin para modificar cualquier variable de juego en tiempo real (los cambi
 
 ```
 ship-commander/
-├── vite.config.mjs     # Config de Vite 8 (root: client, multi-page, proxy /ws y /config)
+├── vite.config.ts      # Config de Vite 8 (root: client, React + Tailwind, multi-page, proxy /ws y /config)
+├── tsconfig*.json      # Solution tsconfig (raíz) + proyectos app (cliente) / node (vite.config) / server
 ├── package.json        # Único: cliente (vite) + servidor (ws); scripts, engines, packageManager (pnpm)
 ├── pnpm-lock.yaml      # Lockfile (commiteado)
-├── client/             # ← empaquetado por Vite (ES modules)
-│   ├── index.html      # Entrada principal: menú, lobby, práctica, HUD, MobiGlass… carga /game.js como módulo
+├── client/             # ← empaquetado por Vite
+│   ├── index.html      # Entrada principal: markup del menú/HUD/MobiGlass… carga /src/main.tsx como módulo
 │   ├── admin.html      # Panel admin (2.ª entrada Vite); autocontenido, fetch("/config")
-│   ├── game.js         # Entrada ES module: WebSocket, render loop, input, menús; importa i18n/particles/sounds
-│   ├── i18n.js         # Traducciones ES/EN (módulo)
-│   ├── particles.js    # Campo de estrellas, sistema de partículas (módulo)
-│   ├── sounds.js       # Música y SFX procedurales — Web Audio API (módulo)
-│   └── styles.css      # Todos los estilos UI (convención: unidades rem, texto ≥ 16px)
+│   └── src/            # ← React 19 + TS, conviviendo con el motor legacy (strangler)
+│       ├── main.tsx        # Entrada: monta React (BrowserRouter) en #root e importa game.js
+│       ├── App.tsx         # Router: mapea pantallas (menu-screen) a rutas; overlay de controles
+│       ├── ui/             # Componentes React migrados (MainMenu, ControlsScreen)
+│       ├── hooks/          # useI18n (suscribe React al idioma de i18n.js)
+│       ├── index.css       # Tailwind v4 sin preflight (convive con styles.css legacy)
+│       ├── game.js         # Motor legacy: WebSocket, render loop, input, menús; importa i18n/particles/sounds
+│       ├── i18n.js         # Traducciones ES/EN (módulo)
+│       ├── particles.js    # Campo de estrellas, sistema de partículas (módulo)
+│       ├── sounds.js       # Música y SFX procedurales — Web Audio API (módulo)
+│       └── styles.css      # Estilos UI legacy (convención: unidades rem, texto ≥ 16px)
 ├── server/             # ← Node + ws en TypeScript (Node 24 type-stripping, sin build; usa el package.json de la raíz)
 │   ├── server.js       # Entry / composition root: arranca admin + juego/WS + game loop (.js)
 │   ├── config.js       # Carga y exporta CFG (defaults + persistencia) (.js)

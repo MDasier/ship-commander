@@ -22,7 +22,7 @@ El cliente se empaqueta con **Vite 8** (bundler Rolldown), pero **solo como paso
 
 Por qué Vite no toca el servidor: las partidas viven en memoria y requieren un proceso Node de larga duración con conexiones WS persistentes → eso no es "estático puro" ni serverless, y una herramienta de frontend no lo empaqueta. Vite aporta al **cliente**: HMR, ES modules (`game.js` importa `i18n`/`particles`/`sounds`), minificado y tree-shaking.
 
-> **El servidor es TypeScript pero NO se compila.** Sus módulos son `.ts` que **Node 24 ejecuta directamente** con *type stripping* nativo (borra los tipos en runtime). No hay paso de build para el server: el comando de arranque sigue siendo `node server/server.js` y el entry resuelve los `.ts` por sí solo. Por eso es imprescindible **Node ≥ 24.16**. El chequeo de tipos (`pnpm run typecheck` → `tsc --noEmit`) es opcional en CI; no genera artefactos.
+> **El servidor es TypeScript pero NO se compila.** Sus módulos son `.ts` que **Node 24 ejecuta directamente** con *type stripping* nativo (borra los tipos en runtime). No hay paso de build para el server: el comando de arranque sigue siendo `node server/server.js` y el entry resuelve los `.ts` por sí solo. Por eso es imprescindible **Node ≥ 24.16**. El chequeo de tipos (`pnpm run typecheck` → `tsc -b`, cubre cliente y server) es opcional en CI; no genera artefactos (todos los proyectos usan `noEmit`).
 
 > Para un contenedor reproducible: un **Dockerfile** que instale deps de raíz + `server/`, ejecute `npm run build` y arranque `node server/server.js` (copiando `dist/` + `server/`).
 
