@@ -19,23 +19,8 @@
       <button data-lang="en">EN</button>
     </div>
 
-    <!-- ── MENÚ PRINCIPAL ── -->
-    <div id="mainMenu">
-      <div id="nameSection">
-        <span data-i18n="menu.tag">Tag</span>
-        <input id="nameInput" type="text" maxlength="16" data-i18n-ph="menu.namePlaceholder"
-          placeholder="Escribe tu nombre..." autocomplete="off" spellcheck="false">
-        <button id="setNameBtn" data-i18n="common.save">Guardar</button>
-        <span id="nameSavedMsg" class="hidden" data-i18n="menu.saved">✓ Guardado</span>
-      </div>
-
-      <div id="mainMenuActions">
-        <button id="menuPlayOnline" class="menuBigBtn" data-i18n="menu.playOnline">COOP</button>
-        <button id="menuSolo" class="menuBigBtn" data-i18n="menu.solo">VUELA SÓLO</button>
-        <button id="menuControls" class="menuBigBtn" data-i18n="menu.controls">VER CONTROLES</button>
-        <button id="menuSupport" class="menuBigBtn support" data-i18n="menu.support">❤ APOYA EL PROYECTO</button>
-      </div>
-    </div>
+    <!-- ── MENÚ PRINCIPAL ── (migrado a React: client/src/ui/MainMenu.tsx,
+         renderizado en la ruta "/" por App.tsx) -->
 
     <!-- ── BUSCAR PARTIDAS ── -->
     <div id="lobby" class="hidden">
