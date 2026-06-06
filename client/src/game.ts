@@ -598,8 +598,12 @@ function getDeadInfo() {
   const inTurret = !!(reservedPilot && !reservedPilot.dead);
   const elapsed = S.clientDeadAt ? Date.now() - S.clientDeadAt : 99999;
   const remaining = Math.max(0, Math.ceil((CFG_RESPAWN_DELAY * 1000 - elapsed) / 1000));
+  // PvP = dos equipos de jugadores enfrentados. Solo entonces tiene sentido
+  // cambiar de equipo (en co-op/oleadas/solo/vuelo libre no hay esa mecánica).
+  const pvp = !waveMode && !S.soloMode;
   return {
     waveMode,
+    pvp,
     teamLives,
     canRespawn,
     inTurret,

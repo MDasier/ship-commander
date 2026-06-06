@@ -19,6 +19,7 @@ import ShipPicker from "./ShipPicker";
 type Turret = { id: string; name: string; type: string; free: number; reservedHere: boolean };
 type DeadInfo = {
   waveMode: boolean;
+  pvp: boolean;
   teamLives: number | null;
   canRespawn: boolean;
   inTurret: boolean;
@@ -198,9 +199,12 @@ export default function DeadPanel() {
 
           {/* Acciones */}
           <div className="mt-auto flex flex-col gap-2.5 pt-1">
-            <button className="gs-btn w-full" onClick={() => roomSwitchTeam()}>
-              {t("dead.switchTeam")}
-            </button>
+            {/* Cambiar equipo: solo en PvP (dos equipos de jugadores) */}
+            {info.pvp && (
+              <button className="gs-btn w-full" onClick={() => roomSwitchTeam()}>
+                {t("dead.switchTeam")}
+              </button>
+            )}
             <button className="gs-btn gs-btn-danger w-full" onClick={() => roomLeave()}>
               <Icon name="arrowL" size={15} /> {t("dead.leave")}
             </button>
