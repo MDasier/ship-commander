@@ -40,6 +40,7 @@ export const S = {
   missiles: [] as Entity[],
   flares: [] as Entity[],
   world: { width: 10000, height: 10000 } as { width: number; height: number },
+  mineMax: 4 as number,  // ranuras de mina del Interceptor; lo difunde el server (CFG.MINE_MAX_ACTIVE)
 
   // Deduplicación de efectos de sonido por id de pulso/rayo.
   prevPulseIds: new Set<string>(),

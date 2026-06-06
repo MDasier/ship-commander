@@ -4,6 +4,7 @@
 
 const { FPS } = require("../constants.ts");
 const { WAVES } = require("../ai/waves.ts");
+const CFG = require("../config");
 
 function buildState(room: Room): any {
   return {
@@ -16,6 +17,9 @@ function buildState(room: Room): any {
     mines:     room.mines || [],
     flare:     room.flare || [],
     asteroids: room.asteroids,
+    // Máx. de minas activas por jugador: editable en caliente, así el HUD del
+    // Interceptor muestra el nº correcto de ranuras sin hardcodearlo en cliente.
+    mineMax:   CFG.MINE_MAX_ACTIVE,
     winner:    room.winner,
     killFeed:  room.killFeed,
     timeLeft:  Math.max(0, Math.ceil(room.timeLeft / FPS)),

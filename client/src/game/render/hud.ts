@@ -39,17 +39,15 @@ function drawWaveHud() {
   }
 }
 
-// HUD del Interceptor: hasta 4 ranuras de mina, cada una con un anillo circular que
-// muestra el tiempo de vida restante de la mina activa (o vacía si no hay).
-
-// HUD del Interceptor: hasta 4 ranuras de mina, cada una con un anillo circular que
-// muestra el tiempo de vida restante de la mina activa (o vacía si no hay).
+// HUD del Interceptor: una ranura de mina por cada slot permitido (S.mineMax =
+// CFG.MINE_MAX_ACTIVE del servidor), con un anillo circular que muestra el tiempo
+// de vida restante de la mina activa (o vacía si no hay).
 function drawMineTimers() {
   const me = getMe();
   if (!me || me.dead || me.shipType !== "interceptor" || me.pilotingFor) return;
 
   const myMines = S.mines.filter(m => m.ownerId === S.myId);
-  const SLOTS = 4; // = CFG.MINE_MAX_ACTIVE en el servidor
+  const SLOTS = S.mineMax; // = CFG.MINE_MAX_ACTIVE, difundido por el servidor
   const total = Math.max(SLOTS, myMines.length);
   const r = 11, gap = 30;
   const cx0 = canvas.width / 2 - ((total - 1) * gap) / 2;

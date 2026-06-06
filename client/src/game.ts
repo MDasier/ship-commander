@@ -441,6 +441,7 @@ ws.onmessage = e => {
     S.prevPulseIds = seen;
     S.asteroids = data.asteroids || [];
     S.world = data.world || S.world;
+    if (data.mineMax) S.mineMax = data.mineMax;
     S.winner = data.winner;
     // El servidor sella cada kill con `time: Date.now()` de SU reloj; el fade del
     // feed (draw.ts) compara contra el reloj del CLIENTE, así que un desfase de
