@@ -31,8 +31,9 @@ import { ws } from "./game/net";
 import { canvas, getMe } from "./game/render/canvas";
 import {
   initRender, startRenderLoop,
-  cycleTargetByRadar, updateUI, updateTimer,
+  updateUI, updateTimer,
 } from "./game/render/draw";
+import { cycleTargetByRadar } from "./game/render/sensors";
 
 // ── Keybindings ────────────────────────────────
 let bindings = { ...DEFAULT_BINDINGS };

@@ -17,7 +17,8 @@ import {
 } from "../../particles.js";
 import { getShapeDef, buildShipPath, drawShipDetail } from "../shapes";
 import { CFG_RESPAWN_DELAY } from "../constants";
-import { lerp, lerpAngle, extrapolateArr, seededRand, ptSegDist } from "../math";
+import { lerp, lerpAngle, extrapolateArr, seededRand } from "../math";
+import { isSheltered, losBlocked } from "./sensors";
 
 // ── Client-side interpolation ──────────────────
 const INTERP_DELAY = 80;  // ms behind server time (~2.5 ticks at 30fps)
@@ -1198,48 +1199,9 @@ function drawMineTimers() {
 // ── Cover helpers ─────────────────────────────
 // Distancia mínima de un punto al segmento A→B (igual que servidor)
 
-// Nave "cubierta": posición dentro del radio de un asteroide flotante (z=1, sobre las naves)
-function isSheltered(px, py) {
-  return S.asteroids.some(a => a.z === 1 && Math.hypot(px - a.x, py - a.y) < a.r);
-}
+// Sensores (isSheltered / losBlocked / radarVisibleEnemies / cycleTarget*) en
+// game/render/sensors.ts (tipado).
 
-// Línea de visión bloqueada: algún asteroide de colisión (z=0) intersecta el segmento
-function losBlocked(ax, ay, bx, by) {
-  return S.asteroids.some(a => a.z === 0 && ptSegDist(a.x, a.y, ax, ay, bx, by) < a.r);
-}
-// ──────────────────────────────────────────────
-
-function radarVisibleEnemies() {
-  const me = S.players[S.myId];
-  if (!me) return [];
-  return Object.values(S.players).filter(p => {
-    if (p.dead || p.team === me.team || p.pilotingFor) return false;
-    if (Math.hypot(p.x - me.x, p.y - me.y) > (p.radarSignature || 450)) return false;
-    if (isSheltered(p.x, p.y)) return false;       // bajo asteroide flotante → oculto
-    if (losBlocked(me.x, me.y, p.x, p.y)) return false; // asteroide sólido entre medias
-    return true;
-  });
-}
-
-function cycleTarget() {
-  const enemies = radarVisibleEnemies();
-  if (enemies.length === 0) { S.targetId = null; return; }
-  if (!S.targetId) { S.targetId = enemies[0].id; return; }
-  const idx = enemies.findIndex(e => e.id === S.targetId);
-  if (idx === -1) { S.targetId = enemies[0].id; return; }
-  if (idx === enemies.length - 1) { S.targetId = null; return; }
-  S.targetId = enemies[idx + 1].id;
-}
-
-function cycleTargetByRadar() {
-  const enemies = radarVisibleEnemies();
-  if (enemies.length === 0) { S.targetId = null; return; }
-  if (!S.targetId) { S.targetId = enemies[0].id; return; }
-  const idx = enemies.findIndex(e => e.id === S.targetId);
-  if (idx === -1) { S.targetId = enemies[0].id; return; }
-  // Al llegar al último → deslockear (null); siguiente click vuelve al primero
-  S.targetId = idx === enemies.length - 1 ? null : enemies[idx + 1].id;
-}
 function drawMissiles(camX, camY) {
 
   S.missiles.forEach(m => {
@@ -2182,6 +2144,5 @@ function loop() {
 }
 
 export {
-  isSheltered, losBlocked, radarVisibleEnemies, cycleTarget, cycleTargetByRadar,
   updateUI, updateTimer,
 };
