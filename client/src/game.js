@@ -636,8 +636,9 @@ function showConnLost() {
   }
   if (_connLost) return;
   _connLost = true;
-  const el = document.getElementById("connLost");
-  if (el) el.classList.remove("hidden");
+  // El overlay de conexión perdida está migrado a React (App.tsx → Reconnect);
+  // game.js sigue conduciendo la reconexión automática (sonda WS + recarga).
+  window.dispatchEvent(new CustomEvent("conn-lost"));
   scheduleReconnect(500);
 }
 
@@ -668,18 +669,6 @@ function tryReconnect() {
 
 ws.addEventListener("close", showConnLost);
 ws.addEventListener("error", showConnLost);
-
-// Animación de los puntos suspensivos del overlay
-setInterval(() => {
-  if (!_connLost) return;
-  const dots = document.getElementById("connLostDots");
-  if (dots) dots.textContent = ".".repeat((Math.floor(Date.now() / 500) % 3) + 1);
-}, 500);
-
-{
-  const _reloadBtn = document.getElementById("connLostReload");
-  if (_reloadBtn) _reloadBtn.onclick = () => location.reload();
-}
 
 let uiState = "lobby";
 let currentRoomId = null;

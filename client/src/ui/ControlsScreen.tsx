@@ -8,6 +8,7 @@ import {
   BINDING_LABELS,
   displayKey,
 } from "../game.js";
+import { Icon } from "./ds";
 
 type Bindings = Record<string, string | null>;
 
@@ -21,9 +22,9 @@ const FIXED_ROWS: Array<{ literal?: string; keyI18n?: string; desc: string }> = 
   { literal: "Del", desc: "controls.fxSelfDestruct" },
 ];
 
-// Pantalla de controles migrada a React (Fase 1). `bindings` vive en game.js;
-// aquí solo se lee/escribe a través de su API. La captura de tecla se hace en
-// el cliente y delega la validación/persistencia en rebindKey().
+// Pantalla de controles migrada a React (Fase 1), reskin GuildSwarm cockpit.
+// `bindings` vive en game.js; aquí solo se lee/escribe a través de su API. La
+// captura de tecla se hace en el cliente y delega validación/persistencia en rebindKey().
 export default function ControlsScreen({ onClose }: { onClose: () => void }) {
   const { t } = useI18n();
   const [bindings, setBindings] = useState<Bindings>(() => getBindings());
@@ -67,74 +68,68 @@ export default function ControlsScreen({ onClose }: { onClose: () => void }) {
     return tr !== key ? tr : (BINDING_LABELS as Record<string, string>)[action];
   };
 
-  const pressLabel = t("controls.press") !== "controls.press" ? t("controls.press") : "Presiona…";
+  const pressLabel = t("controls.press") !== "controls.press" ? t("controls.press") : "…";
 
   return (
     <div
-      className="fixed inset-0 z-[500] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-[500] grid place-items-center bg-black/80 p-6 font-body backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="w-[min(640px,92vw)] max-h-[88vh] overflow-y-auto rounded-lg border border-cyan-500/40 bg-slate-950/95 p-6 text-slate-100 shadow-[0_0_40px_rgba(34,211,238,0.15)]"
+        className="gs-panel sc-scroll max-h-[88vh] w-[min(660px,92vw)] animate-gs-fade overflow-y-auto p-6 text-white"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold tracking-wide text-cyan-300">{t("controls.title")}</h2>
-          <button
-            className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-300 hover:bg-slate-800"
-            onClick={onClose}
-          >
-            {t("common.backMenu")}
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="m-0 font-display text-2xl font-extrabold tracking-wide text-gs-gold-bright">
+            {t("controls.title")}
+          </h2>
+          <button className="gs-btn gs-btn-ghost font-mono text-[13px]" onClick={onClose}>
+            <Icon name="arrowL" size={16} /> {t("common.backMenu")}
           </button>
         </div>
 
-        <table className="w-full border-collapse text-sm">
-          <tbody>
-            {Object.keys(BINDING_LABELS).map((action) => (
-              <tr key={action} className="border-b border-slate-800">
-                <td className="py-2 pr-3">{label(action)}</td>
-                <td className="py-2 pr-3">
-                  {recording === action ? (
-                    <kbd className="animate-pulse rounded bg-cyan-600/30 px-2 py-1 text-cyan-200">{pressLabel}</kbd>
-                  ) : (
-                    <kbd className="rounded bg-slate-800 px-2 py-1 text-slate-200">{displayKey(bindings[action])}</kbd>
-                  )}
-                </td>
-                <td className="py-2 text-right">
-                  <button
-                    className="rounded border border-cyan-600/50 px-3 py-1 text-xs text-cyan-200 hover:bg-cyan-600/20 disabled:opacity-40"
-                    onClick={() => setRecording(action)}
-                    disabled={recording !== null}
-                  >
-                    {t("controls.change")}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {/* Acciones reasignables */}
+        <div className="flex flex-col gap-2.5">
+          {Object.keys(BINDING_LABELS).map((action) => {
+            const rec = recording === action;
+            return (
+              <div key={action} className="flex items-center gap-3">
+                <span className="flex-1 text-sm font-medium text-gs-rule">{label(action)}</span>
+                <span className={`gs-key ${rec ? "animate-gs-pulse border-gs-gold-bright" : ""}`}>
+                  {rec ? pressLabel : displayKey(bindings[action])}
+                </span>
+                <button
+                  className="gs-btn gs-btn-ghost min-h-[34px] px-3 py-1.5 text-[12px] disabled:opacity-40"
+                  onClick={() => setRecording(action)}
+                  disabled={recording !== null}
+                >
+                  {t("controls.change")}
+                </button>
+              </div>
+            );
+          })}
+        </div>
 
         <button
-          className="mt-4 rounded border border-slate-600 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
+          className="gs-btn gs-btn-ghost mt-4 w-full text-[13px] text-gs-gold"
           onClick={() => resetBindings()}
         >
           {t("controls.reset")}
         </button>
 
+        {/* Teclas fijas */}
         <div className="mt-6">
-          <div className="mb-2 text-xs uppercase tracking-widest text-slate-500">{t("controls.fixed")}</div>
-          <table className="w-full border-collapse text-sm text-slate-400">
-            <tbody>
-              {FIXED_ROWS.map((row, i) => (
-                <tr key={i} className="border-b border-slate-800/50">
-                  <td className="py-1.5 pr-3">
-                    <kbd className="rounded bg-slate-800/60 px-2 py-0.5">{row.literal ?? t(row.keyI18n!)}</kbd>
-                  </td>
-                  <td className="py-1.5">{t(row.desc)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="gs-eyebrow mb-3 text-gs-grey-3">{t("controls.fixed")}</div>
+          <div className="flex flex-col gap-2.5">
+            {FIXED_ROWS.map((row, i) => (
+              <div key={i} className="flex items-center gap-3.5">
+                <span className="gs-key min-w-[96px] border-gs-blue-soft/35 bg-gs-blue-soft/8 text-gs-blue-soft">
+                  {row.literal ?? t(row.keyI18n!)}
+                </span>
+                <span className="text-sm text-gs-grey-2">{t(row.desc)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

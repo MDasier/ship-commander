@@ -254,16 +254,8 @@
       placeholder="Mensaje... (Enter enviar · Esc cancelar)" autocomplete="off" spellcheck="false">
   </div>
 
-  <!-- ── CONEXIÓN PERDIDA ── -->
-  <div id="connLost" class="hidden">
-    <div id="connLostInner">
-      <div id="connLostIcon">📡</div>
-      <div id="connLostTitle">30K</div>
-      <div id="connLostMsg"><span data-i18n="conn.reconnecting">Reconectando</span><span id="connLostDots">...</span></div>
-      <div id="connLostHint" data-i18n="conn.hint">Se reconectará automáticamente en cuanto el servidor vuelva.</div>
-      <button id="connLostReload" data-i18n="conn.retry">↻ Reintentar ahora</button>
-    </div>
-  </div>
+  <!-- ── CONEXIÓN PERDIDA ── migrada a React: client/src/ui/Reconnect.tsx,
+       montada por App.tsx al recibir el evento "conn-lost" desde game.js. -->
 
   <!-- ── ARRANQUE / DESPERTAR DEL SERVIDOR (anti-standby, p.ej. Render) ── -->
   <div id="serverBoot">

@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { useI18n } from "../hooks/useI18n";
 import { getPlayerName, setPlayerName, menuPlayOnline, menuSolo, SUPPORT_URL } from "../game.js";
+import { Backdrop, BrandTitle, Icon, InfoDot, LangToggle, RadarMark } from "./ds";
 
-// Menú principal migrado a React (Fase 1). El nombre se sincroniza con game.js
-// vía getPlayerName/setPlayerName; COOP y Solo delegan en game.js, que sigue
-// orquestando las pantallas legacy (lobby/soloSetup) por ahora.
+// Menú principal migrado a React (Fase 1), reskin GuildSwarm cockpit con Tailwind.
+// El nombre se sincroniza con game.js vía getPlayerName/setPlayerName; CO-OP y Solo
+// delegan en game.js, que sigue orquestando las pantallas legacy (lobby/soloSetup).
 export default function MainMenu() {
   const { t, lang, setLang } = useI18n();
   const [name, setName] = useState<string>(() => getPlayerName());
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(false);
 
-  // Guarda el nombre; devuelve false si está vacío (no se permite COOP sin tag).
+  // Guarda el nombre; devuelve false si está vacío (no se permite CO-OP sin tag).
   const save = (): boolean => {
     const v = name.trim();
     if (!v) {
@@ -41,71 +42,95 @@ export default function MainMenu() {
     menuSolo();
   };
 
+  // Acciones del menú (icono + título + subtítulo). El soporte abre el enlace real.
+  const actions = [
+    { id: "coop", icon: "coop", label: t("menu.playOnline"), sub: t("menu.coopSub"), onClick: onCoop, meta: "↵" },
+    { id: "solo", icon: "solo", label: t("menu.solo"), sub: t("menu.soloSub"), onClick: onSolo },
+    {
+      id: "controls",
+      icon: "controls",
+      label: t("menu.controls"),
+      sub: t("menu.controlsSub"),
+      onClick: () => window.dispatchEvent(new CustomEvent("open-controls")),
+    },
+  ];
+
   return (
-    <div className="fixed inset-0 z-[400] flex flex-col items-center justify-center gap-6 bg-black/90 text-slate-100">
-      <h1 className="text-4xl font-bold tracking-[0.2em] text-cyan-300">Ship Commander</h1>
+    <div className="fixed inset-0 z-[400] overflow-y-auto bg-gs-void font-body text-white">
+      <Backdrop />
+      <LangToggle lang={lang} onChange={setLang} />
 
-      <div className="flex gap-2">
-        {(["es", "en"] as const).map((l) => (
+      <div className="relative z-[1] flex min-h-full animate-gs-fade flex-col items-center justify-center gap-11 px-6 py-20">
+        <BrandTitle size={58} subtitle={t("menu.subtitle")} />
+
+        {/* Fila de Tag */}
+        <div className="w-full max-w-[560px]">
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <label className="mb-2 flex items-center gap-2">
+                <span className="gs-eyebrow">{t("menu.tag")}</span>
+                <InfoDot text={t("menu.tagHelp")} />
+              </label>
+              <input
+                className={`gs-input ${error ? "border-gs-red shadow-[0_0_0_1px_var(--color-gs-red)]" : ""}`}
+                value={name}
+                maxLength={16}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && onSave()}
+                aria-label={t("menu.tag")}
+                placeholder={t("menu.namePlaceholder")}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            <button className="gs-btn gs-btn-primary min-w-[110px]" onClick={onSave} disabled={!name.trim()}>
+              <Icon name="save" size={17} /> {t("common.save")}
+            </button>
+          </div>
+          <div className="mt-2 h-5">
+            {saved && (
+              <span
+                className="inline-flex items-center gap-1.5 text-[13px] font-bold text-gs-green"
+                style={{ animation: "gs-saved-pop 1.8s var(--ease-gs)" }}
+              >
+                {t("menu.saved")}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Acciones */}
+        <div className="flex w-full max-w-[560px] flex-col gap-3.5">
+          {actions.map((a) => (
+            <button key={a.id} className="gs-action" onClick={a.onClick}>
+              <span className="grid h-[26px] w-[26px] flex-none place-items-center text-gs-gold-bright">
+                <Icon name={a.icon} size={24} />
+              </span>
+              <span>{a.label}</span>
+              <span className="ml-auto font-body text-[12px] font-semibold normal-case tracking-normal text-gs-grey-3">
+                {a.sub}
+                {a.meta && <span className="ml-2 text-gs-gold/70">{a.meta}</span>}
+              </span>
+            </button>
+          ))}
+
+          {/* Apoyo (abre el enlace real de soporte) */}
           <button
-            key={l}
-            onClick={() => setLang(l)}
-            className={`rounded px-3 py-1 text-sm uppercase ${
-              lang === l ? "bg-cyan-600 text-white" : "border border-slate-600 text-slate-300 hover:bg-slate-800"
-            }`}
+            className="gs-action gs-action-support"
+            onClick={() => window.open(SUPPORT_URL, "_blank", "noopener")}
           >
-            {l}
+            <span className="grid h-[26px] w-[26px] flex-none place-items-center text-gs-pink">
+              <Icon name="heart" size={22} />
+            </span>
+            <span>{t("menu.support")}</span>
+            <span className="ml-auto font-body text-[12px] font-semibold normal-case tracking-normal text-gs-grey-3">
+              {t("menu.supportSub")}
+            </span>
           </button>
-        ))}
-      </div>
-
-      <div className="flex flex-col items-center gap-2">
-        <span className="text-xs uppercase tracking-widest text-slate-400">{t("menu.tag")}</span>
-        <div className="flex items-center gap-2">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={16}
-            placeholder={t("menu.namePlaceholder")}
-            autoComplete="off"
-            spellCheck={false}
-            className={`rounded border bg-slate-900 px-3 py-2 text-center outline-none ${
-              error ? "border-red-500" : "border-slate-600 focus:border-cyan-500"
-            }`}
-          />
-          <button onClick={onSave} className="rounded border border-slate-600 px-3 py-2 text-sm hover:bg-slate-800">
-            {t("common.save")}
-          </button>
-          {saved && <span className="text-sm text-emerald-400">{t("menu.saved")}</span>}
         </div>
       </div>
 
-      <div className="flex flex-col items-stretch gap-3">
-        <button
-          onClick={onCoop}
-          className="rounded-lg border border-cyan-500/50 bg-cyan-600/10 px-8 py-3 text-lg font-semibold tracking-wide hover:bg-cyan-600/25"
-        >
-          {t("menu.playOnline")}
-        </button>
-        <button
-          onClick={onSolo}
-          className="rounded-lg border border-cyan-500/50 bg-cyan-600/10 px-8 py-3 text-lg font-semibold tracking-wide hover:bg-cyan-600/25"
-        >
-          {t("menu.solo")}
-        </button>
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent("open-controls"))}
-          className="rounded-lg border border-slate-600 px-8 py-3 text-lg tracking-wide hover:bg-slate-800"
-        >
-          {t("menu.controls")}
-        </button>
-        <button
-          onClick={() => window.open(SUPPORT_URL, "_blank", "noopener")}
-          className="rounded-lg border border-pink-500/50 bg-pink-600/10 px-8 py-3 text-lg tracking-wide text-pink-200 hover:bg-pink-600/25"
-        >
-          {t("menu.support")}
-        </button>
-      </div>
+      <RadarMark />
     </div>
   );
 }

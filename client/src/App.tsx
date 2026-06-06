@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Routes, Route, useNavigate } from "react-router";
 import MainMenu from "./ui/MainMenu";
 import ControlsScreen from "./ui/ControlsScreen";
+import Reconnect from "./ui/Reconnect";
 
 // Mapea cada pantalla del menú (emitida por game.js) a una ruta. Por ahora solo
 // "/" (MainMenu) tiene componente React; lobby/solo/room siguen en game.js y se
@@ -16,6 +17,7 @@ const SCREEN_PATH: Record<string, string> = {
 export default function App() {
   const navigate = useNavigate();
   const [showControls, setShowControls] = useState(false);
+  const [disconnected, setDisconnected] = useState(false);
 
   // game.js emite "menu-screen" al cambiar de pantalla → reflejamos en la URL.
   useEffect(() => {
@@ -35,6 +37,14 @@ export default function App() {
     return () => window.removeEventListener("open-controls", open);
   }, []);
 
+  // Overlay de conexión perdida. game.js emite "conn-lost" tras una caída (ya
+  // conectado) y conduce la reconexión automática; aquí solo mostramos el overlay.
+  useEffect(() => {
+    const lost = () => setDisconnected(true);
+    window.addEventListener("conn-lost", lost);
+    return () => window.removeEventListener("conn-lost", lost);
+  }, []);
+
   return (
     <>
       <Routes>
@@ -43,6 +53,7 @@ export default function App() {
         <Route path="*" element={null} />
       </Routes>
       {showControls && <ControlsScreen onClose={() => setShowControls(false)} />}
+      {disconnected && <Reconnect onRetry={() => location.reload()} />}
     </>
   );
 }

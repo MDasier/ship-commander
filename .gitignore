@@ -1,3 +1,5 @@
 node_modules/
 .idea/
 dist/
+/Ship Commander-handoff.zip
+/.design-handoff/
