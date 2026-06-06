@@ -16,6 +16,18 @@
   *::after {
     box-sizing: border-box;
   }
+  /* Reset de botón (preflight está desactivado): sin apariencia nativa
+     (fondo claro + borde biselado). Las utilidades/clases .gs-* aportan el
+     estilo real; border-style queda solid para que las utilidades de borde
+     se rendericen bien. */
+  button {
+    appearance: none;
+    background-color: transparent;
+    border: 0 solid transparent;
+    color: inherit;
+    font-family: inherit;
+    cursor: pointer;
+  }
   html,
   body {
     margin: 0;

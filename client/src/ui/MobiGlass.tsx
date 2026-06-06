@@ -74,7 +74,7 @@ export default function MobiGlass({ onClose }: { onClose: () => void }) {
       {/* Variante "Lateral" del handoff: pestañas en columna izquierda. */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[86vh] w-[min(720px,92vw)] overflow-hidden rounded-gs border border-gs-gold bg-gs-ink/85 text-white shadow-gs-glow"
+        className="flex h-[min(500px,86vh)] w-[min(720px,92vw)] overflow-hidden rounded-gs border border-gs-gold bg-gs-ink/85 text-white shadow-gs-glow"
       >
         {/* Columna de pestañas (izquierda) */}
         <div className="flex w-[150px] flex-none flex-col gap-1.5 border-r border-gs-rule/12 bg-black/25 p-2.5">
@@ -89,10 +89,10 @@ export default function MobiGlass({ onClose }: { onClose: () => void }) {
                 key={tb.id}
                 onClick={() => setTab(tb.id)}
                 aria-pressed={active}
-                className={`flex items-center gap-2.5 rounded-md border-l-2 px-3.5 py-3 text-left transition-all duration-200 ease-gs ${
+                className={`flex items-center gap-2.5 rounded-md border px-3.5 py-3 text-left transition-all duration-200 ease-gs ${
                   active
-                    ? "border-l-gs-gold-bright bg-gs-gold-bright/8 text-gs-gold-bright"
-                    : "border-l-transparent text-gs-grey-3 hover:text-white"
+                    ? "border-gs-gold-bright bg-gs-gold-bright/10 text-gs-gold-bright"
+                    : "border-transparent text-gs-grey-3 hover:bg-white/[0.04] hover:text-white"
                 }`}
               >
                 <Icon name={tb.icon} size={17} />
@@ -189,41 +189,46 @@ function MatchTab({ onExit }: { onExit: () => void }) {
   const red = list.filter((p) => (p.team as string) === "red");
   const aliveOf = (arr: Record<string, unknown>[]) => arr.filter((p) => !p.dead).length;
 
-  const TeamRow = ({ side, arr }: { side: "green" | "red"; arr: Record<string, unknown>[] }) => {
+  // Encabezado de equipo + sus integrantes (cada jugador bajo SU equipo, no en
+  // una lista plana: antes parecía que el verde caía en la sección roja).
+  const TeamGroup = ({ side, arr }: { side: "green" | "red"; arr: Record<string, unknown>[] }) => {
     const color = side === "green" ? "var(--color-gs-green)" : "var(--color-gs-red)";
     return (
-      <div className="mb-1 flex items-center justify-between border-b py-2.5" style={{ borderColor: `${color}4d` }}>
-        <span className="font-bold uppercase tracking-wide" style={{ color }}>
-          {side === "green" ? t("room.teamGreen") : t("room.teamRed")}
-        </span>
-        <span className="gs-hud-mono text-[13px]" style={{ color }}>
-          {aliveOf(arr)} / {arr.length}
-        </span>
+      <div className="mb-3">
+        <div className="mb-1.5 flex items-center justify-between border-b py-2.5" style={{ borderColor: `${color}4d` }}>
+          <span className="font-bold uppercase tracking-wide" style={{ color }}>
+            {side === "green" ? t("room.teamGreen") : t("room.teamRed")}
+          </span>
+          <span className="gs-hud-mono text-[13px]" style={{ color }}>
+            {aliveOf(arr)} / {arr.length}
+          </span>
+        </div>
+        {arr.length === 0 ? (
+          <div className="py-1.5 text-[13px] text-gs-grey-3">{t("room.emptyTeam")}</div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {arr.map((p) => (
+              <div key={p.id as string} className="flex items-center gap-2.5 py-1">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: p.dead ? "#222" : color }} />
+                <span className={`font-bold ${(p.id as string) === myId ? "text-white" : "text-gs-rule"}`}>
+                  {(p.name as string) || "Pilot"} {(p.id as string) === myId && <span className="text-gs-grey-3">{t("room.you")}</span>}
+                </span>
+                <span className="gs-hud-mono ml-auto text-[13px] text-gs-grey-2">
+                  {(p.kills as number) ?? 0}K · {(p.deaths as number) ?? 0}D
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
 
   return (
     <div>
-      <TeamRow side="green" arr={green} />
-      <TeamRow side="red" arr={red} />
-      <div className="mt-3.5 flex flex-col gap-1.5">
-        {list.map((p) => (
-          <div key={p.id as string} className="flex items-center gap-2.5 py-1">
-            <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ background: p.dead ? "#222" : (p.team as string) === "red" ? "var(--color-gs-red)" : "var(--color-gs-green)" }}
-            />
-            <span className={`font-bold ${(p.id as string) === myId ? "text-white" : "text-gs-rule"}`}>
-              {(p.name as string) || "Pilot"} {(p.id as string) === myId && <span className="text-gs-grey-3">{t("room.you")}</span>}
-            </span>
-            <span className="gs-hud-mono ml-auto text-[13px] text-gs-grey-2">
-              {(p.kills as number) ?? 0}K · {(p.deaths as number) ?? 0}D
-            </span>
-          </div>
-        ))}
-      </div>
-      <button className="gs-btn gs-btn-danger mt-4 w-full py-3.5 text-[15px]" onClick={() => { onExit(); roomLeave(); }}>
+      <TeamGroup side="green" arr={green} />
+      <TeamGroup side="red" arr={red} />
+      <button className="gs-btn gs-btn-danger mt-2 w-full py-3.5 text-[15px]" onClick={() => { onExit(); roomLeave(); }}>
         {t("dead.leave")}
       </button>
     </div>
@@ -238,21 +243,28 @@ function ControlsTab() {
     const tr = t(key);
     return tr !== key ? tr : (BINDING_LABELS as Record<string, string>)[action];
   };
+  // Una sola lista (solo lectura aquí): reasignables (keycap oro) + fijos (azul),
+  // en dos columnas para que la sección no sea más alta que las demás.
+  const items: { label: string; cap: string; fixed: boolean }[] = [
+    ...Object.keys(BINDING_LABELS as Record<string, string>).map((action) => ({
+      label: label(action),
+      cap: displayKey(bindings[action]),
+      fixed: false,
+    })),
+    ...FIXED_ROWS.map((row) => ({
+      label: t(row.desc),
+      cap: row.literal ?? t(row.keyI18n!),
+      fixed: true,
+    })),
+  ];
   return (
-    <div className="flex flex-col gap-1.5">
-      {Object.keys(BINDING_LABELS as Record<string, string>).map((action) => (
-        <div key={action} className="flex items-center gap-3">
-          <span className="flex-1 text-sm font-medium text-gs-rule">{label(action)}</span>
-          <span className="gs-key">{displayKey(bindings[action])}</span>
-        </div>
-      ))}
-      <div className="gs-eyebrow mb-1 mt-4 text-gs-grey-3">{t("controls.fixed")}</div>
-      {FIXED_ROWS.map((row, i) => (
-        <div key={i} className="flex items-center gap-3.5">
-          <span className="gs-key min-w-[96px] border-gs-blue-soft/35 bg-gs-blue-soft/8 text-gs-blue-soft">
-            {row.literal ?? t(row.keyI18n!)}
+    <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+      {items.map((it, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <span className={`flex-1 text-sm ${it.fixed ? "text-gs-grey-2" : "font-medium text-gs-rule"}`}>{it.label}</span>
+          <span className={`gs-key ${it.fixed ? "border-gs-blue-soft/35 bg-gs-blue-soft/8 text-gs-blue-soft" : ""}`}>
+            {it.cap}
           </span>
-          <span className="text-sm text-gs-grey-2">{t(row.desc)}</span>
         </div>
       ))}
     </div>
