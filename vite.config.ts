@@ -1,16 +1,27 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import babel from "@rolldown/plugin-babel";
+import tailwindcss from "@tailwindcss/vite";
 
-// Vite 8 (bundler Rolldown). El cliente vive en client/; el servidor Node + ws
-// (server/server.js) sigue siendo independiente y sirve el build de dist/ en prod.
+// Vite 8 (bundler Rolldown, compiler Oxc). El cliente vive en client/ (app React
+// + TypeScript); el servidor Node + ws (server/server.js) sigue siendo independiente
+// y sirve el build de dist/ en prod.
 //
-// Dev:  npm run dev:client (Vite + HMR, :5173) · npm run dev:server (node, :8080/:8081)
+// Dev:  pnpm run dev:client (Vite + HMR, :5173) · pnpm run dev:server (node, :8080/:8081)
 //       en dos terminales. El proxy de abajo redirige /ws y /config al servidor.
-// Prod: npm run build → dist/ · npm start → server.js sirve dist/.
+// Prod: pnpm run build → dist/ · pnpm start → server.js sirve dist/.
 export default defineConfig({
   root: "client",
   // El juego es autocontenido (audio procedural, canvas, sin assets externos).
   publicDir: false,
+  plugins: [
+    // React + Fast Refresh (Oxc). React Compiler vía @rolldown/plugin-babel + preset.
+    react(),
+    babel({ presets: [reactCompilerPreset()] }),
+    // Tailwind CSS v4 (plugin oficial de Vite).
+    tailwindcss(),
+  ],
   build: {
     outDir: "../dist",
     emptyOutDir: true,

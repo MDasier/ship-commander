@@ -296,8 +296,13 @@
   <!-- ── CANVAS ── -->
   <canvas id="c"></canvas>
 
-  <!-- Punto de entrada ES module · game.js importa i18n/particles/sounds. Vite lo empaqueta. -->
-  <script type="module" src="/src/game.js"></script>
+  <!-- Raíz de React. El markup del juego (arriba) se migra a componentes React
+       de forma incremental (strangler); por ahora React monta aquí su UI propia,
+       todavía vacía, mientras game.js sigue usando el markup existente. -->
+  <div id="root"></div>
+
+  <!-- Punto de entrada: React monta en #root y arranca el juego (importa game.js). -->
+  <script type="module" src="/src/main.tsx"></script>
 
 </body>
 
