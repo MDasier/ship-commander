@@ -1,6 +1,6 @@
 // Manejo de los mensajes WebSocket entrantes. handleMessage(ws, player, msg)
 // recibe el mensaje ya parseado y muta el estado de la sala correspondiente.
-// El ciclo de conexión (alta/baja del socket) vive en wsServer.js.
+// El ciclo de conexión (alta/baja del socket) vive en wsServer.ts.
 
 const CFG = require("../config");
 const { WORLD_PRESETS, MAX_PLAYERS, FPS } = require("../constants.ts");
@@ -9,13 +9,13 @@ const { send, broadcastRoom, broadcastRoomList } = require("./broadcast.ts");
 const {
   createRoom, joinRoom, removeFromRoom, roomList, detachGunner,
 } = require("../rooms/rooms.ts");
-const { startGame, restartRoom } = require("../rooms/lifecycle");
+const { startGame, restartRoom } = require("../rooms/lifecycle.ts");
 const { applyShipStats, killPlayer } = require("../entities/player.ts");
 const { spawnPos, spawnSafePos, createAsteroids } = require("../entities/spawn.ts");
 const { fireEmpPulse, dropMine, fireCapitalBeam } = require("../sim/weapons.ts");
 const { setWaveBanner, TEAM_LIVES } = require("../ai/waves.ts");
 
-function handleMessage(ws, player, msg) {
+function handleMessage(ws: any, player: Player, msg: any): void {
   if (msg.type === "getRooms") {
     send(ws, { type: "rooms", rooms: roomList() });
     return;
@@ -91,7 +91,7 @@ function handleMessage(ws, player, msg) {
 
     // Mid-game spawn: inicializar el jugador directamente en partida
     if (room.status === "playing") {
-      const allP = Object.values(room.players);
+      const allP = Object.values(room.players) as Player[];
       const greenCount = allP.filter(p => p.team === "green" && !p.dead).length;
       const redCount   = allP.filter(p => p.team === "red"   && !p.dead).length;
       if (player.team !== "green" && player.team !== "red") {
@@ -129,7 +129,7 @@ function handleMessage(ws, player, msg) {
     if (room.coopMode) {
       room.enforceBalance = false;
       // Todos al equipo verde (humanos juntos contra la IA)
-      Object.values(room.players).forEach(p => { p.team = "green"; });
+      Object.values(room.players).forEach((p: Player) => { p.team = "green"; });
     }
     broadcastRoom(room, { type: "roomUpdate", room });
     broadcastRoomList();
@@ -175,7 +175,7 @@ function handleMessage(ws, player, msg) {
     player.ready = !player.ready;
     broadcastRoom(room, { type: "roomUpdate", room });
 
-    const list = Object.values(room.players);
+    const list = Object.values(room.players) as Player[];
     if (list.length >= 1 && list.every(p => p.ready)) {
       if (room.enforceBalance) {
         const gc = list.filter(p => p.team === "green").length;
@@ -213,8 +213,8 @@ function handleMessage(ws, player, msg) {
       if (gunner) gunner.team = player.team;
     }
     if (player.gunnerIds) {
-      player.gunnerIds.filter(Boolean).forEach(gid => {
-        const g = room.players[gid];
+      player.gunnerIds.filter(Boolean).forEach((gid: string | null) => {
+        const g = room.players[gid as string];
         if (g) g.team = player.team;
       });
     }
@@ -237,11 +237,11 @@ function handleMessage(ws, player, msg) {
         player.gunnerId = null;
       }
       if (player.gunnerIds && player.shipType === "capital" && msg.shipType !== "capital") {
-        player.gunnerIds.forEach((gid, idx) => {
+        player.gunnerIds.forEach((gid: string | null, idx: number) => {
           if (!gid) return;
           const g = room.players[gid];
           if (g) { g.pilotingFor = null; g.turretIndex = undefined; }
-          player.gunnerIds[idx] = null;
+          player.gunnerIds![idx] = null;
         });
         player.turretAngles = {};
       }
@@ -323,7 +323,7 @@ function handleMessage(ws, player, msg) {
     if (!room || player.dead) return;
     if (player.empDisabled || (player.pilotingFor && room.players[player.pilotingFor]?.empDisabled)) return;
     if (player.missileCooldown > 0) return;
-    const active = room.missiles.filter(m => m.ownerId === player.id).length;
+    const active = room.missiles.filter((m: Missile) => m.ownerId === player.id).length;
     if (active >= (player.maxMissiles ?? CFG.MISSILE_MAX_ACTIVE)) return;
 
     // Artillero lanza desde la posición del piloto con ángulo de su torreta

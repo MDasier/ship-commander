@@ -8,7 +8,7 @@ const { spawnPos } = require("../entities/spawn.ts");
 const { setWaveBanner, TEAM_LIVES } = require("../ai/waves.ts");
 const { broadcastRoom } = require("../net/broadcast.ts");
 
-function startGame(room) {
+function startGame(room: Room): void {
   room.status = "playing";
   room.bullets  = [];
   room.missiles = [];
@@ -102,7 +102,7 @@ function startGame(room) {
   broadcastRoom(room, { type: "gameStarted" });
 }
 
-function restartRoom(room) {
+function restartRoom(room: Room): void {
   room.status   = "waiting";
   // Co-op: elimina los bots y reinicia el estado de oleadas
   Object.keys(room.players).forEach(pid => { if (room.players[pid].isBot) delete room.players[pid]; });

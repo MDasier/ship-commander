@@ -4,7 +4,7 @@
 // los jugadores se mueven antes de resolver colisiones.
 
 const { FPS } = require("../constants.ts");
-const { rooms } = require("../state.ts");
+const { rooms } = require("../state.ts") as { rooms: Record<string, Room> };
 const { stepPlayers } = require("./movement.ts");
 const { collideAsteroids, stepBullets, stepMissiles } = require("./collisions.ts");
 const { stepEffects } = require("./effects.ts");
@@ -13,7 +13,7 @@ const { buildState } = require("../net/serialize.ts");
 const { broadcastRoom } = require("../net/broadcast.ts");
 
 // Resuelve el ganador (aniquilación total o tiempo agotado con cascada de criterios).
-function resolveVictory(room) {
+function resolveVictory(room: Room): void {
   const allPlayers  = Object.values(room.players);
   const greenAlive  = allPlayers.filter(p => p.team === "green" && !p.dead).length;
   const redAlive    = allPlayers.filter(p => p.team === "red"   && !p.dead).length;
@@ -31,14 +31,14 @@ function resolveVictory(room) {
       if      (greenAlive > redAlive) room.winner = "green";
       else if (redAlive > greenAlive) room.winner = "red";
       else {
-        const greenKills = allPlayers.filter(p => p.team === "green").reduce((s,p) => s + (p.kills||0), 0);
-        const redKills   = allPlayers.filter(p => p.team === "red"  ).reduce((s,p) => s + (p.kills||0), 0);
+        const greenKills = allPlayers.filter(p => p.team === "green").reduce((s, p) => s + (p.kills || 0), 0);
+        const redKills   = allPlayers.filter(p => p.team === "red"  ).reduce((s, p) => s + (p.kills || 0), 0);
         if      (greenKills > redKills) room.winner = "green";
         else if (redKills > greenKills) room.winner = "red";
         else {
           // Desempate por daño total infligido
-          const greenDmg = allPlayers.filter(p => p.team === "green").reduce((s,p) => s + (p.damageDealt||0), 0);
-          const redDmg   = allPlayers.filter(p => p.team === "red"  ).reduce((s,p) => s + (p.damageDealt||0), 0);
+          const greenDmg = allPlayers.filter(p => p.team === "green").reduce((s, p) => s + (p.damageDealt || 0), 0);
+          const redDmg   = allPlayers.filter(p => p.team === "red"  ).reduce((s, p) => s + (p.damageDealt || 0), 0);
           if      (greenDmg > redDmg) room.winner = "green";
           else if (redDmg > greenDmg) room.winner = "red";
           else                        room.winner = "draw";
@@ -48,7 +48,7 @@ function resolveVictory(room) {
   }
 }
 
-function update() {
+function update(): void {
   Object.values(rooms).forEach(room => {
     if (room.status !== "playing") return;
 
@@ -72,7 +72,7 @@ function update() {
   });
 }
 
-function startLoop() {
+function startLoop(): NodeJS.Timeout {
   return setInterval(update, 1000 / FPS);
 }
 

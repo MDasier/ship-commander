@@ -14,8 +14,8 @@ const CFG  = require("../config");
 // dist/ está dos niveles por encima de server/admin/.
 const adminHtmlPath = path.join(__dirname, "../../dist/admin.html");
 
-function startAdminServer(port) {
-  const adminServer = http.createServer((req, res) => {
+function startAdminServer(port: number): any {
+  const adminServer = http.createServer((req: any, res: any) => {
     res.setHeader("Access-Control-Allow-Origin",  "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -32,7 +32,7 @@ function startAdminServer(port) {
 
       if (req.method === "POST") {
         let body = "";
-        req.on("data", chunk => body += chunk);
+        req.on("data", (chunk: any) => body += chunk);
         req.on("end", () => {
           try {
             const updates = JSON.parse(body);
@@ -54,7 +54,7 @@ function startAdminServer(port) {
     }
 
     // Admin panel HTML (build de Vite)
-    fs.readFile(adminHtmlPath, (err, data) => {
+    fs.readFile(adminHtmlPath, (err: any, data: any) => {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       if (err) {
         res.end("<h1>Panel admin</h1><p>No se encontró <code>dist/admin.html</code>. " +

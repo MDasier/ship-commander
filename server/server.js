@@ -6,9 +6,9 @@
 // condición de victoria viven aquí (no en el cliente). El cliente solo envía
 // inputs, interpola el estado recibido y dibuja.
 
-const { startAdminServer } = require("./admin/adminServer");
-const { startGameServer }  = require("./net/wsServer");
-const { startLoop }        = require("./sim/loop");
+const { startAdminServer } = require("./admin/adminServer.ts");
+const { startGameServer }  = require("./net/wsServer.ts");
+const { startLoop }        = require("./sim/loop.ts");
 
 const PORT       = parseInt(process.env.PORT) || 8080;
 const ADMIN_PORT = PORT + 1;

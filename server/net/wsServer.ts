@@ -13,11 +13,11 @@ const { clients } = require("../state.ts");
 const { send, broadcastRoomList } = require("./broadcast.ts");
 const { createPlayer } = require("../entities/player.ts");
 const { removeFromRoom, roomList } = require("../rooms/rooms.ts");
-const { handleMessage } = require("./handlers");
+const { handleMessage } = require("./handlers.ts");
 
 // dist/ está dos niveles por encima de server/net/
 const clientDir = path.join(__dirname, "../../dist");
-const MIME_TYPES = {
+const MIME_TYPES: Record<string, string> = {
   ".html":  "text/html; charset=utf-8",
   ".js":    "application/javascript; charset=utf-8",
   ".css":   "text/css; charset=utf-8",
@@ -29,8 +29,8 @@ const MIME_TYPES = {
   ".woff2": "font/woff2",
 };
 
-function startGameServer(port) {
-  const gameHttpServer = http.createServer((req, res) => {
+function startGameServer(port: number): any {
+  const gameHttpServer = http.createServer((req: any, res: any) => {
     const reqPath  = req.url === "/" ? "/index.html" : req.url.split("?")[0];
     const safePath = path.normalize(reqPath).replace(/^(\.\.[/\\])+/, "");
     const fullPath = path.join(clientDir, safePath);
@@ -39,7 +39,7 @@ function startGameServer(port) {
       res.writeHead(403); res.end(); return;
     }
 
-    fs.readFile(fullPath, (err, data) => {
+    fs.readFile(fullPath, (err: any, data: any) => {
       if (err) { res.writeHead(404); res.end("Not found"); return; }
       const mime = MIME_TYPES[path.extname(fullPath)] || "application/octet-stream";
       res.writeHead(200, { "Content-Type": mime });
@@ -53,7 +53,7 @@ function startGameServer(port) {
     console.log(`Game:         http://localhost:${port}`)
   );
 
-  wss.on("connection", ws => {
+  wss.on("connection", (ws: any) => {
     const id     = crypto.randomUUID();
     const player = createPlayer(id);
     ws.player    = player;
@@ -62,7 +62,7 @@ function startGameServer(port) {
     send(ws, { type: "init", id, ships: CFG.SHIP_TYPES });
     send(ws, { type: "rooms", rooms: roomList() });
 
-    ws.on("message", raw => {
+    ws.on("message", (raw: any) => {
       let msg;
       try { msg = JSON.parse(raw); } catch (e) { return; }
       handleMessage(ws, player, msg);
