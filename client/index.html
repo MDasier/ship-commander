@@ -92,12 +92,8 @@
       <div class="soloHint" data-i18n="solo.hint">Vuela libre para practicar controles y armas. Sal con [F1] → Salir al lobby.</div>
     </div>
 
-    <!-- ── CONTROLES ── -->
-    <div id="controlsScreen" class="hidden">
-      <button class="menuBackBtn" data-back data-i18n="common.backMenu">← Menú</button>
-      <h2 data-i18n="controls.title">Controles</h2>
-      <div id="menuControlsBody"></div>
-    </div>
+    <!-- ── CONTROLES ── (migrada a React: client/src/ui/ControlsScreen.tsx,
+         abierta vía CustomEvent "open-controls" emitido por game.js) -->
 
     <div id="room" class="hidden">
       <div class="roomHeader">

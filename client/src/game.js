@@ -116,6 +116,44 @@ function startRecording(action, keyEl) {
   document.addEventListener("keydown", recordingHandler, true);
 }
 
+// ── Puente para la UI React (Fase 1) ──────────────────────────────────
+// `bindings` sigue siendo la única fuente de verdad que consume el input del
+// juego. React lee/escribe a través de esta API; la captura de tecla la hace
+// el componente React y llama rebindKey(). El render legacy (mobiglass) sigue
+// usando bindings directamente y se mantiene coherente al leer getBindings().
+const _bindingsListeners = [];
+function onBindingsChange(fn) {
+  _bindingsListeners.push(fn);
+  return () => {
+    const i = _bindingsListeners.indexOf(fn);
+    if (i >= 0) _bindingsListeners.splice(i, 1);
+  };
+}
+function _emitBindingsChange() {
+  const snap = getBindings();
+  _bindingsListeners.forEach(fn => { try { fn(snap); } catch (_) { } });
+}
+function getBindings() { return { ...bindings }; }
+// Reasigna `rawKey` a `action`. Devuelve "ok" | "reserved". Misma lógica que
+// startRecording pero sin DOM (normaliza, rechaza reservadas, desvincula
+// conflictos, persiste y notifica a React).
+function rebindKey(action, rawKey) {
+  const newKey = (rawKey || "").toLowerCase();
+  if (RESERVED_KEYS.has(newKey)) return "reserved";
+  for (const [k, v] of Object.entries(bindings)) {
+    if (k !== action && v === newKey) bindings[k] = null;
+  }
+  bindings[action] = newKey;
+  saveBindings();
+  _emitBindingsChange();
+  return "ok";
+}
+function resetBindings() {
+  bindings = { ...DEFAULT_BINDINGS };
+  saveBindings();
+  _emitBindingsChange();
+}
+
 function renderControlesPane(targetId = "pane-controles") {
   cancelRecording();
   const pane = document.getElementById(targetId);
@@ -1515,8 +1553,8 @@ document.getElementById("menuPlayOnline").onclick = () => {
 document.getElementById("menuSolo").onclick = () => showMenuScreen("soloSetup");
 
 document.getElementById("menuControls").onclick = () => {
-  renderControlesPane("menuControlsBody");
-  showMenuScreen("controlsScreen");
+  // La pantalla de controles ahora la renderiza React como overlay (ver App.tsx).
+  window.dispatchEvent(new CustomEvent("open-controls"));
 };
 
 document.getElementById("menuSupport").onclick = () => {
@@ -4491,5 +4529,11 @@ function loop() {
   requestAnimationFrame(loop);
 
 }
+
+// ── Superficie pública para la UI React (Fase 1) ──────────────────────
+export {
+  getBindings, rebindKey, resetBindings, onBindingsChange,
+  BINDING_LABELS, RESERVED_KEYS, DEFAULT_BINDINGS, displayKey, bindingText,
+};
 
 loop();

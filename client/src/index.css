@@ -1,1 +1,8 @@
-@import "tailwindcss";
+/* Tailwind CSS v4 SIN Preflight (reset base) para convivir con el CSS legacy
+   del juego (styles.css) durante la migración incremental. Importamos solo las
+   capas theme + utilities; omitimos la capa base/preflight a propósito.
+   Cuando todo el cliente sea React podremos reactivar el preflight.
+   Doc oficial: https://tailwindcss.com/docs/preflight */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
