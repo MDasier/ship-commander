@@ -1,7 +1,7 @@
 // @ts-nocheck
 // ── Render del mundo: límites, grid, ping y asteroides ────────────────
 import { S } from "../state";
-import { ctx, getMe, worldToScreen } from "./canvas";
+import { canvas, ctx, getMe, worldToScreen } from "./canvas";
 import { seededRand } from "../math";
 
 // Limpia la caché de formas de asteroide (la llama game.ts al resetear la sala).

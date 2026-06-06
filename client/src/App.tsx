@@ -11,7 +11,7 @@ import ChatInput from "./ui/ChatInput";
 import DeadPanel from "./ui/DeadPanel";
 import ControlsScreen from "./ui/ControlsScreen";
 import Reconnect from "./ui/Reconnect";
-import { closeMobiglass } from "./game";
+import { closeMobiglass, getMenuScreen } from "./game";
 
 // Mapea cada pantalla del menú (emitida por game.js) a una ruta. Por ahora solo
 // "/" (MainMenu) tiene componente React; lobby/solo/room siguen en game.js y se
@@ -34,7 +34,14 @@ export default function App() {
   const [dead, setDead] = useState(false);
 
   // game.js emite "menu-screen" al cambiar de pantalla → reflejamos en la URL.
+  // Al montar, sincronizamos la ruta con la pantalla actual de game.js: su
+  // primer evento "mainMenu" se dispara en el bootstrap ANTES de que React
+  // monte y escuche (main.tsx importa game.js antes de renderizar App), así que
+  // sin esto un refresco en /game se quedaría sin menú. getMenuScreen() ya
+  // refleja la pantalla real (mainMenu tras el arranque).
   useEffect(() => {
+    const initial = SCREEN_PATH[getMenuScreen()] || "/";
+    navigate(initial, { replace: true });
     const onScreen = (e: Event) => {
       const name = (e as CustomEvent<string>).detail;
       const path = SCREEN_PATH[name];
