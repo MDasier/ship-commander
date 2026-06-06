@@ -39,6 +39,11 @@ import {
 } from "./game/render/draw";
 import { cycleTargetByRadar } from "./game/render/sensors";
 import { triggerPingEffect } from "./game/render/world";
+import {
+  fireWeapon, stopAutoFire, isCapitalPilot,
+  startBeamCharge, releaseBeamCharge, cycleSpectator,
+  startSdCharge, cancelSd,
+} from "./game/actions";
 
 // Controles/keybindings (getBindings, rebindKey, bindingText, renderControlesPane…)
 // viven en game/controls.ts.
@@ -185,162 +190,8 @@ function chatSend(text) {
 
 // Listeners de ratón/teclado registrados por game/input.ts (installInput).
 
-// ── Weapon heat system
-let weaponFireTimer = null;
-
-const HEAT_PER_SHOT = 10;//calor por bala
-const HEAT_DECAY_MS = 46;//milisegundos de enfriamiento
-const HEAT_DECAY_AMT = 1;//calor que baja por tick
-const BASE_FIRE_MS = 100;//cadencia
-
-const OVERHEAT_LIMIT = 99;//calor máximo (umbral de bloqueo)
-const RECOVER_LIMIT = 60;//calor mínimo (umbral de descongestión)
-
-// ── FIRE LOOP
-function fireWeapon() {
-  const me = getMe();
-
-  if (!me || me.dead || !S.inGame) {
-    stopAutoFire();
-    return;
-  }
-
-  if (S.weaponOverheated) {
-    playAlertSound("weaponLocked");   // intento de disparo con el arma bloqueada
-    stopAutoFire();
-    return;
-  }
-
-  ws.send(JSON.stringify({ type: "shoot" }));
-  playShootSound();
-
-  S.weaponHeat = Math.min(100, S.weaponHeat + HEAT_PER_SHOT);
-
-  if (S.weaponHeat >= OVERHEAT_LIMIT) {
-    S.weaponOverheated = true;
-    playAlertSound("weaponLocked");   // el arma acaba de sobrecalentarse
-    stopAutoFire();
-    return;
-  }
-
-  // SOLO depende del input real
-  if (!S.mouseLeftHeld) {
-    clearTimeout(weaponFireTimer);
-    weaponFireTimer = null;
-    return;
-  }
-
-  const heatFactor = S.weaponHeat / 100;
-
-  const interval = BASE_FIRE_MS *
-    (1 + Math.pow(heatFactor, 2) * 4);
-
-  weaponFireTimer = setTimeout(fireWeapon, interval);
-}
-function startAutoFire() {
-  S.mouseLeftHeld = true;
-
-  // evita duplicar loops
-  if (weaponFireTimer) return;
-
-  fireWeapon();
-}
-function stopAutoFire() {
-  S.mouseLeftHeld = false;
-
-  clearTimeout(weaponFireTimer);
-  weaponFireTimer = null;
-}
-//enfriamiento de arma
-setInterval(() => {
-  if (S.weaponHeat > 0) {
-    S.weaponHeat = Math.max(0, S.weaponHeat - HEAT_DECAY_AMT);
-
-    if (S.weaponOverheated && S.weaponHeat <= RECOVER_LIMIT) {
-      S.weaponOverheated = false;
-    }
-  }
-}, HEAT_DECAY_MS);
-
-
-// ── Rayo de la Capital: mantener pulsado para cargar, soltar para disparar
-// (S.beamHeld)
-function isCapitalPilot() {
-  const me = getMe();
-  return !!(me && !me.dead && me.shipType === "capital" && !me.pilotingFor);
-}
-function startBeamCharge() {
-  if (S.beamHeld) return;            // ignora repetición de tecla
-  S.beamHeld = true;
-  ws.send(JSON.stringify({ type: "beamCharge", charging: true }));
-}
-// cancel=true → soltar sin disparar (mouseleave, perder foco, muerte). Evita que
-// el rayo se dispare por un release involuntario aunque estuviera cargado.
-function releaseBeamCharge(cancel = false) {
-  if (!S.beamHeld) return;
-  S.beamHeld = false;
-  const me = getMe();
-  if (!cancel && me && (me.beamCharge ?? 0) >= 0.999) playBeamFireSound();  // solo si llegó a disparar
-  ws.send(JSON.stringify({ type: "beamCharge", charging: false, cancel }));
-}
-// (S.beamWasReady) para sonar el aviso eléctrico al quedar listo el rayo
-// (S.abilityWasReady) idem para la habilidad [X] (arranca lista → sin aviso inicial)
-
-// Enfriamiento pasivo de arma
-//setInterval(() => {
-//  if (S.weaponHeat > 0) S.weaponHeat = Math.max(0, S.weaponHeat - HEAT_DECAY_AMT);
-//}, HEAT_DECAY_MS);
-
-// (listeners de ratón en game/input.ts)
-
-// ── Spectator
-function cycleSpectator() {
-  const living = Object.values(S.players).filter(p => !p.dead && p.id !== S.myId);
-  if (living.length === 0) { S.specTargetId = null; return; }
-  if (!S.specTargetId) { S.specTargetId = living[0].id; return; }
-  const idx = living.findIndex(p => p.id === S.specTargetId);
-  S.specTargetId = living[(idx + 1) % living.length].id;
-}
-
-// ── Self-destruct
-// sdState/sdCountdown/sdHoldStart viven en S (la UI los lee desde el render);
-// los handles de timer son locales (solo game.ts los maneja).
-let sdHoldTimer = null;
-let sdInterval = null;
-
-function startSdCharge() {
-  const me = getMe();
-  if (!me || me.dead || S.sdState) return;
-  S.sdState = "charging";
-  S.sdHoldStart = Date.now();
-  sdHoldTimer = setTimeout(startSdCountdown, 2000);
-}
-
-function startSdCountdown() {
-  S.sdState = "countdown";
-  S.sdCountdown = 5;
-  playSelfDestructBeep(5);
-  sdInterval = setInterval(() => {
-    S.sdCountdown--;
-    if (S.sdCountdown > 0) {
-      playSelfDestructBeep(S.sdCountdown);
-    } else {
-      clearInterval(sdInterval);
-      sdInterval = null;
-      S.sdState = null;
-      ws.send(JSON.stringify({ type: "selfDestruct" }));
-    }
-  }, 1000);
-}
-
-function cancelSd() {
-  clearTimeout(sdHoldTimer);
-  clearInterval(sdInterval);
-  S.sdState = null;
-  sdHoldTimer = null;
-  sdInterval = null;
-  S.sdCountdown = 0;
-}
+// Acciones de combate (disparo/calor, rayo Capital, espectador, autodestrucción)
+// viven en game/actions.ts.
 
 // ── Nombre del jugador ──────────────────────────────────────────────
 // Migrado a React (MainMenu): game.js ya no depende del DOM #nameInput.
