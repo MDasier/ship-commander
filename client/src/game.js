@@ -1497,28 +1497,13 @@ function lobbyJoin(roomId) {
   ws.send(JSON.stringify({ type: "joinRoom", roomId }));
 }
 
-const readyBtn = document.getElementById("ready");
-
-readyBtn.onclick = () => {
-  if (uiState !== "inRoom") return;
-
-  ws.send(JSON.stringify({
-    type: "ready"
-  }));
-
-  readyBtn.textContent =
-    readyBtn.textContent === "Go"
-      ? "Ready"
-      : "Go";
-};
-
-document.getElementById("leaveRoom").onclick = returnToLobby;
-
-document.getElementById("switchTeam").onclick = () => {
-  ws.send(JSON.stringify({
-    type: "switchTeam"
-  }));
-};
+// ── Acciones de la sala (disparadas desde React, Room.tsx) ──
+function roomSend(msg) { ws.send(JSON.stringify(msg)); }
+function getRoomData() { return roomData; }
+function getMyId() { return myId; }
+function roomToggleReady() { if (uiState === "inRoom") roomSend({ type: "ready" }); }
+function roomSwitchTeam() { roomSend({ type: "switchTeam" }); }
+function roomLeave() { returnToLobby(); }
 
 // ── Navegación del menú principal ──────────────
 // Enlace de donaciones — reemplázalo por el tuyo (PayPal.me, Ko-fi, etc.)
@@ -1527,7 +1512,7 @@ const SUPPORT_URL = "https://www.paypal.com/paypalme/mdasier";
 const MENU_SCREENS = ["mainMenu", "lobby", "soloSetup", "controlsScreen", "room"];
 // Pantallas cuyo UI ya vive en React (App.tsx las monta como overlay). A medida
 // que se migran pantallas legacy se añaden aquí para ocultar el #menu antiguo.
-const REACT_SCREENS = new Set(["mainMenu", "soloSetup", "lobby"]);
+const REACT_SCREENS = new Set(["mainMenu", "soloSetup", "lobby", "room"]);
 let _menuScreen = "mainMenu";
 function showMenuScreen(name) {
   _menuScreen = name;
@@ -1602,14 +1587,8 @@ ws.onmessage = e => {
   }
 
   if (data.type === "balanceError") {
-    const hint = document.getElementById("roomHint");
-    if (hint) {
-      hint.textContent = `⚠ Equipos desequilibrados (Verde: ${data.green} · Rojo: ${data.red}) — iguala los equipos para empezar`;
-      hint.style.color = "#ffaa44";
-      setTimeout(() => {
-        if (hint) { hint.textContent = "Esperando jugadores..."; hint.style.color = ""; }
-      }, 10000);
-    }
+    // La sala vive en React (Room.tsx): le pasamos el aviso de desequilibrio.
+    window.dispatchEvent(new CustomEvent("room-error", { detail: { green: data.green, red: data.red } }));
   }
 
   if (data.type === "gameStarted") {
@@ -1825,16 +1804,18 @@ function buildShipCards(ships) {
     return btn;
   }
 
+  // #shipCards (sala) y #soloShipCards están migrados a React; solo persiste el
+  // panel de muerte legacy (#deadShipCards). Guardamos cada contenedor.
   const container = document.getElementById("shipCards");
-  container.innerHTML = "";
+  if (container) container.innerHTML = "";
   const deadContainer = document.getElementById("deadShipCards");
-  deadContainer.innerHTML = "";
+  if (deadContainer) deadContainer.innerHTML = "";
   const soloContainer = document.getElementById("soloShipCards");
   if (soloContainer) soloContainer.innerHTML = "";
 
   for (const [type, ship] of Object.entries(ships)) {
-    container.appendChild(makeCard(type, ship, "prev-"));
-    deadContainer.appendChild(makeCard(type, ship, "dead-prev-"));
+    if (container) container.appendChild(makeCard(type, ship, "prev-"));
+    if (deadContainer) deadContainer.appendChild(makeCard(type, ship, "dead-prev-"));
     if (soloContainer) soloContainer.appendChild(makeCard(type, ship, "solo-prev-"));
   }
 
@@ -1842,7 +1823,13 @@ function buildShipCards(ships) {
   syncSoloShipSelector(soloSelectedShip);
 }
 
+// La sala está migrada a React (Room.tsx). renderPlayers solo notifica a React,
+// que renderiza el listado de jugadores/equipos desde getRoomData(). El cuerpo
+// legacy queda renombrado como función muerta (no se invoca) hasta su limpieza.
 function renderPlayers() {
+  window.dispatchEvent(new CustomEvent("room-update"));
+}
+function _renderPlayersLegacy() {
   if (!roomData) return;
 
   playersDiv.innerHTML = "";
@@ -2071,7 +2058,9 @@ function handleShipCardClick(e) {
   ws.send(JSON.stringify({ type: "selectShip", shipType: card.dataset.type }));
   syncShipSelector(card.dataset.type);
 }
-document.getElementById("shipCards").addEventListener("click", handleShipCardClick);
+// #shipCards (sala) migrado a React; el panel de muerte (#deadShipCards) sigue legacy.
+const _shipCardsEl = document.getElementById("shipCards");
+if (_shipCardsEl) _shipCardsEl.addEventListener("click", handleShipCardClick);
 document.getElementById("deadShipCards").addEventListener("click", handleShipCardClick);
 
 const _soloShipCards = document.getElementById("soloShipCards");
@@ -3608,9 +3597,10 @@ function drawFlares(camX, camY) {
 
 }
 function updateUI() {
+  // El botón "Go"/ready vive ahora en React (Room.tsx); guardamos por si el
+  // elemento legacy ya no existe.
   const readyBtn = document.getElementById("ready");
-
-  readyBtn.disabled = uiState !== "inRoom";
+  if (readyBtn) readyBtn.disabled = uiState !== "inRoom";
 }
 
 //RADAR
@@ -4496,6 +4486,8 @@ export {
   getShips, drawShipPreview, startSolo,
   // Lista de salas Co-op (puente para React)
   getRoomList, lobbyCreateRoom, lobbyRefresh, lobbyJoin,
+  // Sala / lobby con equipos (puente para React)
+  getRoomData, getMyId, roomSend, roomToggleReady, roomSwitchTeam, roomLeave,
 };
 
 loop();

@@ -31,28 +31,9 @@
     <!-- ── CONTROLES ── (migrada a React: client/src/ui/ControlsScreen.tsx,
          abierta vía CustomEvent "open-controls" emitido por game.js) -->
 
-    <div id="room" class="hidden">
-      <div class="roomHeader">
-        <h2 data-i18n="room.title">LOBBY</h2>
+    <!-- ── SALA / LOBBY CON EQUIPOS ── migrada a React: client/src/ui/Room.tsx
+         (ruta "/room"), abierta al unirse/crear sala desde game.js. -->
 
-      </div>
-
-      <div id="players"></div>
-      <div id="roomHint" data-i18n="room.hint">Esperando jugadores...</div>
-
-      <div id="roomActions">
-        <button id="switchTeam" data-i18n="room.switchTeam">Cambiar equipo</button>
-        <button id="leaveRoom" data-i18n="common.leave">Salir</button>
-        <button id="ready" disabled data-i18n="room.ready">Go</button>
-      </div>
-
-      <!-- ── SELECTOR DE NAVE — generado dinámicamente por buildShipCards() ── -->
-      <div id="shipSelector">
-        <div class="selectorLabel" data-i18n="room.shipLabel">NAVE DE COMBATE</div>
-        <div id="shipCards"></div>
-      </div>
-
-    </div>
   </div>
 
   <!-- ── HUD ── -->

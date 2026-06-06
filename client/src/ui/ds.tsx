@@ -228,6 +228,27 @@ export function SegOption({
   );
 }
 
+// ── Interruptor dorado (toggles de host) ─────────────────────
+export function GoldToggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={() => onChange(!on)}
+      className={`relative h-[30px] w-16 flex-none cursor-pointer rounded-full transition-all duration-200 ease-gs ${
+        on ? "border border-gs-gold-bright bg-gs-gold-bright/15 shadow-[0_0_12px_rgba(255,198,25,0.3)]" : "border border-gs-rule/25 bg-black/40"
+      }`}
+    >
+      <span
+        className={`absolute top-[3px] h-[22px] w-[22px] rounded-full transition-all duration-200 ease-gs ${
+          on ? "left-[37px] bg-gs-gold-bright" : "left-[3px] bg-gs-grey-3"
+        }`}
+      />
+    </button>
+  );
+}
+
 // ── Datos de nave del servidor (puente game.js) ──────────────
 export type ShipMeta = {
   label?: string;
