@@ -15,6 +15,7 @@ const { send, broadcastRoomList } = require("./broadcast.ts");
 const { createPlayer } = require("../entities/player.ts");
 const { removeFromRoom, roomList } = require("../rooms/rooms.ts");
 const { handleMessage } = require("./handlers.ts");
+const { handleConfigRequest, adminAuthorized } = require("../admin/adminServer.ts");
 
 // dist/ está dos niveles por encima de server/net/
 const clientDir = path.join(__dirname, "../../dist");
@@ -32,13 +33,21 @@ const MIME_TYPES: Record<string, string> = {
 
 function startGameServer(port: number): any {
   const gameHttpServer = http.createServer((req: any, res: any) => {
-    const reqPath  = req.url === "/" ? "/index.html" : req.url.split("?")[0];
+    // Panel admin servido desde el MISMO puerto (en Render solo se expone uno):
+    // la API /config y el alias /admin → admin.html. La protección por ADMIN_ACCESS
+    // (Basic Auth) la aplica el módulo admin; /admin.html también queda protegido.
+    if (handleConfigRequest(req, res)) return;
+
+    const rawPath  = req.url === "/" ? "/index.html" : req.url.split("?")[0];
+    const reqPath  = rawPath === "/admin" ? "/admin.html" : rawPath;
     const safePath = path.normalize(reqPath).replace(/^(\.\.[/\\])+/, "");
     const fullPath = path.join(clientDir, safePath);
 
     if (!fullPath.startsWith(clientDir)) {
       res.writeHead(403); res.end(); return;
     }
+
+    if (safePath === "/admin.html" && !adminAuthorized(req, res)) return;
 
     fs.readFile(fullPath, (err: any, data: any) => {
       if (err) { res.writeHead(404); res.end("Not found"); return; }
