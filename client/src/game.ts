@@ -35,6 +35,7 @@ import {
   lerp, lerpAngle, extrapolateArr, seededRand, ptSegDist,
 } from "./game/math";
 import { S } from "./game/state";
+import { ws } from "./game/net";
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -228,81 +229,8 @@ addEventListener("resize", () => {
   canvas.height = innerHeight;
 });
 
-const _wsProto = location.protocol === "https:" ? "wss:" : "ws:";
-const _wsHost = location.hostname ? location.host : "localhost:8080";
-// El juego usa el path "/ws" para no colisionar con el WebSocket de HMR del dev
-// server de Vite (que también usa la raíz). El servidor escucha en ese mismo path.
-const _wsURL = _wsProto + "//" + _wsHost + "/ws";
-const ws = new WebSocket(_wsURL);
-
-// ── Feedback de pérdida de conexión + reconexión automática ──
-// El estado del jugador vive en el servidor atado a la conexión; al reconectar se
-// recarga la página para empezar una sesión limpia y coherente.
-let _reconnectTimer = null;
-let _reconnectProbe = null;
-
-// ── Arranque en frío del servidor (anti-standby) ──
-// Mientras no se haya conectado nunca, mostramos la pantalla de "despertando";
-// si tarda, escalamos al mensaje de reposo. Tras la primera conexión, una caída
-// pasa a usar el overlay normal de "conexión perdida".
-function hideBoot() {
-  const b = document.getElementById("serverBoot");
-  if (b) b.classList.add("hidden");
-}
-function showBoot(cold) {
-  const b = document.getElementById("serverBoot");
-  if (b) b.classList.remove("hidden");
-  if (cold) {
-    const c = document.getElementById("serverBootCold");
-    if (c) c.classList.remove("hidden");
-  }
-}
-// Si en 4 s no hemos conectado, probablemente el servidor estaba dormido
-setTimeout(() => { if (!S.everConnected) showBoot(true); }, 4000);
-ws.addEventListener("open", () => { S.everConnected = true; hideBoot(); });
-
-function showConnLost() {
-  // Aún no habíamos conectado nunca → es un arranque en frío, no una caída
-  if (!S.everConnected) {
-    showBoot(true);
-    scheduleReconnect(1500);
-    return;
-  }
-  if (S.connLost) return;
-  S.connLost = true;
-  // El overlay de conexión perdida está migrado a React (App.tsx → Reconnect);
-  // game.js sigue conduciendo la reconexión automática (sonda WS + recarga).
-  window.dispatchEvent(new CustomEvent("conn-lost"));
-  scheduleReconnect(500);
-}
-
-function scheduleReconnect(delay) {
-  clearTimeout(_reconnectTimer);
-  _reconnectTimer = setTimeout(tryReconnect, delay);
-}
-
-function tryReconnect() {
-  // Cierra cualquier sonda previa
-  if (_reconnectProbe) { try { _reconnectProbe.onopen = _reconnectProbe.onerror = null; _reconnectProbe.close(); } catch (e) { } }
-  try {
-    _reconnectProbe = new WebSocket(_wsURL);
-  } catch (e) {
-    scheduleReconnect(2000);
-    return;
-  }
-  _reconnectProbe.onopen = () => {
-    // Servidor disponible de nuevo → recargar para reiniciar la sesión limpiamente
-    try { _reconnectProbe.close(); } catch (e) { }
-    location.reload();
-  };
-  _reconnectProbe.onerror = () => {
-    try { _reconnectProbe.close(); } catch (e) { }
-    scheduleReconnect(2000); // reintenta cada 2 s mientras el servidor no responda
-  };
-}
-
-ws.addEventListener("close", showConnLost);
-ws.addEventListener("error", showConnLost);
+// El socket del juego + reconexión automática viven en game/net.ts. game.ts solo
+// le cuelga el manejador de mensajes (ws.onmessage), acoplado a sus funciones.
 
 // Estado de juego centralizado en game/state.ts (objeto mutable `S`). Aquí solo
 // quedan handles/constantes locales que no comparte ningún otro módulo.
