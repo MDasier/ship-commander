@@ -15,44 +15,15 @@ import {
 import {
   getShapeDef, buildShipPath, drawShipDetail, drawShipPreview,
 } from "./game/shapes.js";
+import {
+  DEFAULT_BINDINGS, BINDING_LABELS, RESERVED_KEYS,
+  SUPPORT_URL, MENU_SCREENS, REACT_SCREENS, CFG_RESPAWN_DELAY,
+} from "./game/constants.js";
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
 // ── Keybindings ────────────────────────────────
-const DEFAULT_BINDINGS = {
-  thrust: "w",
-  reverse: "s",
-  strafeLeft: "a",
-  strafeRight: "d",
-  shoot: "e",
-  missile: "q",
-  flare: "f",
-  special: "x",
-  respawn: "r",
-  scan: "c",
-  inertiaDamp: "z",
-  brake: " ",
-};
-
-const BINDING_LABELS = {
-  thrust: "Propulsión",
-  reverse: "Retroceso",
-  strafeLeft: "Strafe izquierda",
-  strafeRight: "Strafe derecha",
-  shoot: "Disparar (teclado)",
-  missile: "Misil (teclado)",
-  flare: "Bengala",
-  special: "Habilidad especial (EMP / mina)",
-  respawn: "Reaparecer",
-  scan: "Escaneo radar",
-  inertiaDamp: "Toggle inercia",
-  brake: "Brake",
-};
-
-// Teclas que no se pueden asignar (fijas)
-const RESERVED_KEYS = new Set(["tab", "f1", "delete", "escape"]);
-
 let bindings = { ...DEFAULT_BINDINGS };
 try {
   const saved = JSON.parse(localStorage.getItem("spacetactics_bindings") || "null");
@@ -853,13 +824,6 @@ function roomSwitchTeam() { roomSend({ type: "switchTeam" }); }
 function roomLeave() { returnToLobby(); }
 
 // ── Navegación del menú principal ──────────────
-// Enlace de donaciones — reemplázalo por el tuyo (PayPal.me, Ko-fi, etc.)
-const SUPPORT_URL = "https://www.paypal.com/paypalme/mdasier";
-
-const MENU_SCREENS = ["mainMenu", "lobby", "soloSetup", "controlsScreen", "room"];
-// Pantallas cuyo UI ya vive en React (App.tsx las monta como overlay). A medida
-// que se migran pantallas legacy se añaden aquí para ocultar el #menu antiguo.
-const REACT_SCREENS = new Set(["mainMenu", "soloSetup", "lobby", "room"]);
 let _menuScreen = "mainMenu";
 function showMenuScreen(name) {
   _menuScreen = name;
@@ -1343,8 +1307,6 @@ addEventListener("keyup", e => {
   if (e.key === "Delete" && sdState === "charging") cancelSd();
   if (bindings.shoot && e.key.toLowerCase() === bindings.shoot && beamHeld) releaseBeamCharge();
 });
-
-const CFG_RESPAWN_DELAY = 5; // debe coincidir con server config RESPAWN_DELAY
 
 setInterval(() => {
   if (!inGame) return;
