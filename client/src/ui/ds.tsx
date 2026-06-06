@@ -4,7 +4,7 @@
 // El estilo vive en index.css (tokens @theme + clases .gs-*).
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { getShips, drawShipPreview } from "../game";
+import { getShips, getWorldPresets, drawShipPreview } from "../game";
 
 // ── Iconos (viewBox 24, trazo currentColor) ──────────────────
 const ICON_PATHS: Record<string, ReactNode> = {
@@ -319,6 +319,27 @@ export function useShips(): Record<string, ShipMeta> | null {
     return () => window.removeEventListener("ships-init", sync);
   }, []);
   return ships;
+}
+
+// ── Presets de mundo del servidor (puente game.js) ──────────
+export type WorldPreset = { w: number; h: number; asteroids: number; label: string };
+
+// Etiqueta de km de un preset: w/1000 → "3K", "6K", … (fuente única: servidor).
+export function presetKm(p: WorldPreset): string {
+  return `${Math.round(p.w / 1000)}K`;
+}
+
+// Suscribe a los presets de mundo del init del servidor (mismo evento que las
+// naves: "ships-init"). Devuelve el mapa { size: WorldPreset } o null.
+export function useWorldPresets(): Record<string, WorldPreset> | null {
+  const [presets, setPresets] = useState<Record<string, WorldPreset> | null>(() => getWorldPresets());
+  useEffect(() => {
+    const sync = () => setPresets({ ...(getWorldPresets() as Record<string, WorldPreset>) });
+    if (!getWorldPresets()) window.addEventListener("ships-init", sync);
+    else sync();
+    return () => window.removeEventListener("ships-init", sync);
+  }, []);
+  return presets;
 }
 
 // Canvas con la geometría de la nave (dibujada por game.js, acento oro).

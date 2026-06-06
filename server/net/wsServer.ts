@@ -9,6 +9,7 @@ const http      = require("http");
 const fs        = require("fs");
 const path      = require("path");
 const CFG       = require("../config");
+const { WORLD_PRESETS } = require("../constants.ts");
 const { clients } = require("../state.ts");
 const { send, broadcastRoomList } = require("./broadcast.ts");
 const { createPlayer } = require("../entities/player.ts");
@@ -59,7 +60,7 @@ function startGameServer(port: number): any {
     ws.player    = player;
     clients.set(id, ws);
 
-    send(ws, { type: "init", id, ships: CFG.SHIP_TYPES });
+    send(ws, { type: "init", id, ships: CFG.SHIP_TYPES, worldPresets: WORLD_PRESETS });
     send(ws, { type: "rooms", rooms: roomList() });
 
     ws.on("message", (raw: any) => {

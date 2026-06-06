@@ -8,7 +8,7 @@ import {
   roomSwitchTeam,
   roomLeave,
 } from "../game";
-import { Backdrop, BackBtn, BrandTitle, GoldToggle, LangToggle, SegOption } from "./ds";
+import { Backdrop, BackBtn, BrandTitle, GoldToggle, LangToggle, SegOption, useWorldPresets, presetKm } from "./ds";
 import ShipPicker from "./ShipPicker";
 
 // Sala / lobby con equipos, migrada a React (Fase 2). Reproduce el flujo real
@@ -37,12 +37,14 @@ type RoomData = {
   worldSize?: string;
 };
 
-const SIZES = [
-  { key: "small", km: "3K", ast: 15, label: "room.sizeSmall" },
-  { key: "medium", km: "6K", ast: 40, label: "room.sizeMedium" },
-  { key: "large", km: "10K", ast: 80, label: "room.sizeLarge" },
-  { key: "huge", km: "15K", ast: 130, label: "room.sizeHuge" },
-];
+// Las claves i18n del nombre por tamaño; el km y el nº de asteroides se derivan
+// de los WORLD_PRESETS del servidor (useWorldPresets) para no quedar desfasados.
+const SIZE_LABEL_KEYS: Record<string, string> = {
+  small: "room.sizeSmall",
+  medium: "room.sizeMedium",
+  large: "room.sizeLarge",
+  huge: "room.sizeHuge",
+};
 
 // Suscribe al estado de sala del servidor (game.js → evento "room-update").
 function useRoom() {
@@ -189,8 +191,19 @@ export default function Room() {
   const { t, lang, setLang } = useI18n();
   const room = useRoom();
   const myId = getMyId() as string;
+  const presets = useWorldPresets();
   const [name, setName] = useState("");
   const [balanceWarn, setBalanceWarn] = useState(false);
+
+  // Tamaños de mapa derivados de los WORLD_PRESETS del servidor (km + asteroides).
+  const sizes = presets
+    ? Object.entries(presets).map(([key, p]) => ({
+        key,
+        km: presetKm(p),
+        ast: p.asteroids,
+        label: SIZE_LABEL_KEYS[key] || key,
+      }))
+    : [];
 
   // Sincroniza el input de nombre cuando cambia la sala (solo host lo edita).
   useEffect(() => {
@@ -309,7 +322,7 @@ export default function Room() {
                     <div>
                       <div className="mb-3 text-[15px] font-semibold text-gs-rule">{t("room.scenarioSize")}</div>
                       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                        {SIZES.map((s) => (
+                        {sizes.map((s) => (
                           <SegOption
                             key={s.key}
                             active={(room.worldSize || "medium") === s.key}

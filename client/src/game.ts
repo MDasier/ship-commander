@@ -296,6 +296,7 @@ ws.onmessage = e => {
 
   if (data.type === "init") {
     S.myId = data.id;
+    if (data.worldPresets) S.worldPresets = data.worldPresets;
     if (data.ships) buildShipCards(data.ships);
     applyName();
   }
@@ -476,6 +477,12 @@ const SHIP_LABELS = { interceptor: "INTERCEPTOR", fighter: "L.FIGHTER", bomber: 
 // y más adelante Lobby) rendericen sus tarjetas con los stats reales.
 function getShips() { return S.shipMeta; }
 
+// Presets de mundo del servidor (WORLD_PRESETS) enviados en el init. Fuente única
+// de los tamaños de mapa: km (w/1000) y nº de asteroides. Evita que los labels
+// del cliente queden desfasados respecto al server. Llega en el mismo "init" que
+// las naves, así que React puede suscribirse al evento "ships-init".
+function getWorldPresets() { return S.worldPresets; }
+
 function buildShipCards(ships) {
   S.shipMeta = ships;
   window.dispatchEvent(new CustomEvent("ships-init"));
@@ -620,7 +627,7 @@ export {
   getPlayerName, setPlayerName, menuPlayOnline, menuSolo, menuMain, getMenuScreen, SUPPORT_URL,
   isEverConnected,
   // Datos de nave + práctica solo (puente para React)
-  getShips, drawShipPreview, startSolo,
+  getShips, getWorldPresets, drawShipPreview, startSolo,
   // Lista de salas Co-op (puente para React)
   getRoomList, lobbyCreateRoom, lobbyRefresh, lobbyJoin,
   // Sala / lobby con equipos (puente para React)

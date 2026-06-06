@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../hooks/useI18n";
 import { getRoomList, lobbyCreateRoom, lobbyRefresh, lobbyJoin, menuMain } from "../game";
-import { Backdrop, BackBtn, BrandTitle, Icon, LangToggle } from "./ds";
+import { Backdrop, BackBtn, BrandTitle, Icon, LangToggle, useWorldPresets, presetKm } from "./ds";
 
 // Lista de salas Co-op migrada a React (Fase 2). Los datos llegan del servidor
 // vía game.js (getRoomList + evento "rooms-update"); las acciones (crear/
@@ -17,8 +17,6 @@ type Room = {
   players: number;
 };
 
-const SIZE_LABELS: Record<string, string> = { small: "3K", medium: "6K", large: "10K", huge: "15K" };
-
 // Suscribe al listado de salas del servidor.
 function useRooms(): Room[] {
   const [rooms, setRooms] = useState<Room[]>(() => getRoomList() || []);
@@ -31,11 +29,10 @@ function useRooms(): Room[] {
   return rooms;
 }
 
-function RoomRow({ room }: { room: Room }) {
+function RoomRow({ room, size }: { room: Room; size: string }) {
   const { t } = useI18n();
   const playing = room.status === "playing";
   const canJoin = !playing || !!room.allowJoinMidGame;
-  const size = SIZE_LABELS[room.worldSize || ""] || "6K";
   const statusColor = playing ? "var(--color-gs-gold-soft)" : "var(--color-gs-green)";
   const statusText = playing ? (room.allowJoinMidGame ? `${t("lobby.playing")} · ${t("lobby.open")}` : t("lobby.playing")) : t("lobby.waiting");
 
@@ -70,6 +67,13 @@ function RoomRow({ room }: { room: Room }) {
 export default function CoopRooms() {
   const { t, lang, setLang } = useI18n();
   const rooms = useRooms();
+  const presets = useWorldPresets();
+
+  // km de un tamaño desde los WORLD_PRESETS del servidor (fallback al cargar).
+  const sizeKm = (worldSize?: string) => {
+    const p = presets?.[worldSize || "medium"];
+    return p ? presetKm(p) : "";
+  };
 
   return (
     <div className="fixed inset-0 z-[400] overflow-y-auto bg-gs-void font-body text-white">
@@ -111,7 +115,7 @@ export default function CoopRooms() {
           ) : (
             <div className="flex flex-col gap-2.5">
               {rooms.map((r) => (
-                <RoomRow key={r.id} room={r} />
+                <RoomRow key={r.id} room={r} size={sizeKm(r.worldSize)} />
               ))}
             </div>
           )}

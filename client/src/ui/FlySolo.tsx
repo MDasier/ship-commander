@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useI18n } from "../hooks/useI18n";
 import { menuMain, startSolo } from "../game";
-import { Backdrop, BackBtn, BrandTitle, LangToggle, Section, SegOption } from "./ds";
+import { Backdrop, BackBtn, BrandTitle, LangToggle, Section, SegOption, useWorldPresets, presetKm } from "./ds";
 import ShipPicker from "./ShipPicker";
 
 // Pantalla de práctica en solitario migrada a React (Fase 2). Reúne modo,
@@ -9,10 +9,13 @@ import ShipPicker from "./ShipPicker";
 // conserva el flujo real (nombre + audio + mensaje WebSocket al servidor).
 // Opciones de tamaño/duración con paridad al cliente legacy (medium/huge y
 // "sin límite" deshabilitados; large y 5 min por defecto).
-const SIZES = [
-  { id: "medium", km: "6K", disabled: true },
-  { id: "large", km: "10K", disabled: false },
-  { id: "huge", km: "15K", disabled: true },
+// Qué tamaños ofrece la práctica en solitario y cuáles van deshabilitados
+// (paridad con el cliente legacy). El km se deriva de los WORLD_PRESETS del
+// servidor (useWorldPresets) para no quedar desfasado.
+const SOLO_SIZES = [
+  { id: "medium", disabled: true },
+  { id: "large", disabled: false },
+  { id: "huge", disabled: true },
 ];
 
 export default function FlySolo() {
@@ -21,6 +24,13 @@ export default function FlySolo() {
   const [durationS, setDurationS] = useState(300);
   const [size, setSize] = useState("large");
   const [ship, setShip] = useState("fighter");
+  const presets = useWorldPresets();
+
+  // km de cada tamaño desde los presets del servidor (vacío hasta que llega el init).
+  const sizes = SOLO_SIZES.map((s) => ({
+    ...s,
+    km: presets?.[s.id] ? presetKm(presets[s.id]) : "",
+  }));
 
   const durations = [
     { secs: 180, label: "3 " + t("solo.min") },
@@ -65,7 +75,7 @@ export default function FlySolo() {
 
           <Section label={t("solo.size")}>
             <div className="mx-auto grid max-w-[420px] grid-cols-3 gap-2.5">
-              {SIZES.map((s) => (
+              {sizes.map((s) => (
                 <SegOption
                   key={s.id}
                   active={size === s.id}

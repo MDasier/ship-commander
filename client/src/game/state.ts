@@ -28,6 +28,7 @@ export const S = {
   roomData: null as any,
   roomList: [] as any[],
   shipMeta: null as any,
+  worldPresets: null as any,   // { small|medium|large|huge: { w, h, asteroids, label } } del init del servidor
 
   // ── Entidades del mundo (estado interpolado / difundido) ──
   players: {} as Record<string, Entity>,
