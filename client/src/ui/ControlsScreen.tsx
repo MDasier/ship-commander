@@ -76,7 +76,7 @@ export default function ControlsScreen({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="gs-panel gs-scroll max-h-[88vh] w-[min(660px,92vw)] animate-gs-fade overflow-y-auto p-6 text-white"
+        className="gs-panel gs-scroll max-h-[88vh] w-[min(860px,92vw)] animate-gs-fade overflow-y-auto p-6 text-white"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5 flex items-center justify-between">
@@ -94,7 +94,7 @@ export default function ControlsScreen({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Acciones reasignables */}
-        <div className="flex flex-col gap-2.5">
+        <div className="grid grid-cols-1 gap-x-10 gap-y-2.5 sm:grid-cols-2">
           {Object.keys(BINDING_LABELS).map((action) => {
             const rec = recording === action;
             return (
@@ -125,7 +125,7 @@ export default function ControlsScreen({ onClose }: { onClose: () => void }) {
         {/* Teclas fijas */}
         <div className="mt-6">
           <div className="gs-eyebrow mb-3 text-gs-grey-3">{t("controls.fixed")}</div>
-          <div className="flex flex-col gap-2.5">
+          <div className="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2">
             {FIXED_ROWS.map((row, i) => (
               <div key={i} className="flex items-center gap-3.5">
                 <span className="gs-key min-w-[96px] border-gs-blue-soft/35 bg-gs-blue-soft/8 text-gs-blue-soft">
