@@ -1,11 +1,13 @@
 // @ts-nocheck
-// Migración incremental a TS (Fase B). Este fichero (entry+fachada, ~3.4k líneas)
-// se renombró .js→.ts para que los importadores resuelvan y para poder extraer
-// módulos TIPADOS (que SÍ se chequean) a game/*. El repo usa TypeScript 6 con
-// strict ON por defecto: tipar el cuerpo entero de golpe es inviable sin riesgo
-// de regresión, así que se mantiene sin chequear igual que la estrategia
-// checkJs:false del resto de JS legacy. Quitar este pragma a medida que su
-// contenido migre a módulos tipados (net.ts, input.ts, render/, …).
+// Entry / orquestador del cliente. Tras la modularización (state, net, input,
+// controls, actions, render/*), aquí queda el cableado, el manejador de mensajes
+// (ws.onmessage), el puente de getters/acciones para React y algunos helpers de
+// menú/sala/nave. Mantiene @ts-nocheck: el cuerpo restante usa shapes laxos del
+// dominio (Object.values sobre `S.players` → unknown, params implícitos) y
+// tiparlo aportaría poco; la red de seguridad son los MÓDULOS tipados que SÍ
+// chequea tsc. Los módulos extraídos NO llevan @ts-nocheck (salvo render/*, que
+// es canvas legacy). Verificado: quitar el pragma deja 56 errores solo de tipado
+// (no de correctitud); la extracción ya destapó y arregló los orphans reales.
 // ── Módulos del cliente (ES modules · empaquetados por Vite) ──
 import "./styles.css";
 import { applyI18n, onLangChange, setLang } from "./i18n.js";
