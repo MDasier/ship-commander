@@ -2,6 +2,8 @@
 
 Ship Commander is a real-time multiplayer space combat game featuring fleet coordination, physics-driven combat, and a server-authoritative architecture. The project is built with a modern TypeScript stack and a clear separation between simulation (server) and rendering (client).
 
+[TRY](https://ship-commander.onrender.com/)
+
 ---
 
 ## 🚀 Overview
