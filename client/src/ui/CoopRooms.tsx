@@ -25,6 +25,7 @@ function useRooms(): Room[] {
   useEffect(() => {
     const sync = () => setRooms([...(getRoomList() || [])]);
     window.addEventListener("rooms-update", sync);
+    sync(); // re-lee al montar por si el mensaje "rooms" llegó antes del efecto
     return () => window.removeEventListener("rooms-update", sync);
   }, []);
   return rooms;

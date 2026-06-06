@@ -5,8 +5,10 @@ import CoopRooms from "./ui/CoopRooms";
 import Room from "./ui/Room";
 import FlySolo from "./ui/FlySolo";
 import Hud from "./ui/Hud";
+import MobiGlass from "./ui/MobiGlass";
 import ControlsScreen from "./ui/ControlsScreen";
 import Reconnect from "./ui/Reconnect";
+import { closeMobiglass } from "./game.js";
 
 // Mapea cada pantalla del menú (emitida por game.js) a una ruta. Por ahora solo
 // "/" (MainMenu) tiene componente React; lobby/solo/room siguen en game.js y se
@@ -23,6 +25,7 @@ export default function App() {
   const navigate = useNavigate();
   const [showControls, setShowControls] = useState(false);
   const [disconnected, setDisconnected] = useState(false);
+  const [mobiOpen, setMobiOpen] = useState(false);
 
   // game.js emite "menu-screen" al cambiar de pantalla → reflejamos en la URL.
   useEffect(() => {
@@ -50,6 +53,13 @@ export default function App() {
     return () => window.removeEventListener("conn-lost", lost);
   }, []);
 
+  // MobiGlass en partida: game.js emite "mobi" (true/false) al abrir/cerrar (F1).
+  useEffect(() => {
+    const onMobi = (e: Event) => setMobiOpen((e as CustomEvent<boolean>).detail);
+    window.addEventListener("mobi", onMobi as EventListener);
+    return () => window.removeEventListener("mobi", onMobi as EventListener);
+  }, []);
+
   return (
     <>
       <Routes>
@@ -62,6 +72,7 @@ export default function App() {
         <Route path="*" element={null} />
       </Routes>
       {showControls && <ControlsScreen onClose={() => setShowControls(false)} />}
+      {mobiOpen && <MobiGlass onClose={() => closeMobiglass()} />}
       {disconnected && <Reconnect onRetry={() => location.reload()} />}
     </>
   );

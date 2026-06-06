@@ -51,6 +51,9 @@ function useRoom() {
   useEffect(() => {
     const sync = () => setRoom(getRoomData() ? { ...(getRoomData() as RoomData) } : null);
     window.addEventListener("room-update", sync);
+    // Re-lee al montar: el roomUpdate de creación es único; si su evento cayó
+    // entre el render y este efecto, lo recuperamos aquí (si no, no llega otro).
+    sync();
     return () => window.removeEventListener("room-update", sync);
   }, []);
   return room;

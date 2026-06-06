@@ -848,20 +848,8 @@ document.getElementById("mobiTabBar").addEventListener("click", e => {
   mobiActiveTab = pane;
   updateMobiPane(pane);
 });*/
-document.getElementById("mobiTabBar").addEventListener("click", e => {
-  const btn = e.target.closest(".mobiTab");
-  if (!btn) return;
-
-  setMobiTab(btn.dataset.pane);
-});
-
-// Close button
-document.getElementById("mobiCloseBtn").onclick = closeMobiglass;
-
-// Click outside panel closes it
-mobiglassEl.addEventListener("click", e => {
-  if (e.target === mobiglassEl) closeMobiglass();
-});
+// Pestañas, botón de cierre y click-fuera del MobiGlass los gestiona React
+// (MobiGlass.tsx). game.js solo emite el evento "mobi" en open/closeMobiglass.
 /*
 function openMobiglass() {
   const me = getMe();
@@ -892,28 +880,19 @@ function bindingText(action) {
   });
 })();
 
+// MobiGlass migrado a React (MobiGlass.tsx). open/close solo gestionan el flag
+// mobiOpen (consultado por F1 y el cierre en game over) y avisan a React por
+// evento; el render del overlay lo hace el componente.
 function openMobiglass() {
   const me = getMe();
   if (!me) return;
-
   mobiOpen = true;
-  mobiglassEl.classList.remove("hidden");
-
-  renderPilotPane();
-  renderPartidaPane();
-
-  setMobiTab("piloto");
+  window.dispatchEvent(new CustomEvent("mobi", { detail: true }));
 }
-/*
-function closeMobiglass() {
-  mobiOpen = false;
-  mobiglassEl.classList.add("hidden");
-}*/
 function closeMobiglass() {
   cancelRecording();
-
   mobiOpen = false;
-  mobiglassEl.classList.add("hidden");
+  window.dispatchEvent(new CustomEvent("mobi", { detail: false }));
 }
 function setMobiTab(tab) {
   mobiActiveTab = tab;
@@ -1020,6 +999,23 @@ function applyStoredVolumes() {
   setMusicTrack(track);
   setMuted(isMutedStored);
 }
+
+// ── Ajustes de audio (puente para React, pestaña Ajustes del MobiGlass) ──
+function getAudioSettings() {
+  return {
+    effects: parseFloat(localStorage.getItem("vol_effects") ?? "0.8"),
+    music: parseFloat(localStorage.getItem("vol_music") ?? "0.5"),
+    track: localStorage.getItem("music_track") ?? "A",
+    muted: localStorage.getItem("audio_muted") === "1",
+  };
+}
+function setAudioEffects(v) { setEffectsVolume(v); localStorage.setItem("vol_effects", String(v)); }
+function setAudioMusic(v) { setMusicVolume(v); localStorage.setItem("vol_music", String(v)); }
+function setAudioTrack(t) { setMusicTrack(t); localStorage.setItem("music_track", t); }
+function setAudioMuted(b) { setMuted(b); localStorage.setItem("audio_muted", b ? "1" : "0"); }
+
+// Estado de jugadores (puente para React: paneles Piloto/Partida del MobiGlass).
+function getPlayers() { return players; }
 
 function updateMobiglass() {
   console.count("updateMobiglass");
@@ -4321,9 +4317,9 @@ function loop() {
     }
   }
 
-  if (mobiOpen) updateMobiglass();
+  // El contenido del MobiGlass lo renderiza React (lee getMe/getPlayers al abrir).
 
-  // ── Scoreboard (Tab mantenido)  
+  // ── Scoreboard (Tab mantenido)
   if (showScoreboard) {
     const rem = 18; // 1rem base
 
@@ -4496,6 +4492,9 @@ export {
   getRoomList, lobbyCreateRoom, lobbyRefresh, lobbyJoin,
   // Sala / lobby con equipos (puente para React)
   getRoomData, getMyId, roomSend, roomToggleReady, roomSwitchTeam, roomLeave,
+  // MobiGlass en partida (puente para React)
+  getMe, getPlayers, closeMobiglass,
+  getAudioSettings, setAudioEffects, setAudioMusic, setAudioTrack, setAudioMuted,
 };
 
 loop();
