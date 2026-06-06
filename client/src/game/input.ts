@@ -35,7 +35,6 @@ interface InputDeps {
   getMe: () => any;
   isCapitalPilot: () => boolean;
   fireWeapon: () => void;
-  startAutoFire?: () => void;
   stopAutoFire: () => void;
   startBeamCharge: () => void;
   releaseBeamCharge: (cancel?: boolean) => void;

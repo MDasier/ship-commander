@@ -34,6 +34,7 @@ import {
   updateUI, updateTimer,
 } from "./game/render/draw";
 import { cycleTargetByRadar } from "./game/render/sensors";
+import { triggerPingEffect } from "./game/render/world";
 
 // ── Keybindings ────────────────────────────────
 let bindings = { ...DEFAULT_BINDINGS };
@@ -205,16 +206,7 @@ function renderControlesPane(paneId = "pane-controles") {
 }
 
 
-const pingEffect = [];
-function triggerPingEffect(x, y) {
-  pingEffect.push({
-    x,
-    y,
-    start: performance.now(),
-    duration: 1200
-  });
-}
-
+// triggerPingEffect (+ su cola) vive en game/render/world.ts.
 
 // canvas/ctx/worldToScreen/getMe viven en game/render/canvas.ts (tamaño + resize).
 
@@ -477,32 +469,31 @@ function cycleSpectator() {
 }
 
 // ── Self-destruct
-let sdState = null;  // null | "charging" | "countdown"
+// sdState/sdCountdown/sdHoldStart viven en S (la UI los lee desde el render);
+// los handles de timer son locales (solo game.ts los maneja).
 let sdHoldTimer = null;
 let sdInterval = null;
-let sdCountdown = 0;
-let sdHoldStart = 0;
 
 function startSdCharge() {
   const me = getMe();
-  if (!me || me.dead || sdState) return;
-  sdState = "charging";
-  sdHoldStart = Date.now();
+  if (!me || me.dead || S.sdState) return;
+  S.sdState = "charging";
+  S.sdHoldStart = Date.now();
   sdHoldTimer = setTimeout(startSdCountdown, 2000);
 }
 
 function startSdCountdown() {
-  sdState = "countdown";
-  sdCountdown = 5;
+  S.sdState = "countdown";
+  S.sdCountdown = 5;
   playSelfDestructBeep(5);
   sdInterval = setInterval(() => {
-    sdCountdown--;
-    if (sdCountdown > 0) {
-      playSelfDestructBeep(sdCountdown);
+    S.sdCountdown--;
+    if (S.sdCountdown > 0) {
+      playSelfDestructBeep(S.sdCountdown);
     } else {
       clearInterval(sdInterval);
       sdInterval = null;
-      sdState = null;
+      S.sdState = null;
       ws.send(JSON.stringify({ type: "selfDestruct" }));
     }
   }, 1000);
@@ -511,10 +502,10 @@ function startSdCountdown() {
 function cancelSd() {
   clearTimeout(sdHoldTimer);
   clearInterval(sdInterval);
-  sdState = null;
+  S.sdState = null;
   sdHoldTimer = null;
   sdInterval = null;
-  sdCountdown = 0;
+  S.sdCountdown = 0;
 }
 
 // ── Nombre del jugador ──────────────────────────────────────────────
@@ -933,7 +924,7 @@ export {
 installInput({
   canvas,
   getBindings,
-  getSdState: () => sdState,
+  getSdState: () => S.sdState,
   getMe,
   isCapitalPilot,
   fireWeapon,

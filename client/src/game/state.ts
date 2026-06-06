@@ -110,4 +110,9 @@ export const S = {
 
   // Handle del timer que difiere el game over 2.5 s (compartido loop ↔ game.ts).
   gameOverTimer: null as ReturnType<typeof setTimeout> | null,
+
+  // ── Autodestrucción (compartido: lógica en game.ts, UI en render) ──
+  sdState: null as null | "charging" | "countdown",
+  sdCountdown: 0,
+  sdHoldStart: 0,
 };

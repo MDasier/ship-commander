@@ -236,6 +236,13 @@ function drawGrid(camX, camY) {
 //!EFECTO DE PING
 
 //!EFECTO DE PING
+// Cola de ondas de ping del radar. El productor (triggerPingEffect) lo llama
+// el input al pulsar escaneo; el consumidor (drawpingEffect) las dibuja/expira.
+const pingEffect = [];
+export function triggerPingEffect(x, y) {
+  pingEffect.push({ x, y, start: performance.now(), duration: 1200 });
+}
+
 function drawpingEffect(camX, camY) {
   const now = performance.now();
 

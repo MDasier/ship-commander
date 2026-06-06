@@ -318,8 +318,8 @@ function loop() {
   }
 
   // ── Self-destruct UI
-  if (sdState === "charging") {
-    const progress = Math.min(1, (Date.now() - sdHoldStart) / 2000);
+  if (S.sdState === "charging") {
+    const progress = Math.min(1, (Date.now() - S.sdHoldStart) / 2000);
     const cx = canvas.width / 2;
     const cy = canvas.height / 2 + 80;
     ctx.save();
@@ -336,7 +336,7 @@ function loop() {
     ctx.restore();
   }
 
-  if (sdState === "countdown") {
+  if (S.sdState === "countdown") {
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
     ctx.save();
@@ -355,8 +355,8 @@ function loop() {
     ctx.font = "bold 13px 'Courier New', monospace";
     ctx.fillText(i18nt("game.selfDestructWarn"), cx, cy - 62);
     ctx.fillStyle = "#ff2222";
-    ctx.font = `bold ${70 + (5 - sdCountdown) * 4}px 'Courier New', monospace`;
-    ctx.fillText(sdCountdown, cx, cy + 12);
+    ctx.font = `bold ${70 + (5 - S.sdCountdown) * 4}px 'Courier New', monospace`;
+    ctx.fillText(S.sdCountdown, cx, cy + 12);
     ctx.fillStyle = "#555";
     ctx.font = "11px 'Courier New', monospace";
     ctx.fillText(i18nt("game.selfDestructCancel", { key: "DEL" }), cx, cy + 36);
