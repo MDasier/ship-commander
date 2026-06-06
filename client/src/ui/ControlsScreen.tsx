@@ -83,8 +83,13 @@ export default function ControlsScreen({ onClose }: { onClose: () => void }) {
           <h2 className="m-0 font-display text-2xl font-extrabold tracking-wide text-gs-gold-bright">
             {t("controls.title")}
           </h2>
-          <button className="gs-btn gs-btn-ghost font-mono text-[13px]" onClick={onClose}>
-            <Icon name="arrowL" size={16} /> {t("common.backMenu")}
+          <button
+            className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-gs border border-gs-rule/20 bg-transparent text-gs-grey-2 transition-all duration-200 ease-gs hover:border-gs-gold hover:text-white"
+            onClick={onClose}
+            aria-label={t("common.close")}
+            title={t("common.close")}
+          >
+            <Icon name="x" size={18} />
           </button>
         </div>
 

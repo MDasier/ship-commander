@@ -27,6 +27,7 @@ const I18N = {
     // Común
     "common.save": "Guardar",
     "common.backMenu": "Menú",
+    "common.close": "Cerrar",
     "common.leave": "Salir",
     "common.ready": "LISTO",
     "common.recommended": "Recom.",
@@ -238,6 +239,7 @@ const I18N = {
   en: {
     "common.save": "Save",
     "common.backMenu": "Menu",
+    "common.close": "Close",
     "common.leave": "Leave",
     "common.ready": "READY",
     "common.recommended": "Rec.",
