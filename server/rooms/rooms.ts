@@ -105,7 +105,12 @@ function removeFromRoom(player: Player): void {
   delete room.players[player.id];
   player.roomId = null;
 
-  if (Object.keys(room.players).length === 0) {
+  // Los bots NUNCA mantienen viva una sala: en cuanto no queda ningún jugador
+  // real (humano), la sala se elimina (junto con los NPC que aún contenga). Si
+  // contáramos a los bots, una co-op en solitario dejaría salas zombi al
+  // desconectarse/refrescar el único humano.
+  const humansLeft = Object.values(room.players).filter(p => !p.isBot).length;
+  if (humansLeft === 0) {
     delete rooms[room.id];
   } else {
     broadcast.broadcastRoom(room, { type: "roomUpdate", room });
