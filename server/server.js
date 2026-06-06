@@ -8,10 +8,9 @@ const CFG       = require("./config");
 const FPS     = 60;
 
 const WORLD_PRESETS = {
-  small:  { w: 3000,  h: 3000,  asteroids: 15,  label: "Pequeño" },
-  medium: { w: 6000,  h: 6000,  asteroids: 40,  label: "Medio"   },
-  large:  { w: 10000, h: 10000, asteroids: 80,  label: "Grande"  },
-  huge:   { w: 15000, h: 15000, asteroids: 130, label: "Enorme"  },
+  medium: { w: 10000,  h: 10000,  asteroids: 77,  label: "Medio"   },
+  large:  { w: 20000, h: 20000, asteroids: 107,  label: "Grande"  },
+  huge:   { w: 40000, h: 40000, asteroids: 207, label: "Enorme"  },
 };
 function spawnSafePos(team, room) {
   const W = room.worldW;
@@ -542,7 +541,7 @@ function createAsteroids(count, W, H) {
 
 function createRoom(ownerId, ownerName) {
   const id     = crypto.randomUUID();
-  const preset = WORLD_PRESETS.medium;
+  const preset = WORLD_PRESETS.large;
   const W = preset.w, H = preset.h;
   rooms[id] = {
     id,
@@ -550,7 +549,7 @@ function createRoom(ownerId, ownerName) {
     ownerId,
     name: ownerName ? `Sala de ${ownerName}`.slice(0, 28) : "Nueva sala",
     enforceBalance: false,
-    worldSize: "medium",
+    worldSize: "large",
     worldW: W,
     worldH: H,
     players: {},
@@ -818,8 +817,8 @@ wss.on("connection", ws => {
       room.solo = true;
       room.name = "Práctica";
       // Tamaño de mundo
-      const preset = WORLD_PRESETS[msg.size] || WORLD_PRESETS.medium;
-      room.worldSize = WORLD_PRESETS[msg.size] ? msg.size : "medium";
+      const preset = WORLD_PRESETS[msg.size] || WORLD_PRESETS.large;
+      room.worldSize = WORLD_PRESETS[msg.size] ? msg.size : "large";
       room.worldW = preset.w; room.worldH = preset.h;
       room.asteroids = createAsteroids(preset.asteroids, preset.w, preset.h);
       // Duración (s): >0 acota a [30, 3600]; 0 o vacío = prácticamente ilimitada
