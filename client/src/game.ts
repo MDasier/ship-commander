@@ -8,24 +8,22 @@
 // contenido migre a módulos tipados (net.ts, input.ts, render/, …).
 // ── Módulos del cliente (ES modules · empaquetados por Vite) ──
 import "./styles.css";
-import { i18nt, applyI18n, onLangChange, setLang } from "./i18n.js";
+import { applyI18n, onLangChange, setLang } from "./i18n.js";
 import { spawnExplosion, spawnBeamImpact } from "./particles.js";
 import {
   getBindings, rebindKey, resetBindings, onBindingsChange,
-  displayKey, bindingText, renderControlesPane,
+  displayKey, bindingText, renderControlesPane, cancelRecording,
 } from "./game/controls";
 import {
   initAudio, startMusic, stopMusic, resetAudio,
-  playShootSound, playEmpSound,
-  playBeamFireSound, playExplosionSound, playVictorySound,
-  playSelfDestructBeep, playAlertSound,
+  playEmpSound, playExplosionSound, playVictorySound,
 } from "./sounds.js";
 import { drawShipPreview } from "./game/shapes";
 import {
   DEFAULT_BINDINGS, BINDING_LABELS, RESERVED_KEYS,
   SUPPORT_URL, MENU_SCREENS, REACT_SCREENS,
 } from "./game/constants";
-import { keys, clearKeys, installInput } from "./game/input";
+import { clearKeys, installInput } from "./game/input";
 import {
   applyStoredVolumes, getAudioSettings,
   setAudioEffects, setAudioMusic, setAudioTrack, setAudioMuted,

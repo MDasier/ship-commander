@@ -27,7 +27,7 @@ export function displayKey(k: string | null): string {
 
 let recordingHandler: ((e: KeyboardEvent) => void) | null = null;
 
-function cancelRecording() {
+export function cancelRecording() {
   if (recordingHandler) {
     document.removeEventListener("keydown", recordingHandler, true);
     recordingHandler = null;
