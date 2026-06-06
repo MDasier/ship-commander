@@ -6,8 +6,8 @@ import {
   updateParticles, drawStars, drawParticles,
 } from "./particles.js";
 import {
-  initAudio, startMusic, stopMusic, setMusicTrack, setMusicVolume, setEffectsVolume,
-  setMuted, setMissileWarning, resetAudio,
+  initAudio, startMusic, stopMusic,
+  setMissileWarning, resetAudio,
   playShootSound, playBeamReadySound, playAbilityReadySound, playEmpSound,
   playBeamFireSound, playExplosionSound, playMissileSound, playVictorySound,
   playSelfDestructBeep, playAlertSound, playVoiceAlert, playPingSound,
@@ -19,6 +19,10 @@ import {
   DEFAULT_BINDINGS, BINDING_LABELS, RESERVED_KEYS,
   SUPPORT_URL, MENU_SCREENS, REACT_SCREENS, CFG_RESPAWN_DELAY,
 } from "./game/constants.js";
+import {
+  applyStoredVolumes, getAudioSettings,
+  setAudioEffects, setAudioMusic, setAudioTrack, setAudioMuted,
+} from "./game/audio.js";
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -468,31 +472,6 @@ function closeMobiglass() {
   mobiOpen = false;
   window.dispatchEvent(new CustomEvent("mobi", { detail: false }));
 }
-function applyStoredVolumes() {
-  const effects = parseFloat(localStorage.getItem("vol_effects") ?? "0.8");
-  const music = parseFloat(localStorage.getItem("vol_music") ?? "0.5");
-  const track = localStorage.getItem("music_track") ?? "A";
-  const isMutedStored = localStorage.getItem("audio_muted") === "1";
-  setEffectsVolume(effects);
-  setMusicVolume(music);
-  setMusicTrack(track);
-  setMuted(isMutedStored);
-}
-
-// ── Ajustes de audio (puente para React, pestaña Ajustes del MobiGlass) ──
-function getAudioSettings() {
-  return {
-    effects: parseFloat(localStorage.getItem("vol_effects") ?? "0.8"),
-    music: parseFloat(localStorage.getItem("vol_music") ?? "0.5"),
-    track: localStorage.getItem("music_track") ?? "A",
-    muted: localStorage.getItem("audio_muted") === "1",
-  };
-}
-function setAudioEffects(v) { setEffectsVolume(v); localStorage.setItem("vol_effects", String(v)); }
-function setAudioMusic(v) { setMusicVolume(v); localStorage.setItem("vol_music", String(v)); }
-function setAudioTrack(t) { setMusicTrack(t); localStorage.setItem("music_track", t); }
-function setAudioMuted(b) { setMuted(b); localStorage.setItem("audio_muted", b ? "1" : "0"); }
-
 // Estado de jugadores (puente para React: paneles Piloto/Partida del MobiGlass).
 function getPlayers() { return players; }
 
