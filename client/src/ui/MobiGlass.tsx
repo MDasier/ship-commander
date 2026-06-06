@@ -71,34 +71,17 @@ export default function MobiGlass({ onClose }: { onClose: () => void }) {
       onClick={onClose}
       className="fixed inset-0 z-[500] grid animate-gs-fade place-items-center bg-[rgba(5,4,10,0.72)] font-body backdrop-blur-[2px]"
     >
+      {/* Variante "Lateral" del handoff: pestañas en columna izquierda. */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[86vh] w-[min(720px,92vw)] flex-col overflow-hidden rounded-gs border border-gs-gold bg-gs-ink/85 text-white shadow-gs-glow"
+        className="flex max-h-[86vh] w-[min(720px,92vw)] overflow-hidden rounded-gs border border-gs-gold bg-gs-ink/85 text-white shadow-gs-glow"
       >
-        {/* Header */}
-        <div className="flex items-center gap-2.5 border-b border-gs-rule/12 px-5 py-4">
-          <Icon name="bolt" size={16} style={{ color: "var(--color-gs-gold-bright)" }} />
-          <span className="gs-eyebrow">{t("mobiglass")}</span>
-          <span className="gs-hud-mono text-[13px] text-gs-grey-3">| {tag}</span>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="gs-btn gs-btn-danger ml-auto min-h-[34px] min-w-[34px] p-2"
-          >
-            <Icon name="x" size={16} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="sc-scroll flex-1 overflow-y-auto px-6 py-5">
-          {tab === "pilot" && <PilotTab me={me} />}
-          {tab === "match" && <MatchTab onExit={onClose} />}
-          {tab === "controls" && <ControlsTab />}
-          {tab === "settings" && <SettingsTab lang={lang} setLang={setLang} />}
-        </div>
-
-        {/* Tabs (abajo) */}
-        <div className="grid grid-cols-4 border-t border-gs-rule/12">
+        {/* Columna de pestañas (izquierda) */}
+        <div className="flex w-[150px] flex-none flex-col gap-1.5 border-r border-gs-rule/12 bg-black/25 p-2.5">
+          <div className="flex items-center gap-2 px-3 pb-4 pt-2.5">
+            <Icon name="bolt" size={16} style={{ color: "var(--color-gs-gold-bright)" }} />
+            <span className="gs-eyebrow text-[11px]">{t("mobiglass")}</span>
+          </div>
           {TABS.map((tb) => {
             const active = tab === tb.id;
             return (
@@ -106,10 +89,10 @@ export default function MobiGlass({ onClose }: { onClose: () => void }) {
                 key={tb.id}
                 onClick={() => setTab(tb.id)}
                 aria-pressed={active}
-                className={`flex flex-col items-center justify-center gap-1.5 border-t-2 px-2 py-3.5 transition-all duration-200 ease-gs ${
+                className={`flex items-center gap-2.5 rounded-md border-l-2 px-3.5 py-3 text-left transition-all duration-200 ease-gs ${
                   active
-                    ? "border-t-gs-gold-bright bg-gs-gold-bright/8 text-gs-gold-bright"
-                    : "border-t-transparent text-gs-grey-3 hover:text-white"
+                    ? "border-l-gs-gold-bright bg-gs-gold-bright/8 text-gs-gold-bright"
+                    : "border-l-transparent text-gs-grey-3 hover:text-white"
                 }`}
               >
                 <Icon name={tb.icon} size={17} />
@@ -117,6 +100,26 @@ export default function MobiGlass({ onClose }: { onClose: () => void }) {
               </button>
             );
           })}
+        </div>
+
+        {/* Columna derecha: cabecera + cuerpo */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center gap-2.5 border-b border-gs-rule/12 px-5 py-4">
+            <span className="gs-hud-mono text-[13px] text-gs-grey-3">{tag}</span>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="gs-btn gs-btn-danger ml-auto min-h-[34px] min-w-[34px] p-2"
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>
+          <div className="sc-scroll flex-1 overflow-y-auto px-6 py-5">
+            {tab === "pilot" && <PilotTab me={me} />}
+            {tab === "match" && <MatchTab onExit={onClose} />}
+            {tab === "controls" && <ControlsTab />}
+            {tab === "settings" && <SettingsTab lang={lang} setLang={setLang} />}
+          </div>
         </div>
       </div>
     </div>

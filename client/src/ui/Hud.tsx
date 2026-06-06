@@ -23,23 +23,21 @@ export default function Hud() {
   const { t } = useI18n();
   return (
     <div className="pointer-events-none fixed inset-0 z-[100] font-body">
-      {/* Panel de estado (arriba-izquierda) */}
-      <div className="gs-panel absolute left-6 top-6 min-w-[210px] border-l-[3px] border-l-gs-gold-bright px-[18px] py-4">
-        <div className="gs-eyebrow mb-3 text-[10px] text-gs-gold">{t("hud.status")}</div>
-        <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-          {ROWS.map((r) => (
-            <div key={r.id} className="contents">
-              <span className="gs-hud-mono text-[12px] font-semibold text-gs-grey-3">{t(r.label)}</span>
-              <span id={r.id} className="gs-hud-mono text-right text-[13px] font-semibold text-gs-rule" />
-            </div>
-          ))}
-          {/* Habilidad especial [X] — game.js gestiona display y valores */}
-          <div id="abilityRow" className="contents" style={{ display: "none" }}>
-            <span id="abilityName" className="gs-hud-mono text-[12px] font-semibold text-gs-gold">
-              ESP
-            </span>
-            <span id="abilityCd" className="gs-hud-mono text-right text-[13px] font-semibold text-gs-gold-bright" />
+      {/* Telemetría (arriba-izquierda) — variante "Esquinas" del handoff:
+          columna de líneas "LABEL: valor" sin panel, fuente mono. */}
+      <div className="gs-hud-mono absolute left-6 top-6 flex flex-col gap-[7px]">
+        {ROWS.map((r) => (
+          <div key={r.id} className="text-[14px]">
+            <span className="text-gs-grey-3">{t(r.label)}: </span>
+            <span id={r.id} className="font-medium text-gs-rule" />
           </div>
+        ))}
+        {/* Habilidad especial [X] — game.js gestiona display y valores */}
+        <div id="abilityRow" className="text-[14px]" style={{ display: "none" }}>
+          <span className="text-gs-grey-3">
+            <span id="abilityName">ESP</span>:{" "}
+          </span>
+          <span id="abilityCd" className="font-medium text-gs-gold-bright" />
         </div>
       </div>
 

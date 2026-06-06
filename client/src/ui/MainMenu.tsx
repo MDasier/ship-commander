@@ -99,32 +99,39 @@ export default function MainMenu() {
           </div>
         </div>
 
-        {/* Acciones */}
-        <div className="flex w-full max-w-[560px] flex-col gap-3.5">
+        {/* Acciones — variante "Cuadr." (grid 2×2) del handoff */}
+        <div className="grid w-full max-w-[560px] grid-cols-2 gap-3.5">
           {actions.map((a) => (
-            <button key={a.id} className="gs-action" onClick={a.onClick}>
-              <span className="grid h-[26px] w-[26px] flex-none place-items-center text-gs-gold-bright">
-                <Icon name={a.icon} size={24} />
+            <button
+              key={a.id}
+              className="gs-action min-h-[150px] flex-col items-start justify-between gap-3.5"
+              onClick={a.onClick}
+            >
+              <span className="grid h-[30px] w-[30px] place-items-center text-gs-gold-bright">
+                <Icon name={a.icon} size={28} />
               </span>
-              <span>{a.label}</span>
-              <span className="ml-auto font-body text-[12px] font-semibold normal-case tracking-normal text-gs-grey-3">
-                {a.sub}
-                {a.meta && <span className="ml-2 text-gs-gold/70">{a.meta}</span>}
+              <span>
+                {a.label}
+                <span className="mt-1.5 block font-body text-[12px] font-semibold normal-case tracking-normal text-gs-grey-3">
+                  {a.sub}
+                </span>
               </span>
             </button>
           ))}
 
           {/* Apoyo (abre el enlace real de soporte) */}
           <button
-            className="gs-action gs-action-support"
+            className="gs-action gs-action-support min-h-[150px] flex-col items-start justify-between gap-3.5"
             onClick={() => window.open(SUPPORT_URL, "_blank", "noopener")}
           >
-            <span className="grid h-[26px] w-[26px] flex-none place-items-center text-gs-pink">
-              <Icon name="heart" size={22} />
+            <span className="grid h-[30px] w-[30px] place-items-center text-gs-pink">
+              <Icon name="heart" size={26} />
             </span>
-            <span>{t("menu.support")}</span>
-            <span className="ml-auto font-body text-[12px] font-semibold normal-case tracking-normal text-gs-grey-3">
-              {t("menu.supportSub")}
+            <span>
+              {t("menu.support")}
+              <span className="mt-1.5 block font-body text-[12px] font-semibold normal-case tracking-normal text-gs-grey-3">
+                {t("menu.supportSub")}
+              </span>
             </span>
           </button>
         </div>
