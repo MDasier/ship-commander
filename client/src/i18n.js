@@ -152,7 +152,7 @@ const I18N = {
     "dead.selectShip": "SELECCIONAR NAVE",
     "dead.turret": "O ENTRA DE ARTILLERO",
     "dead.switchTeam": "⇄ Cambiar equipo",
-    "dead.leave": "↩ Salir al lobby",
+    "dead.leave": "Salir al lobby",
     "dead.reserved": "RESERVADA · [R] para entrar",
     "dead.freeTurrets": "{n} torreta(s) libre(s)",
     "dead.minimize": "Minimizar",
@@ -177,7 +177,7 @@ const I18N = {
     "gameover.hostHint": "Eres el HOST · puedes reiniciar la partida para todos o volver al lobby",
     "gameover.guestHint": "Esperando a que el HOST reinicie... · puedes volver al lobby cuando quieras",
     "gameover.restart": "Reiniciar partida",
-    "gameover.back": "↩ Volver al lobby",
+    "gameover.back": "Volver al lobby",
     "gameover.victory": "VICTORIA",
     "gameover.defeat": "DERROTA",
     "gameover.draw": "EMPATE",
@@ -188,7 +188,7 @@ const I18N = {
     // Conexión
     "conn.reconnecting": "Reconectando",
     "conn.hint": "Se reconectará automáticamente en cuanto el servidor vuelva.",
-    "conn.retry": "↻ Reintentar ahora",
+    "conn.retry": "Reintentar ahora",
 
     // Arranque / standby del servidor
     "boot.waking": "Conectando con el servidor...",
@@ -367,7 +367,7 @@ const I18N = {
     "dead.selectShip": "SELECT SHIP",
     "dead.turret": "OR MAN A TURRET",
     "dead.switchTeam": "⇄ Switch team",
-    "dead.leave": "↩ Leave to lobby",
+    "dead.leave": "Leave to lobby",
     "dead.reserved": "RESERVED · [R] to enter",
     "dead.freeTurrets": "{n} free turret(s)",
     "dead.minimize": "Minimize",
@@ -390,7 +390,7 @@ const I18N = {
     "gameover.hostHint": "You are the HOST · restart the match for everyone or return to the lobby",
     "gameover.guestHint": "Waiting for the HOST to restart... · you can return to the lobby anytime",
     "gameover.restart": "Restart match",
-    "gameover.back": "↩ Back to lobby",
+    "gameover.back": "Back to lobby",
     "gameover.victory": "VICTORY",
     "gameover.defeat": "DEFEAT",
     "gameover.draw": "DRAW",
@@ -399,7 +399,7 @@ const I18N = {
 
     "conn.reconnecting": "Reconnecting",
     "conn.hint": "It will reconnect automatically once the server is back.",
-    "conn.retry": "↻ Retry now",
+    "conn.retry": "Retry now",
 
     "boot.waking": "Connecting to the server...",
     "boot.cold": "The server was asleep. Waking it up, please wait a few seconds...",
