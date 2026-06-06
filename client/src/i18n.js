@@ -440,8 +440,12 @@ let LANG = (function () {
 })();
 
 // Devuelve el texto traducido, con sustitución de variables {nombre}.
-function i18nt(key, vars) {
-  const dict = I18N[LANG] || I18N.es;
+// `lang` opcional: si se pasa, fuerza ese idioma (los componentes React lo
+// pasan desde su estado para que el React Compiler vea la dependencia del
+// idioma y recalcule los textos al cambiarlo). Los llamadores legacy (game.js)
+// no lo pasan y usan el LANG global del módulo.
+function i18nt(key, vars, lang) {
+  const dict = I18N[lang || LANG] || I18N.es;
   let s = dict[key];
   if (s == null) s = I18N.es[key];
   if (s == null) return key;

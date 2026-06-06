@@ -9,6 +9,9 @@ export function useI18n() {
 
   useEffect(() => onLangChange((l: string) => setLangState(l)), []);
 
-  const t = (key: string, vars?: Record<string, unknown>) => i18nt(key, vars) as string;
+  // Pasamos `lang` (estado) a i18nt para que el React Compiler vea que el texto
+  // depende del idioma y recalcule las llamadas t("clave") al cambiarlo (si no,
+  // las hoistea como constantes y los textos no se refrescaban).
+  const t = (key: string, vars?: Record<string, unknown>) => i18nt(key, vars, lang) as string;
   return { t, lang, setLang: setLang as (l: string) => void };
 }
