@@ -155,6 +155,7 @@ function returnToLobby() {
   S.currentRoomId = null;
   S.roomData = null;
 
+  stopMusic();   // al salir de partida (sin pasar por game over) la música seguía sonando
   resetAudio();
   hideGameOver();
   hideDeadPanel();
