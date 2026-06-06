@@ -11,8 +11,10 @@ import ShipPicker from "./ShipPicker";
 //    vidas de equipo, torretas libres (entrar de artillero) y acciones.
 // La info de la derecha (antes dibujada centrada en el canvas y que se
 // superponía con las cards) llega de getDeadInfo(); se refresca por intervalo
-// mientras el panel está montado. El panel solo se monta cuando se puede
-// reaparecer (evento "dead"); el caso "sin vidas" lo dibuja el canvas.
+// mientras el panel está montado. Se monta SIEMPRE que estás muerto (evento
+// "dead"): si puedes reaparecer muestra la selección de nave; sin vidas, una
+// vista compacta de espectador. Es minimizable para ver la partida (la cámara
+// ya sigue a un aliado vivo = modo espectador; [TAB] cambia de objetivo).
 
 type Turret = { id: string; name: string; type: string; free: number; reservedHere: boolean };
 type DeadInfo = {
@@ -40,6 +42,7 @@ function Metric({ label, value, valueClass }: { label: string; value: ReactNode;
 export default function DeadPanel() {
   const { t } = useI18n();
   const [, setTick] = useState(0);
+  const [minimized, setMinimized] = useState(false);
   // Refresco ligero mientras el panel está montado (estado vivo del servidor +
   // cuenta atrás de reaparición).
   useEffect(() => {
@@ -75,6 +78,44 @@ export default function DeadPanel() {
     ? `${info.inTurret ? t("room.board") : t("controls.respawn")} · [${info.respawnKey}]`
     : t("game.respawnIn", { n: info.remaining });
 
+  // Minimizado: solo un botón flotante para restaurar; el resto queda libre para
+  // ver la partida (la cámara sigue a un aliado vivo).
+  if (minimized) {
+    return (
+      <div className="pointer-events-none fixed inset-x-0 top-20 z-[200] flex justify-center font-body">
+        <button className="gs-btn gs-btn-ghost pointer-events-auto" onClick={() => setMinimized(false)}>
+          <Icon name="chevronR" size={14} className="-rotate-90" /> {t("dead.restore")}
+        </button>
+      </div>
+    );
+  }
+
+  // Sin vidas de equipo: no se puede reaparecer → panel compacto de espectador.
+  if (!info.canRespawn) {
+    return (
+      <div className="pointer-events-none fixed inset-0 z-[200] grid place-items-center px-6 font-body">
+        <div className="gs-panel pointer-events-auto flex w-[min(420px,92vw)] flex-col items-center gap-4 p-6 text-center">
+          <div
+            className="font-display text-[28px] font-black tracking-[0.12em] text-gs-red"
+            style={{ textShadow: "0 0 18px rgba(155,57,53,0.5)" }}
+          >
+            {t("game.destroyed")}
+          </div>
+          <p className="m-0 max-w-[320px] leading-relaxed text-gs-grey-3">{t("game.noTeamLives")}</p>
+          <p className="m-0 text-[12px] text-gs-grey-3">{t("dead.spectateHint")}</p>
+          <div className="mt-1 flex w-full flex-col gap-2.5">
+            <button className="gs-btn gs-btn-ghost w-full" onClick={() => setMinimized(true)}>
+              <Icon name="chevronR" size={14} className="rotate-90" /> {t("dead.spectate")}
+            </button>
+            <button className="gs-btn gs-btn-danger w-full" onClick={() => roomLeave()}>
+              <Icon name="arrowL" size={15} /> {t("dead.leave")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="pointer-events-none fixed inset-0 z-[200] grid place-items-center px-6 font-body">
       <div className="gs-panel pointer-events-auto grid max-h-[90vh] w-[min(1120px,96vw)] grid-cols-1 gap-6 overflow-y-auto p-6 lg:grid-cols-[640px_minmax(0,1fr)]">
@@ -89,6 +130,16 @@ export default function DeadPanel() {
 
         {/* Columna derecha: estado de muerte + acciones */}
         <div className="flex flex-col gap-4 lg:border-l lg:border-gs-rule/12 lg:pl-6">
+          {/* Minimizar (deja ver la partida en modo espectador) */}
+          <div className="flex justify-end">
+            <button
+              className="gs-btn gs-btn-ghost min-h-[34px] px-3 py-1.5 text-[12px]"
+              onClick={() => setMinimized(true)}
+            >
+              <Icon name="chevronR" size={13} className="rotate-90" /> {t("dead.minimize")}
+            </button>
+          </div>
+
           {/* DESTRUIDO + botón de reaparición (además de la tecla R) */}
           <div className="flex flex-col items-center gap-3 text-center">
             <div

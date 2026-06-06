@@ -155,6 +155,10 @@ const I18N = {
     "dead.leave": "↩ Salir al lobby",
     "dead.reserved": "RESERVADA · [R] para entrar",
     "dead.freeTurrets": "{n} torreta(s) libre(s)",
+    "dead.minimize": "Minimizar",
+    "dead.restore": "Mostrar panel",
+    "dead.spectate": "Ver como espectador",
+    "dead.spectateHint": "Sigues a tus aliados · [TAB] cambia de vista",
 
     // MobiGlass
     "mobi.pilot": "PILOTO",
@@ -366,6 +370,10 @@ const I18N = {
     "dead.leave": "↩ Leave to lobby",
     "dead.reserved": "RESERVED · [R] to enter",
     "dead.freeTurrets": "{n} free turret(s)",
+    "dead.minimize": "Minimize",
+    "dead.restore": "Show panel",
+    "dead.spectate": "Spectate",
+    "dead.spectateHint": "Following your allies · [TAB] switch view",
 
     "mobi.pilot": "PILOT",
     "mobi.match": "MATCH",

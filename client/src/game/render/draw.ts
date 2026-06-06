@@ -200,27 +200,11 @@ function loop() {
     const pilot = me.pilotingFor ? S.players[me.pilotingFor] : null;
     setMissileWarning(!me.dead && !!(me.lockedByMissile || pilot?.lockedByMissile));
 
-    if (me.dead) {
-      // Vidas: oleadas → pool de equipo; PVP/vuelo libre → infinito
-      const canRespawn = S.waveMode ? (S.teamLives ?? 0) > 0 : true;
-      // El panel de muerte lo monta React (DeadPanel) y muestra TODA la info
-      // (DESTRUIDO, cuenta atrás, vidas, oleada, enemigos, torretas, acciones).
-      // Para no superponer texto sobre el panel, en canvas solo dibujamos el
-      // caso "sin vidas de equipo", en el que el panel queda oculto.
-      setDeadPanelVisible(canRespawn);
-      if (!canRespawn) {
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
-        ctx.font = "bold 40px 'Courier New', monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(i18nt("game.destroyed"), canvas.width / 2, canvas.height / 2 - 30);
-        ctx.font = "13px 'Courier New', monospace";
-        ctx.fillStyle = "#666";
-        ctx.fillText(i18nt("game.noTeamLives"), canvas.width / 2, canvas.height / 2 + 16);
-        ctx.textAlign = "left";
-      }
-    } else {
-      setDeadPanelVisible(false);
-    }
+    // El panel de muerte (DeadPanel React) se monta siempre que estás muerto: si
+    // puedes reaparecer muestra la selección de nave; sin vidas, una vista
+    // compacta de espectador. En ambos casos es minimizable para ver la partida
+    // (la cámara ya sigue a un aliado vivo = modo espectador).
+    setDeadPanelVisible(me.dead);
 
     // Aviso de nave apagada por EMP
     if (!me.dead && me.empDisabled) {
