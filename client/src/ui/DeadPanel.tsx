@@ -51,7 +51,7 @@ export default function DeadPanel() {
     return () => clearInterval(id);
   }, []);
 
-  const me = getMe() as { shipType?: string } | undefined;
+  const me = getMe() as { shipType?: string; team?: string } | undefined;
   const turrets = (getTurretOptions() as Turret[]) || [];
   const info = getDeadInfo() as DeadInfo;
 
@@ -71,6 +71,23 @@ export default function DeadPanel() {
   const selectShip = (type: string) => {
     setPicked(type);
     roomSend({ type: "selectShip", shipType: type });
+  };
+
+  // Equipo optimista: estando muerto el cambio no se refleja de inmediato en
+  // getMe().team, así que alternamos al instante para dar feedback (el fondo del
+  // botón = equipo actual) y adoptamos el valor del servidor cuando cambia.
+  const serverTeam: "green" | "red" = me?.team === "red" ? "red" : "green";
+  const [team, setTeam] = useState<"green" | "red">(serverTeam);
+  const prevTeam = useRef(serverTeam);
+  useEffect(() => {
+    if (serverTeam !== prevTeam.current) {
+      prevTeam.current = serverTeam;
+      setTeam(serverTeam);
+    }
+  });
+  const switchTeam = () => {
+    setTeam((tm) => (tm === "red" ? "green" : "red"));
+    roomSwitchTeam();
   };
 
   const ready = info.remaining <= 0;
@@ -160,20 +177,30 @@ export default function DeadPanel() {
             </button>
           </div>
 
-          {/* Métricas: oleada / enemigos / vidas de equipo */}
-          <div className="flex flex-col gap-2.5">
-            {info.waveMode && (
-              <>
-                <Metric label={t("solo.waves")} value={`${info.waveNum}/${info.waveTotal}`} valueClass="text-gs-gold-bright" />
-                <Metric label={t("hud.enemiesShort")} value={info.enemiesLeft} valueClass="text-gs-gold-bright" />
-              </>
-            )}
-            <Metric
-              label={t("game.teamLives")}
-              value={info.waveMode ? (info.teamLives ?? 0) : "∞"}
-              valueClass="text-gs-red"
-            />
-          </div>
+          {/* Métricas: oleada / enemigos / vidas de equipo. Solo en modo oleadas;
+              en PvP / vuelo libre las vidas son infinitas y no aporta mostrarlas. */}
+          {info.waveMode && (
+            <div className="flex flex-col gap-2.5">
+              <Metric label={t("solo.waves")} value={`${info.waveNum}/${info.waveTotal}`} valueClass="text-gs-gold-bright" />
+              <Metric label={t("hud.enemiesShort")} value={info.enemiesLeft} valueClass="text-gs-gold-bright" />
+              <Metric label={t("game.teamLives")} value={info.teamLives ?? 0} valueClass="text-gs-red" />
+            </div>
+          )}
+
+          {/* Cambiar equipo: solo en PvP, debajo de las vidas (lejos de "Salir").
+              El fondo refleja el equipo ACTUAL del jugador → al pulsar cambia. */}
+          {info.pvp && (
+            <button
+              className={`gs-btn w-full ${
+                team === "red"
+                  ? "border-gs-red bg-gs-red/20 text-white hover:border-gs-red hover:bg-gs-red/30"
+                  : "border-gs-green bg-gs-green/20 text-white hover:border-gs-green hover:bg-gs-green/30"
+              }`}
+              onClick={switchTeam}
+            >
+              {t("dead.switchTeam")}
+            </button>
+          )}
 
           {/* Torretas libres: entrar de artillero en una nave aliada */}
           {turrets.length > 0 && (
@@ -199,12 +226,6 @@ export default function DeadPanel() {
 
           {/* Acciones */}
           <div className="mt-auto flex flex-col gap-2.5 pt-1">
-            {/* Cambiar equipo: solo en PvP (dos equipos de jugadores) */}
-            {info.pvp && (
-              <button className="gs-btn w-full" onClick={() => roomSwitchTeam()}>
-                {t("dead.switchTeam")}
-              </button>
-            )}
             <button className="gs-btn gs-btn-danger w-full" onClick={() => roomLeave()}>
               <Icon name="arrowL" size={15} /> {t("dead.leave")}
             </button>
