@@ -23,6 +23,9 @@ import {
   applyStoredVolumes, getAudioSettings,
   setAudioEffects, setAudioMusic, setAudioTrack, setAudioMuted,
 } from "./game/audio.js";
+import {
+  lerp, lerpAngle, extrapolateArr, seededRand, ptSegDist,
+} from "./game/math.js";
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -343,18 +346,6 @@ const INTERP_DELAY = 80;  // ms behind server time (~2.5 ticks at 30fps)
 const MAX_BUFFER = 12;
 let stateBuffer = [];  // [{time, players, bullets, missiles, flares}]
 
-function lerp(a, b, t) { return a + (b - a) * t; }
-
-function lerpAngle(a, b, t) {
-  let d = b - a;
-  while (d > Math.PI) d -= 2 * Math.PI;
-  while (d < -Math.PI) d += 2 * Math.PI;
-  return a + d * t;
-}
-
-function extrapolateArr(arr, ticks) {
-  return arr.map(e => ({ ...e, x: e.x + e.vx * ticks, y: e.y + e.vy * ticks }));
-}
 
 function applyInterpolatedState() {
   if (stateBuffer.length === 0) return;
@@ -1030,20 +1021,6 @@ function renderRooms(list) {
 // Etiquetas cortas para la lista de jugadores — se actualizan dinámicamente
 const SHIP_LABELS = { interceptor: "INTERCEPTOR", fighter: "L.FIGHTER", bomber: "BOMBER", gunship: "GUNSHIP" };
 
-function speedRating(mult) {
-  if (mult >= 1.4) return "+++";
-  if (mult >= 0.9) return "++";
-  if (mult >= 0.5) return "+";
-  return "−−−";
-}
-
-function radarRating(sig) {
-  if (sig >= 3000) return "+++";   // muy visible
-  if (sig >= 1500) return "++";
-  if (sig >= 800) return "+";
-  return "−−";                     // firma baja = difícil de detectar
-}
-
 // Metadatos de nave que envía el servidor en el init. Se exponen a React
 // (getShips + evento "ships-init") para que las pantallas React (Vuela Solo,
 // y más adelante Lobby) rendericen sus tarjetas con los stats reales.
@@ -1623,14 +1600,6 @@ function drawpingEffect(camX, camY) {
 // ── Asteroid rendering ─────────────────────────
 
 // LCG pseudo-random con semilla para formas consistentes entre clientes
-function seededRand(seed) {
-  let s = (seed | 0) >>> 0;
-  return () => {
-    s = Math.imul(s, 1664525) + 1013904223 | 0;
-    return (s >>> 0) / 4294967296;
-  };
-}
-
 const asteroidCache = new Map(); // key → { pts, colorIdx }
 
 function getAsteroidProps(ast) {
@@ -2438,13 +2407,6 @@ function drawMineTimers() {
 //MISILES
 // ── Cover helpers ─────────────────────────────
 // Distancia mínima de un punto al segmento A→B (igual que servidor)
-function ptSegDist(px, py, ax, ay, bx, by) {
-  const dx = bx - ax, dy = by - ay;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
-  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
-}
 
 // Nave "cubierta": posición dentro del radio de un asteroide flotante (z=1, sobre las naves)
 function isSheltered(px, py) {
