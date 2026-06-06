@@ -11,18 +11,21 @@ function drawWorldBounds(camX, camY) {
   const me = getMe();
   if (!me) return;
 
-  const WORLD_SIZE = 10000;
+  // Tamaño REAL del mundo (del servidor), no un valor fijo: si se hardcodea, los
+  // bordes derecho/inferior no coinciden con el tamaño de mapa elegido.
+  const W = S.world.width;
+  const H = S.world.height;
   const WARNING_DIST = 1000;
 
   const leftDist   = me.x;
-  const rightDist  = WORLD_SIZE - me.x;
+  const rightDist  = W - me.x;
   const topDist    = me.y;
-  const bottomDist = WORLD_SIZE - me.y;
+  const bottomDist = H - me.y;
 
   const leftX   = worldToScreen(0, 0, camX, camY).x;
-  const rightX  = worldToScreen(WORLD_SIZE, 0, camX, camY).x;
+  const rightX  = worldToScreen(W, 0, camX, camY).x;
   const topY    = worldToScreen(0, 0, camX, camY).y;
-  const bottomY = worldToScreen(0, WORLD_SIZE, camX, camY).y;
+  const bottomY = worldToScreen(0, H, camX, camY).y;
 
   const t = performance.now() * 0.003;
 
