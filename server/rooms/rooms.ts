@@ -70,7 +70,11 @@ function createRoom(ownerId: string, ownerName: string): Room {
 function joinRoom(player: Player, room: Room): void {
   player.roomId = room.id;
   room.players[player.id] = player;
-  if (room.coopMode) player.team = "green";   // co-op: todos en el mismo equipo
+  // Equipo por defecto al entrar: verde (co-op: todos juntos vs IA; PvP: arranca
+  // en verde y puede cambiar). Antes quedaba null en PvP, así que el primer
+  // "Cambiar equipo" hacía null→verde (sin cambio visible) y solo el segundo
+  // clic cambiaba de verdad.
+  player.team = "green";
 }
 
 function removeFromRoom(player: Player): void {
