@@ -4,7 +4,7 @@
 // El estilo vive en index.css (tokens @theme + clases .gs-*).
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { getShips, drawShipPreview } from "../game.js";
+import { getShips, drawShipPreview } from "../game";
 
 // ── Iconos (viewBox 24, trazo currentColor) ──────────────────
 const ICON_PATHS: Record<string, ReactNode> = {

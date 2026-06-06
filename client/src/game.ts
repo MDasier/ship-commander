@@ -1,3 +1,11 @@
+// @ts-nocheck
+// Migración incremental a TS (Fase B). Este fichero (entry+fachada, ~3.4k líneas)
+// se renombró .js→.ts para que los importadores resuelvan y para poder extraer
+// módulos TIPADOS (que SÍ se chequean) a game/*. El repo usa TypeScript 6 con
+// strict ON por defecto: tipar el cuerpo entero de golpe es inviable sin riesgo
+// de regresión, así que se mantiene sin chequear igual que la estrategia
+// checkJs:false del resto de JS legacy. Quitar este pragma a medida que su
+// contenido migre a módulos tipados (net.ts, input.ts, render/, …).
 // ── Módulos del cliente (ES modules · empaquetados por Vite) ──
 import "./styles.css";
 import { i18nt, applyI18n, onLangChange, setLang, getLang } from "./i18n.js";

@@ -13,7 +13,7 @@ import {
   getBindings,
   BINDING_LABELS,
   displayKey,
-} from "../game.js";
+} from "../game";
 import { Icon, LangToggle } from "./ds";
 
 // MobiGlass en partida migrado a React (Fase 2). Overlay con pestañas

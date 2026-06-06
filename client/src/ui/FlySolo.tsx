@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useI18n } from "../hooks/useI18n";
-import { menuMain, startSolo } from "../game.js";
+import { menuMain, startSolo } from "../game";
 import { Backdrop, BackBtn, BrandTitle, LangToggle, RadarMark, Section, SegOption } from "./ds";
 import ShipPicker from "./ShipPicker";
 

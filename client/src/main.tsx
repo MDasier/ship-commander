@@ -6,7 +6,7 @@ import "./styles.css";
 // Arranca el juego (canvas imperativo). El markup vive en index.html; game.js
 // se auto-ejecuta al importarse y captura sus elementos por id. Migración
 // incremental (strangler): la UI se irá moviendo a componentes React.
-import "./game.js";
+import "./game";
 import App from "./App.tsx";
 
 createRoot(document.getElementById("root")!).render(

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useI18n } from "../hooks/useI18n";
-import { getPlayerName, setPlayerName, menuPlayOnline, menuSolo, SUPPORT_URL } from "../game.js";
+import { getPlayerName, setPlayerName, menuPlayOnline, menuSolo, SUPPORT_URL } from "../game";
 import { Backdrop, BrandTitle, Icon, InfoDot, LangToggle, RadarMark } from "./ds";
 
 // Menú principal migrado a React (Fase 1), reskin GuildSwarm cockpit con Tailwind.

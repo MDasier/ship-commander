@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../hooks/useI18n";
-import { chatSend } from "../game.js";
+import { chatSend } from "../game";
 
 // Input de chat migrado a React (Fase 2). El LOG de mensajes se dibuja en el
 // canvas (game.js); aquí solo el campo de entrada al abrir (Enter desde el

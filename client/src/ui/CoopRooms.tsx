@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../hooks/useI18n";
-import { getRoomList, lobbyCreateRoom, lobbyRefresh, lobbyJoin, menuMain } from "../game.js";
+import { getRoomList, lobbyCreateRoom, lobbyRefresh, lobbyJoin, menuMain } from "../game";
 import { Backdrop, BackBtn, BrandTitle, Icon, LangToggle, RadarMark } from "./ds";
 
 // Lista de salas Co-op migrada a React (Fase 2). Los datos llegan del servidor

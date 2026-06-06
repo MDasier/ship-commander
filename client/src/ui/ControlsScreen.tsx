@@ -7,7 +7,7 @@ import {
   onBindingsChange,
   BINDING_LABELS,
   displayKey,
-} from "../game.js";
+} from "../game";
 import { Icon } from "./ds";
 
 type Bindings = Record<string, string | null>;

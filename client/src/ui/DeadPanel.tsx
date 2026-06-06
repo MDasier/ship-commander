@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../hooks/useI18n";
-import { getMe, getTurretOptions, roomSend, roomSwitchTeam, roomLeave } from "../game.js";
+import { getMe, getTurretOptions, roomSend, roomSwitchTeam, roomLeave } from "../game";
 import { Icon } from "./ds";
 import ShipPicker from "./ShipPicker";
 

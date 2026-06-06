@@ -1,5 +1,5 @@
 import { useI18n } from "../hooks/useI18n";
-import { gameRestart, roomLeave } from "../game.js";
+import { gameRestart, roomLeave } from "../game";
 
 // Overlay de fin de partida migrado a React (Fase 2). El texto VICTORIA/DERROTA
 // y el marcador se siguen dibujando en el canvas (game.js); aquí solo van las

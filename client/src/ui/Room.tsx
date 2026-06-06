@@ -8,7 +8,7 @@ import {
   roomSwitchTeam,
   roomLeave,
   menuMain,
-} from "../game.js";
+} from "../game";
 import { Backdrop, BackBtn, BrandTitle, GoldToggle, Icon, LangToggle, RadarMark, SegOption } from "./ds";
 import ShipPicker from "./ShipPicker";
 

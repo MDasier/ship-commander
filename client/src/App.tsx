@@ -11,7 +11,7 @@ import ChatInput from "./ui/ChatInput";
 import DeadPanel from "./ui/DeadPanel";
 import ControlsScreen from "./ui/ControlsScreen";
 import Reconnect from "./ui/Reconnect";
-import { closeMobiglass } from "./game.js";
+import { closeMobiglass } from "./game";
 
 // Mapea cada pantalla del menú (emitida por game.js) a una ruta. Por ahora solo
 // "/" (MainMenu) tiene componente React; lobby/solo/room siguen en game.js y se
