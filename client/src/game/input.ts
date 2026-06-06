@@ -14,7 +14,7 @@ import { S } from "./state";
 import { ws } from "./net";
 import { PING_COOLDOWN_MS, CFG_RESPAWN_DELAY } from "./constants";
 import {
-  initAudio, playShootSound, playMissileSound, playAlertSound,
+  initAudio, playMissileSound, playAlertSound,
   playPingSound, playBeamReadySound, playAbilityReadySound,
 } from "../sounds.js";
 
@@ -133,15 +133,7 @@ export function installInput(deps: InputDeps) {
       if (me && !me.dead) S.inertiaDampActive = !S.inertiaDampActive;
     }
 
-    // Fallback teclado: shoot / missile
-    if (bindings.shoot && key === bindings.shoot) {
-      if (isCapitalPilot()) {
-        startBeamCharge();
-      } else {
-        ws.send(JSON.stringify({ type: "shoot" }));
-        playShootSound();
-      }
-    }
+    // Fallback teclado: misil (el disparo es solo con el ratón)
     if (bindings.missile && key === bindings.missile && S.targetId) {
       const meM = getMe();
       const ready = meM && (meM.missileCooldown ?? 0) <= 0 &&
@@ -160,8 +152,9 @@ export function installInput(deps: InputDeps) {
       const meNow = getMe();
       if (meNow && meNow.dead) {
         cycleSpectator();
-      } else {
+      } else if (!S.showScoreboard) {
         S.showScoreboard = true;
+        window.dispatchEvent(new CustomEvent("scoreboard", { detail: true }));
       }
     }
 
@@ -231,10 +224,11 @@ export function installInput(deps: InputDeps) {
     const tag = document.activeElement?.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || (document.activeElement as HTMLElement)?.isContentEditable) return;
 
-    const bindings = getBindings();
-    if (e.key === "Tab") S.showScoreboard = false;
+    if (e.key === "Tab" && S.showScoreboard) {
+      S.showScoreboard = false;
+      window.dispatchEvent(new CustomEvent("scoreboard", { detail: false }));
+    }
     if (e.key === "Delete" && getSdState() === "charging") cancelSd();
-    if (bindings.shoot && e.key.toLowerCase() === bindings.shoot && S.beamHeld) releaseBeamCharge();
   });
 
   // ── Envío de input al servidor (~30/s) + avisos de voz por flanco ──

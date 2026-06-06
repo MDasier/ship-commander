@@ -13,6 +13,7 @@ import ControlsScreen from "./ui/ControlsScreen";
 import Reconnect from "./ui/Reconnect";
 import Boot from "./ui/Boot";
 import Toast from "./ui/Toast";
+import Scoreboard from "./ui/Scoreboard";
 import { closeMobiglass, getMenuScreen, isEverConnected } from "./game";
 
 // Mapea cada pantalla del menú (emitida por game.js) a una ruta. Por ahora solo
@@ -34,6 +35,7 @@ export default function App() {
   const [gameOver, setGameOver] = useState<{ isHost: boolean; solo: boolean } | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [dead, setDead] = useState(false);
+  const [scoreboard, setScoreboard] = useState(false);
   // Overlay de arranque: visible al cargar hasta conectar (salvo que ya
   // estuviéramos conectados al montar, p. ej. si el "open" llegó antes).
   const [boot, setBoot] = useState<{ cold: boolean } | null>(() => (isEverConnected() ? null : { cold: false }));
@@ -90,6 +92,7 @@ export default function App() {
     };
     const onChat = (e: Event) => setChatOpen((e as CustomEvent<boolean>).detail);
     const onDead = (e: Event) => setDead((e as CustomEvent<boolean>).detail);
+    const onScore = (e: Event) => setScoreboard((e as CustomEvent<boolean>).detail);
     const onBoot = (e: Event) => {
       const d = (e as CustomEvent<{ show: boolean; cold?: boolean }>).detail;
       setBoot(d.show ? { cold: !!d.cold } : null);
@@ -97,6 +100,7 @@ export default function App() {
     window.addEventListener("gameover", onGameOver as EventListener);
     window.addEventListener("chat", onChat as EventListener);
     window.addEventListener("dead", onDead as EventListener);
+    window.addEventListener("scoreboard", onScore as EventListener);
     window.addEventListener("boot", onBoot as EventListener);
     // Por si el "open" del WS (hideBoot) ocurrió entre el render y este efecto:
     // re-chequeamos y ocultamos el overlay de arranque si ya estamos conectados.
@@ -105,6 +109,7 @@ export default function App() {
       window.removeEventListener("gameover", onGameOver as EventListener);
       window.removeEventListener("chat", onChat as EventListener);
       window.removeEventListener("dead", onDead as EventListener);
+      window.removeEventListener("scoreboard", onScore as EventListener);
       window.removeEventListener("boot", onBoot as EventListener);
     };
   }, []);
@@ -121,6 +126,7 @@ export default function App() {
         <Route path="*" element={null} />
       </Routes>
       {dead && <DeadPanel />}
+      {scoreboard && <Scoreboard />}
       {gameOver && <GameOver isHost={gameOver.isHost} solo={gameOver.solo} />}
       {chatOpen && <ChatInput />}
       {showControls && <ControlsScreen onClose={() => setShowControls(false)} />}

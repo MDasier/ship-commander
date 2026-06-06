@@ -160,6 +160,11 @@ const I18N = {
     "dead.spectate": "Ver como espectador",
     "dead.spectateHint": "Sigues a tus aliados · [TAB] cambia de vista",
 
+    // Marcador (Tab)
+    "scoreboard.title": "MARCADOR",
+    "scoreboard.hint": "Suelta [TAB] para cerrar",
+    "scoreboard.pilot": "PILOTO",
+
     // MobiGlass
     "mobi.pilot": "PILOTO",
     "mobi.match": "PARTIDA",
@@ -377,6 +382,10 @@ const I18N = {
     "dead.restore": "Show panel",
     "dead.spectate": "Spectate",
     "dead.spectateHint": "Following your allies · [TAB] switch view",
+
+    "scoreboard.title": "SCOREBOARD",
+    "scoreboard.hint": "Release [TAB] to close",
+    "scoreboard.pilot": "PILOT",
 
     "mobi.pilot": "PILOT",
     "mobi.match": "MATCH",
