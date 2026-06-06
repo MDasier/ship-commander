@@ -14,18 +14,18 @@ import {
 } from "./sounds.js";
 import {
   getShapeDef, buildShipPath, drawShipDetail, drawShipPreview,
-} from "./game/shapes.js";
+} from "./game/shapes";
 import {
   DEFAULT_BINDINGS, BINDING_LABELS, RESERVED_KEYS,
   SUPPORT_URL, MENU_SCREENS, REACT_SCREENS, CFG_RESPAWN_DELAY,
-} from "./game/constants.js";
+} from "./game/constants";
 import {
   applyStoredVolumes, getAudioSettings,
   setAudioEffects, setAudioMusic, setAudioTrack, setAudioMuted,
-} from "./game/audio.js";
+} from "./game/audio";
 import {
   lerp, lerpAngle, extrapolateArr, seededRand, ptSegDist,
-} from "./game/math.js";
+} from "./game/math";
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");

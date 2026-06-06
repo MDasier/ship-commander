@@ -25,10 +25,10 @@ function getAudioSettings() {
     muted: localStorage.getItem("audio_muted") === "1",
   };
 }
-function setAudioEffects(v) { setEffectsVolume(v); localStorage.setItem("vol_effects", String(v)); }
-function setAudioMusic(v) { setMusicVolume(v); localStorage.setItem("vol_music", String(v)); }
-function setAudioTrack(t) { setMusicTrack(t); localStorage.setItem("music_track", t); }
-function setAudioMuted(b) { setMuted(b); localStorage.setItem("audio_muted", b ? "1" : "0"); }
+function setAudioEffects(v: number) { setEffectsVolume(v); localStorage.setItem("vol_effects", String(v)); }
+function setAudioMusic(v: number) { setMusicVolume(v); localStorage.setItem("vol_music", String(v)); }
+function setAudioTrack(t: string) { setMusicTrack(t); localStorage.setItem("music_track", t); }
+function setAudioMuted(b: boolean) { setMuted(b); localStorage.setItem("audio_muted", b ? "1" : "0"); }
 
 export {
   applyStoredVolumes, getAudioSettings,
