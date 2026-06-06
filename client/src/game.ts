@@ -34,6 +34,7 @@ import {
 import {
   lerp, lerpAngle, extrapolateArr, seededRand, ptSegDist,
 } from "./game/math";
+import { S } from "./game/state";
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -143,9 +144,9 @@ function resetBindings() {
   _emitBindingsChange();
 }
 
-function renderControlesPane(targetId = "pane-controles") {
+function renderControlesPane(paneId = "pane-controles") {
   cancelRecording();
-  const pane = document.getElementById(targetId);
+  const pane = document.getElementById(paneId);
   if (!pane) return;
   pane.innerHTML = "";
 
@@ -186,7 +187,7 @@ function renderControlesPane(targetId = "pane-controles") {
   resetBtn.onclick = () => {
     bindings = { ...DEFAULT_BINDINGS };
     saveBindings();
-    renderControlesPane(targetId);
+    renderControlesPane(paneId);
   };
 
   const fixedDiv = document.createElement("div");
@@ -237,7 +238,6 @@ const ws = new WebSocket(_wsURL);
 // ── Feedback de pérdida de conexión + reconexión automática ──
 // El estado del jugador vive en el servidor atado a la conexión; al reconectar se
 // recarga la página para empezar una sesión limpia y coherente.
-let _connLost = false;
 let _reconnectTimer = null;
 let _reconnectProbe = null;
 
@@ -245,7 +245,6 @@ let _reconnectProbe = null;
 // Mientras no se haya conectado nunca, mostramos la pantalla de "despertando";
 // si tarda, escalamos al mensaje de reposo. Tras la primera conexión, una caída
 // pasa a usar el overlay normal de "conexión perdida".
-let _everConnected = false;
 function hideBoot() {
   const b = document.getElementById("serverBoot");
   if (b) b.classList.add("hidden");
@@ -259,18 +258,18 @@ function showBoot(cold) {
   }
 }
 // Si en 4 s no hemos conectado, probablemente el servidor estaba dormido
-setTimeout(() => { if (!_everConnected) showBoot(true); }, 4000);
-ws.addEventListener("open", () => { _everConnected = true; hideBoot(); });
+setTimeout(() => { if (!S.everConnected) showBoot(true); }, 4000);
+ws.addEventListener("open", () => { S.everConnected = true; hideBoot(); });
 
 function showConnLost() {
   // Aún no habíamos conectado nunca → es un arranque en frío, no una caída
-  if (!_everConnected) {
+  if (!S.everConnected) {
     showBoot(true);
     scheduleReconnect(1500);
     return;
   }
-  if (_connLost) return;
-  _connLost = true;
+  if (S.connLost) return;
+  S.connLost = true;
   // El overlay de conexión perdida está migrado a React (App.tsx → Reconnect);
   // game.js sigue conduciendo la reconexión automática (sonda WS + recarga).
   window.dispatchEvent(new CustomEvent("conn-lost"));
@@ -305,67 +304,28 @@ function tryReconnect() {
 ws.addEventListener("close", showConnLost);
 ws.addEventListener("error", showConnLost);
 
-let uiState = "lobby";
-let currentRoomId = null;
+// Estado de juego centralizado en game/state.ts (objeto mutable `S`). Aquí solo
+// quedan handles/constantes locales que no comparte ningún otro módulo.
 let gameOverTimer = null;
 
-let myId = null;
-let roomData = null;
-
-let players = {};
-let bullets = [];
-let beams = [];
-let empPulses = [];
-let mines = [];
-let prevPulseIds = new Set();   // para sonar el EMP/explosión solo en pulsos nuevos
-let prevBeamIds = new Set();    // para lanzar el burst de impacto del rayo solo una vez
-
-// ── Modo oleadas (solo práctica) ──
-let soloMode = false;
-let waveMode = false;
-let teamLives = null;   // vidas compartidas del equipo en modo oleadas (null = respawn infinito)
-let waveNum = 0;
-let waveTotal = 0;
-let enemiesLeft = 0;
-let waveBanner = null;       // { key, n } enviado por el servidor
-let waveBannerSig = null;
-let waveBannerShownAt = 0;
-let asteroids = [];
-
-let targetId = null;
-let missiles = [];
-let flares = [];
-let scanUntil = 0;
-let pingEnemiesUntil = 0;
-let nextPingAt = 0;          // cooldown del ping de radar (1 cada 3 s)
 const PING_COOLDOWN_MS = 3000;
-let inertiaDampActive = true;
-
-let world = {
-  width: 10000,
-  height: 10000
-};
-
-let winner = null;
-let prevWinner = null;
 
 // ── Client-side interpolation ──────────────────
 const INTERP_DELAY = 80;  // ms behind server time (~2.5 ticks at 30fps)
 const MAX_BUFFER = 12;
-let stateBuffer = [];  // [{time, players, bullets, missiles, flares}]
 
 
 function applyInterpolatedState() {
-  if (stateBuffer.length === 0) return;
+  if (S.stateBuffer.length === 0) return;
 
   const renderTime = Date.now() - INTERP_DELAY;
 
   // Find the two states that bracket renderTime
   let idx = 0;
-  while (idx < stateBuffer.length - 1 && stateBuffer[idx + 1].time <= renderTime) idx++;
+  while (idx < S.stateBuffer.length - 1 && S.stateBuffer[idx + 1].time <= renderTime) idx++;
 
-  const s0 = stateBuffer[idx];
-  const s1 = stateBuffer[idx + 1];
+  const s0 = S.stateBuffer[idx];
+  const s1 = S.stateBuffer[idx + 1];
 
   // Ticks elapsed since the latest state we have (for bullet/missile extrapolation)
   const latest = s1 || s0;
@@ -373,10 +333,10 @@ function applyInterpolatedState() {
 
   if (!s1) {
     // Only one state available — use it directly, extrapolate projectiles
-    players = s0.players;
-    bullets = extrapolateArr(s0.bullets, ticksSince);
-    missiles = extrapolateArr(s0.missiles, ticksSince);
-    flares = s0.flares;
+    S.players = s0.players;
+    S.bullets = extrapolateArr(s0.bullets, ticksSince);
+    S.missiles = extrapolateArr(s0.missiles, ticksSince);
+    S.flares = s0.flares;
     return;
   }
 
@@ -396,25 +356,14 @@ function applyInterpolatedState() {
       angle: lerpAngle(p0.angle, p1.angle, t),
     };
   }
-  players = interped;
-  bullets = extrapolateArr(s1.bullets, ticksSince);
-  missiles = extrapolateArr(s1.missiles, ticksSince);
-  flares = s1.flares;
+  S.players = interped;
+  S.bullets = extrapolateArr(s1.bullets, ticksSince);
+  S.missiles = extrapolateArr(s1.missiles, ticksSince);
+  S.flares = s1.flares;
 
   // Trim buffer — keep only the last MAX_BUFFER entries
-  if (stateBuffer.length > MAX_BUFFER) stateBuffer.splice(0, stateBuffer.length - MAX_BUFFER);
+  if (S.stateBuffer.length > MAX_BUFFER) S.stateBuffer.splice(0, S.stateBuffer.length - MAX_BUFFER);
 }
-let deadIds = new Set();
-
-let specTargetId = null;
-let killFeed = [];
-let chatLog = [];
-let shakeMag = 0;
-let clientDeadAt = null;
-let showScoreboard = false;
-
-let mouseX = 0;
-let mouseY = 0;
 
 const keys = {};
 
@@ -432,12 +381,12 @@ const menu = document.getElementById("menu");
 // El HUD vive en React (Hud.tsx), montado en la ruta /game. Sustituimos el
 // antiguo flag visual (#hud.hidden) por un estado de juego explícito que los
 // guards de input consultan; React monta/desmonta el HUD por ruta.
-let inGame = false;
+// (S.inGame)
 
 // ── Mobiglass
 // Pestañas, botón de cierre y click-fuera del MobiGlass los gestiona React
 // (MobiGlass.tsx). game.js solo emite el evento "mobi" en open/closeMobiglass.
-let mobiOpen = false;
+// (S.mobiOpen)
 
 function bindingText(action) {
   return displayKey(bindings[action] || DEFAULT_BINDINGS[action]);
@@ -458,21 +407,21 @@ function bindingText(action) {
 })();
 
 // MobiGlass migrado a React (MobiGlass.tsx). open/close solo gestionan el flag
-// mobiOpen (consultado por F1 y el cierre en game over) y avisan a React por
+// S.mobiOpen (consultado por F1 y el cierre en game over) y avisan a React por
 // evento; el render del overlay lo hace el componente.
 function openMobiglass() {
   const me = getMe();
   if (!me) return;
-  mobiOpen = true;
+  S.mobiOpen = true;
   window.dispatchEvent(new CustomEvent("mobi", { detail: true }));
 }
 function closeMobiglass() {
   cancelRecording();
-  mobiOpen = false;
+  S.mobiOpen = false;
   window.dispatchEvent(new CustomEvent("mobi", { detail: false }));
 }
 // Estado de jugadores (puente para React: paneles Piloto/Partida del MobiGlass).
-function getPlayers() { return players; }
+function getPlayers() { return S.players; }
 
 
 // ── Game Over
@@ -480,13 +429,13 @@ function getPlayers() { return players; }
 // se siguen dibujando en el canvas; React solo monta las pistas host/invitado y
 // los botones (reiniciar / volver al lobby), vía el evento "gameover".
 function showGameOver() {
-  if (uiState !== "inRoom") return;
-  if (!winner) return;
-  const isHost = !!(roomData && roomData.ownerId === myId);
+  if (S.uiState !== "inRoom") return;
+  if (!S.winner) return;
+  const isHost = !!(S.roomData && S.roomData.ownerId === S.myId);
   playVictorySound();
   stopMusic();
   hideDeadPanel();
-  window.dispatchEvent(new CustomEvent("gameover", { detail: { show: true, isHost, solo: soloMode } }));
+  window.dispatchEvent(new CustomEvent("gameover", { detail: { show: true, isHost, solo: S.soloMode } }));
 }
 
 function hideGameOver() {
@@ -497,15 +446,15 @@ function hideGameOver() {
 function gameRestart() { ws.send(JSON.stringify({ type: "restartGame" })); }
 
 function resetClientState() {
-  players = {}; bullets = []; missiles = []; asteroids = [];
-  flares = []; winner = null; prevWinner = null; targetId = null;
-  stateBuffer = [];
-  specTargetId = null; deadIds = new Set(); killFeed = []; chatLog = [];
-  shakeMag = 0;
+  S.players = {}; S.bullets = []; S.missiles = []; S.asteroids = [];
+  S.flares = []; S.winner = null; S.prevWinner = null; S.targetId = null;
+  S.stateBuffer = [];
+  S.specTargetId = null; S.deadIds = new Set(); S.killFeed = []; S.chatLog = [];
+  S.shakeMag = 0;
   asteroidCache.clear();
   cancelSd();
   hideDeadPanel();
-  soloMode = false; waveMode = false; waveNum = 0; enemiesLeft = 0; waveBanner = null; teamLives = null;
+  S.soloMode = false; S.waveMode = false; S.waveNum = 0; S.enemiesLeft = 0; S.waveBanner = null; S.teamLives = null;
 }
 
 // Vuelve al lobby desde cualquier estado (game over, partida en curso o muerto).
@@ -513,14 +462,14 @@ function resetClientState() {
 function returnToLobby() {
   clearTimeout(gameOverTimer);
   gameOverTimer = null;
-  winner = null;
-  prevWinner = null;
+  S.winner = null;
+  S.prevWinner = null;
 
   ws.send(JSON.stringify({ type: "leaveRoom" }));
-  resetClientState();          // limpia winner/prevWinner, players, target, etc.
-  uiState = "lobby";
-  currentRoomId = null;
-  roomData = null;
+  resetClientState();          // limpia S.winner/S.prevWinner, S.players, target, etc.
+  S.uiState = "lobby";
+  S.currentRoomId = null;
+  S.roomData = null;
 
   resetAudio();
   hideGameOver();
@@ -528,24 +477,24 @@ function returnToLobby() {
   closeMobiglass();
   closeChat();
   menu.style.display = "";
-  inGame = false;
+  S.inGame = false;
   showMenuScreen("mainMenu");   // volver al hub principal
   updateUI();
 }
 
 // ── Chat ── migrado a React (ChatInput.tsx): el LOG se dibuja en el canvas;
-// React solo monta el input al abrir. chatInputOpen sigue aquí (puerta del input
+// React solo monta el input al abrir. S.chatInputOpen sigue aquí (puerta del input
 // de juego). openChat/closeChat emiten "chat"; chatSend envía y cierra.
-let chatInputOpen = false;
+// (S.chatInputOpen)
 
 function openChat() {
-  chatInputOpen = true;
+  S.chatInputOpen = true;
   clearKeys();   // suelta el movimiento al empezar a escribir
   window.dispatchEvent(new CustomEvent("chat", { detail: true }));
 }
 
 function closeChat() {
-  chatInputOpen = false;
+  S.chatInputOpen = false;
   window.dispatchEvent(new CustomEvent("chat", { detail: false }));
 }
 
@@ -556,27 +505,20 @@ function chatSend(text) {
 }
 
 canvas.addEventListener("mousemove", e => {
-  mouseX = e.clientX;
-  mouseY = e.clientY;
+  S.mouseX = e.clientX;
+  S.mouseY = e.clientY;
 });
 
 document.addEventListener("contextmenu", e => e.preventDefault());
 
 // ── Weapon heat system
-let weaponHeat = 0;
-let mouseLeftHeld = false;
 let weaponFireTimer = null;
-
-// Estados para avisos de voz por flanco (se disparan una vez al cruzar el umbral)
-let _voiceFuelLow = false;
-let _voiceShieldDown = false;
 
 const HEAT_PER_SHOT = 10;//calor por bala
 const HEAT_DECAY_MS = 46;//milisegundos de enfriamiento
 const HEAT_DECAY_AMT = 1;//calor que baja por tick
 const BASE_FIRE_MS = 100;//cadencia
 
-let weaponOverheated = false;
 const OVERHEAT_LIMIT = 99;//calor máximo (umbral de bloqueo)
 const RECOVER_LIMIT = 60;//calor mínimo (umbral de descongestión)
 
@@ -584,12 +526,12 @@ const RECOVER_LIMIT = 60;//calor mínimo (umbral de descongestión)
 function fireWeapon() {
   const me = getMe();
 
-  if (!me || me.dead || !inGame) {
+  if (!me || me.dead || !S.inGame) {
     stopAutoFire();
     return;
   }
 
-  if (weaponOverheated) {
+  if (S.weaponOverheated) {
     playAlertSound("weaponLocked");   // intento de disparo con el arma bloqueada
     stopAutoFire();
     return;
@@ -598,23 +540,23 @@ function fireWeapon() {
   ws.send(JSON.stringify({ type: "shoot" }));
   playShootSound();
 
-  weaponHeat = Math.min(100, weaponHeat + HEAT_PER_SHOT);
+  S.weaponHeat = Math.min(100, S.weaponHeat + HEAT_PER_SHOT);
 
-  if (weaponHeat >= OVERHEAT_LIMIT) {
-    weaponOverheated = true;
+  if (S.weaponHeat >= OVERHEAT_LIMIT) {
+    S.weaponOverheated = true;
     playAlertSound("weaponLocked");   // el arma acaba de sobrecalentarse
     stopAutoFire();
     return;
   }
 
   // SOLO depende del input real
-  if (!mouseLeftHeld) {
+  if (!S.mouseLeftHeld) {
     clearTimeout(weaponFireTimer);
     weaponFireTimer = null;
     return;
   }
 
-  const heatFactor = weaponHeat / 100;
+  const heatFactor = S.weaponHeat / 100;
 
   const interval = BASE_FIRE_MS *
     (1 + Math.pow(heatFactor, 2) * 4);
@@ -622,7 +564,7 @@ function fireWeapon() {
   weaponFireTimer = setTimeout(fireWeapon, interval);
 }
 function startAutoFire() {
-  mouseLeftHeld = true;
+  S.mouseLeftHeld = true;
 
   // evita duplicar loops
   if (weaponFireTimer) return;
@@ -630,59 +572,59 @@ function startAutoFire() {
   fireWeapon();
 }
 function stopAutoFire() {
-  mouseLeftHeld = false;
+  S.mouseLeftHeld = false;
 
   clearTimeout(weaponFireTimer);
   weaponFireTimer = null;
 }
 //enfriamiento de arma
 setInterval(() => {
-  if (weaponHeat > 0) {
-    weaponHeat = Math.max(0, weaponHeat - HEAT_DECAY_AMT);
+  if (S.weaponHeat > 0) {
+    S.weaponHeat = Math.max(0, S.weaponHeat - HEAT_DECAY_AMT);
 
-    if (weaponOverheated && weaponHeat <= RECOVER_LIMIT) {
-      weaponOverheated = false;
+    if (S.weaponOverheated && S.weaponHeat <= RECOVER_LIMIT) {
+      S.weaponOverheated = false;
     }
   }
 }, HEAT_DECAY_MS);
 
 
 // ── Rayo de la Capital: mantener pulsado para cargar, soltar para disparar
-let beamHeld = false;
+// (S.beamHeld)
 function isCapitalPilot() {
   const me = getMe();
   return !!(me && !me.dead && me.shipType === "capital" && !me.pilotingFor);
 }
 function startBeamCharge() {
-  if (beamHeld) return;            // ignora repetición de tecla
-  beamHeld = true;
+  if (S.beamHeld) return;            // ignora repetición de tecla
+  S.beamHeld = true;
   ws.send(JSON.stringify({ type: "beamCharge", charging: true }));
 }
 // cancel=true → soltar sin disparar (mouseleave, perder foco, muerte). Evita que
 // el rayo se dispare por un release involuntario aunque estuviera cargado.
 function releaseBeamCharge(cancel = false) {
-  if (!beamHeld) return;
-  beamHeld = false;
+  if (!S.beamHeld) return;
+  S.beamHeld = false;
   const me = getMe();
   if (!cancel && me && (me.beamCharge ?? 0) >= 0.999) playBeamFireSound();  // solo si llegó a disparar
   ws.send(JSON.stringify({ type: "beamCharge", charging: false, cancel }));
 }
-let beamWasReady = false;     // para sonar el aviso eléctrico al quedar listo el rayo
-let abilityWasReady = true;   // idem para la habilidad [X] (arranca lista → sin aviso inicial)
+// (S.beamWasReady) para sonar el aviso eléctrico al quedar listo el rayo
+// (S.abilityWasReady) idem para la habilidad [X] (arranca lista → sin aviso inicial)
 
 // Enfriamiento pasivo de arma
 //setInterval(() => {
-//  if (weaponHeat > 0) weaponHeat = Math.max(0, weaponHeat - HEAT_DECAY_AMT);
+//  if (S.weaponHeat > 0) S.weaponHeat = Math.max(0, S.weaponHeat - HEAT_DECAY_AMT);
 //}, HEAT_DECAY_MS);
 
 canvas.addEventListener("mousedown", e => {
-  if (!inGame) return;
+  if (!S.inGame) return;
   const me = getMe();
   if (!me || me.dead) return;
   if (e.button === 0) {
     if (isCapitalPilot()) { startBeamCharge(); return; }
     stopAutoFire();
-    mouseLeftHeld = true;
+    S.mouseLeftHeld = true;
     fireWeapon();
   } else if (e.button === 2) {
     // Clic der: ciclar objetivo; al pasar del último → deslockear
@@ -702,11 +644,11 @@ addEventListener("blur", () => { releaseBeamCharge(true); stopAutoFire(); });
 
 // ── Spectator
 function cycleSpectator() {
-  const living = Object.values(players).filter(p => !p.dead && p.id !== myId);
-  if (living.length === 0) { specTargetId = null; return; }
-  if (!specTargetId) { specTargetId = living[0].id; return; }
-  const idx = living.findIndex(p => p.id === specTargetId);
-  specTargetId = living[(idx + 1) % living.length].id;
+  const living = Object.values(S.players).filter(p => !p.dead && p.id !== S.myId);
+  if (living.length === 0) { S.specTargetId = null; return; }
+  if (!S.specTargetId) { S.specTargetId = living[0].id; return; }
+  const idx = living.findIndex(p => p.id === S.specTargetId);
+  S.specTargetId = living[(idx + 1) % living.length].id;
 }
 
 // ── Self-destruct
@@ -752,28 +694,28 @@ function cancelSd() {
 
 // ── Nombre del jugador ──────────────────────────────────────────────
 // Migrado a React (MainMenu): game.js ya no depende del DOM #nameInput.
-// El nombre vive en `playerName` + localStorage y se sincroniza vía GameAPI.
-let playerName = (localStorage.getItem("spacetactics_name") || "").trim();
+// El nombre vive en `S.playerName` + localStorage y se sincroniza vía GameAPI.
+S.playerName = (localStorage.getItem("spacetactics_name") || "").trim();
 
 function applyName(name) {
-  if (name != null) playerName = String(name).trim();
-  if (!playerName) playerName = "Pilot";
-  localStorage.setItem("spacetactics_name", playerName);
+  if (name != null) S.playerName = String(name).trim();
+  if (!S.playerName) S.playerName = "Pilot";
+  localStorage.setItem("spacetactics_name", S.playerName);
   if (ws.readyState === 1) {
-    ws.send(JSON.stringify({ type: "setName", name: playerName }));
+    ws.send(JSON.stringify({ type: "setName", name: S.playerName }));
   }
-  return playerName;
+  return S.playerName;
 }
 
 // Valida que haya un nombre escrito (el menú React lo exige antes de COOP).
 function requireName() {
-  if (!playerName.trim()) return false;
+  if (!S.playerName.trim()) return false;
   applyName();
   return true;
 }
 
 // Getters/setters para la UI React.
-function getPlayerName() { return playerName; }
+function getPlayerName() { return S.playerName; }
 function setPlayerName(name) { return applyName(name); }
 
 // Acciones de la lista de salas (disparadas desde React, CoopRooms.tsx).
@@ -795,9 +737,9 @@ function lobbyJoin(roomId) {
 
 // ── Acciones de la sala (disparadas desde React, Room.tsx) ──
 function roomSend(msg) { ws.send(JSON.stringify(msg)); }
-function getRoomData() { return roomData; }
-function getMyId() { return myId; }
-function roomToggleReady() { if (uiState === "inRoom") roomSend({ type: "ready" }); }
+function getRoomData() { return S.roomData; }
+function getMyId() { return S.myId; }
+function roomToggleReady() { if (S.uiState === "inRoom") roomSend({ type: "ready" }); }
 function roomSwitchTeam() { roomSend({ type: "switchTeam" }); }
 function roomLeave() { returnToLobby(); }
 
@@ -852,7 +794,7 @@ ws.onmessage = e => {
   const data = JSON.parse(e.data);
 
   if (data.type === "init") {
-    myId = data.id;
+    S.myId = data.id;
     if (data.ships) buildShipCards(data.ships);
     applyName();
   }
@@ -863,15 +805,15 @@ ws.onmessage = e => {
 
   if (data.type === "roomJoined") {
 
-    currentRoomId = data.roomId;
-    uiState = "inRoom";
+    S.currentRoomId = data.roomId;
+    S.uiState = "inRoom";
 
     showMenuScreen("room");
     updateUI();
   }
 
   if (data.type === "roomUpdate") {
-    roomData = data.room;
+    S.roomData = data.room;
     renderPlayers();
   }
 
@@ -883,33 +825,33 @@ ws.onmessage = e => {
   if (data.type === "gameStarted") {
 
     menu.style.display = "none";
-    inGame = true;
+    S.inGame = true;
     // Desmonta cualquier overlay de menú React (p. ej. FlySolo) al entrar en juego.
     window.dispatchEvent(new CustomEvent("menu-screen", { detail: "game" }));
-    deadIds = new Set();
+    S.deadIds = new Set();
     startMusic();
 
   }
 
   if (data.type === "chat") {
-    chatLog.push({ name: data.name, team: data.team, text: data.text, ts: Date.now() });
-    if (chatLog.length > 8) chatLog.shift();
+    S.chatLog.push({ name: data.name, team: data.team, text: data.text, ts: Date.now() });
+    if (S.chatLog.length > 8) S.chatLog.shift();
   }
 
   if (data.type === "roomRestarted") {
 
     clearTimeout(gameOverTimer);
     gameOverTimer = null;
-    winner = null;
-    prevWinner = null;
+    S.winner = null;
+    S.prevWinner = null;
 
     resetClientState();
-    roomData = data.room;
-    uiState = "inRoom";
-    currentRoomId = data.room.id;
+    S.roomData = data.room;
+    S.uiState = "inRoom";
+    S.currentRoomId = data.room.id;
     hideGameOver();
     closeMobiglass();
-    inGame = false;
+    S.inGame = false;
     menu.style.display = "";
     showMenuScreen("room");
     renderPlayers();
@@ -920,49 +862,49 @@ ws.onmessage = e => {
   if (data.type === "state") {
     // Ignorar estados tardíos que llegan tras salir de la sala: el servidor sigue
     // emitiendo a 60fps hasta procesar el leaveRoom y esos frames re-asignaban
-    // `winner`, reprogramando el game over (bug de "doble salida" al lobby).
-    if (uiState !== "inRoom") return;
+    // `S.winner`, reprogramando el game over (bug de "doble salida" al lobby).
+    if (S.uiState !== "inRoom") return;
 
     const incoming = data.players || {};
 
     // Detect newly dead → explosion + shake
     Object.values(incoming).forEach(p => {
-      if (p.dead && !deadIds.has(p.id)) {
-        deadIds.add(p.id);
+      if (p.dead && !S.deadIds.has(p.id)) {
+        S.deadIds.add(p.id);
         // Artillero dentro de una nave: no generar explosión separada (ya la genera el piloto)
         if (!p.pilotingFor) {
           spawnExplosion(p.x, p.y, p.team);
           playExplosionSound();
-          const myP = players[myId];
+          const myP = S.players[S.myId];
           if (myP) {
             const dist = Math.hypot(p.x - myP.x, p.y - myP.y);
-            shakeMag = Math.max(shakeMag, Math.max(0, (500 - dist) / 500) * 14);
+            S.shakeMag = Math.max(S.shakeMag, Math.max(0, (500 - dist) / 500) * 14);
           }
         }
-        if (p.id === myId) { cancelSd(); clientDeadAt = Date.now(); targetId = null; }
+        if (p.id === S.myId) { cancelSd(); S.clientDeadAt = Date.now(); S.targetId = null; }
       }
       // Detectar respawn (dead → alive)
-      if (!p.dead && deadIds.has(p.id)) {
-        deadIds.delete(p.id);
-        if (p.id === myId) { clientDeadAt = null; hideDeadPanel(); }
+      if (!p.dead && S.deadIds.has(p.id)) {
+        S.deadIds.delete(p.id);
+        if (p.id === S.myId) { S.clientDeadAt = null; hideDeadPanel(); }
       }
     });
 
     // Mostrar/ocultar panel de nave al morir
-    const myIncoming = incoming[myId];
-    const myWasDead = players[myId]?.dead;
+    const myIncoming = incoming[S.myId];
+    const myWasDead = S.players[S.myId]?.dead;
     if (myIncoming && myIncoming.dead && !myWasDead) showDeadPanel();
     if (myIncoming && !myIncoming.dead && myWasDead) hideDeadPanel();
 
     // Detect damage taken → shake
-    const myPrev = players[myId];
-    const myNext = incoming[myId];
+    const myPrev = S.players[S.myId];
+    const myNext = incoming[S.myId];
     if (myPrev && myNext && myNext.hp < myPrev.hp && myNext.hp > 0) {
-      shakeMag = Math.max(shakeMag, (myPrev.hp - myNext.hp) * 0.45);
+      S.shakeMag = Math.max(S.shakeMag, (myPrev.hp - myNext.hp) * 0.45);
     }
 
     // Push to interpolation buffer — positions are applied each RAF frame
-    stateBuffer.push({
+    S.stateBuffer.push({
       time: Date.now(),
       players: incoming,
       bullets: data.bullets || [],
@@ -971,48 +913,48 @@ ws.onmessage = e => {
     });
 
     // Non-interpolated state: apply immediately
-    beams = data.beams || [];
+    S.beams = data.beams || [];
     // Burst de impacto (partículas) solo al aparecer un beam nuevo que ha golpeado
     const seenBeams = new Set();
-    beams.forEach(b => {
+    S.beams.forEach(b => {
       seenBeams.add(b.id);
-      if (b.hit && !prevBeamIds.has(b.id)) spawnBeamImpact(b.x2, b.y2, b.team);
+      if (b.hit && !S.prevBeamIds.has(b.id)) spawnBeamImpact(b.x2, b.y2, b.team);
     });
-    prevBeamIds = seenBeams;
-    empPulses = data.empPulses || [];
-    mines = data.mines || [];
+    S.prevBeamIds = seenBeams;
+    S.empPulses = data.empPulses || [];
+    S.mines = data.mines || [];
     // Sonido al aparecer una onda EMP / explosión de mina nueva
     const seen = new Set();
-    empPulses.forEach(e => {
+    S.empPulses.forEach(e => {
       seen.add(e.id);
-      if (!prevPulseIds.has(e.id)) {
+      if (!S.prevPulseIds.has(e.id)) {
         if (e.blast) playExplosionSound(); else playEmpSound();
       }
     });
-    prevPulseIds = seen;
-    asteroids = data.asteroids || [];
-    world = data.world || world;
-    winner = data.winner;
-    killFeed = data.killFeed || [];
+    S.prevPulseIds = seen;
+    S.asteroids = data.asteroids || [];
+    S.world = data.world || S.world;
+    S.winner = data.winner;
+    S.killFeed = data.killFeed || [];
     updateTimer(data.timeLeft);
 
     // Modo oleadas (solo práctica)
-    soloMode = !!data.solo;
-    waveMode = !!data.waveMode;
-    teamLives = (data.teamLives === undefined ? null : data.teamLives);
-    waveNum = data.wave || 0;
-    waveTotal = data.waveTotal || 0;
-    enemiesLeft = data.enemiesLeft || 0;
+    S.soloMode = !!data.solo;
+    S.waveMode = !!data.waveMode;
+    S.teamLives = (data.teamLives === undefined ? null : data.teamLives);
+    S.waveNum = data.wave || 0;
+    S.waveTotal = data.waveTotal || 0;
+    S.enemiesLeft = data.enemiesLeft || 0;
     if (data.waveBanner) {
       const sig = data.waveBanner.key + "|" + data.waveBanner.n;
-      if (sig !== waveBannerSig) {
-        waveBanner = data.waveBanner;       // { key, n }
-        waveBannerSig = sig;
-        waveBannerShownAt = Date.now();
+      if (sig !== S.waveBannerSig) {
+        S.waveBanner = data.waveBanner;       // { key, n }
+        S.waveBannerSig = sig;
+        S.waveBannerShownAt = Date.now();
       }
     } else {
-      waveBanner = null;
-      waveBannerSig = null;
+      S.waveBanner = null;
+      S.waveBannerSig = null;
     }
   }
 
@@ -1020,10 +962,9 @@ ws.onmessage = e => {
 
 // La lista de salas está migrada a React (CoopRooms.tsx). Guardamos el último
 // listado del servidor y avisamos a React; el render lo hace el componente.
-let roomList = [];
-function getRoomList() { return roomList; }
+function getRoomList() { return S.roomList; }
 function renderRooms(list) {
-  roomList = Array.isArray(list) ? list : [];
+  S.roomList = Array.isArray(list) ? list : [];
   window.dispatchEvent(new CustomEvent("rooms-update"));
 }
 // Etiquetas cortas para la lista de jugadores — se actualizan dinámicamente
@@ -1032,11 +973,10 @@ const SHIP_LABELS = { interceptor: "INTERCEPTOR", fighter: "L.FIGHTER", bomber: 
 // Metadatos de nave que envía el servidor en el init. Se exponen a React
 // (getShips + evento "ships-init") para que las pantallas React (Vuela Solo,
 // y más adelante Lobby) rendericen sus tarjetas con los stats reales.
-let shipMeta = null;
-function getShips() { return shipMeta; }
+function getShips() { return S.shipMeta; }
 
 function buildShipCards(ships) {
-  shipMeta = ships;
+  S.shipMeta = ships;
   window.dispatchEvent(new CustomEvent("ships-init"));
   for (const [type, ship] of Object.entries(ships)) {
     const words = (ship.label || type).split(" ");
@@ -1119,11 +1059,11 @@ function hideDeadPanel() { setDeadPanelVisible(false); }
 // libre que un jugador muerto puede abordar para reaparecer como artillero.
 // Devuelve los datos; React (DeadPanel) los renderiza y refresca por intervalo.
 function getTurretOptions() {
-  const me = players[myId];
+  const me = S.players[S.myId];
   if (!me) return [];
   const myReservedPilot = me.pilotingFor || null;
   const entries = [];
-  Object.values(players).forEach(p => {
+  Object.values(S.players).forEach(p => {
     if (p.dead || p.team !== me.team || p.pilotingFor) return;
     if (p.shipType !== "gunship" && p.shipType !== "capital") return;
     const free = p.shipType === "gunship"
@@ -1159,10 +1099,10 @@ addEventListener("keydown", e => {
   if (bindings.scan && key === bindings.scan) {
     const me = getMe();
     const now = performance.now();
-    if (me && !me.dead && now >= nextPingAt) {
-      nextPingAt = now + PING_COOLDOWN_MS;   // 1 ping cada 3 s
-      scanUntil = now + 8000;
-      pingEnemiesUntil = now + 2000;
+    if (me && !me.dead && now >= S.nextPingAt) {
+      S.nextPingAt = now + PING_COOLDOWN_MS;   // 1 ping cada 3 s
+      S.scanUntil = now + 8000;
+      S.pingEnemiesUntil = now + 2000;
       triggerPingEffect(me.x, me.y);
       initAudio();         // asegura el contexto de audio en este gesto de tecla
       playPingSound();     // sonar tipo Star Citizen
@@ -1171,7 +1111,7 @@ addEventListener("keydown", e => {
 
   if (bindings.inertiaDamp && key === bindings.inertiaDamp) {
     const me = getMe();
-    if (me && !me.dead) inertiaDampActive = !inertiaDampActive;
+    if (me && !me.dead) S.inertiaDampActive = !S.inertiaDampActive;
   }
 
   // Fallback teclado: shoot / missile
@@ -1183,12 +1123,12 @@ addEventListener("keydown", e => {
       playShootSound();
     }
   }
-  if (bindings.missile && key === bindings.missile && targetId) {
+  if (bindings.missile && key === bindings.missile && S.targetId) {
     const meM = getMe();
     const ready = meM && (meM.missileCooldown ?? 0) <= 0 &&
       (meM.missilesActive ?? 0) < (meM.maxMissiles ?? 0);
     if (ready) {
-      ws.send(JSON.stringify({ type: "missile", targetId }));
+      ws.send(JSON.stringify({ type: "missile", targetId: S.targetId }));
       playMissileSound();
     } else {
       playAlertSound("noMissile");   // sin misiles disponibles / en recarga
@@ -1202,23 +1142,23 @@ addEventListener("keydown", e => {
     if (meNow && meNow.dead) {
       cycleSpectator();
     } else {
-      showScoreboard = true;
+      S.showScoreboard = true;
     }
   }
 
   if (bindings.respawn && key === bindings.respawn) {
     const meNow = getMe();
     // Vidas: en oleadas hace falta pool del equipo > 0; en PVP/vuelo libre es infinito
-    const canRespawn = waveMode ? (teamLives ?? 0) > 0 : true;
+    const canRespawn = S.waveMode ? (S.teamLives ?? 0) > 0 : true;
     if (meNow && meNow.dead && canRespawn) {
-      const elapsed = clientDeadAt ? Date.now() - clientDeadAt : 99999;
+      const elapsed = S.clientDeadAt ? Date.now() - S.clientDeadAt : 99999;
       if (elapsed >= (CFG_RESPAWN_DELAY * 1000)) {
         ws.send(JSON.stringify({ type: "respawn" }));
       }
     }
   }
 
-  if (key === "enter" && !chatInputOpen) {
+  if (key === "enter" && !S.chatInputOpen) {
     e.preventDefault();
     const meNow = getMe();
     if (meNow && !meNow.dead) openChat();
@@ -1244,14 +1184,14 @@ addEventListener("keydown", e => {
   if (e.key === "F1") {
     e.preventDefault();
     initAudio();
-    if (mobiOpen) closeMobiglass();
+    if (S.mobiOpen) closeMobiglass();
     else openMobiglass();
   }
 
   if (e.key === "Delete") {
     if (e.repeat) return;
     e.preventDefault();
-    if (chatInputOpen) return;
+    if (S.chatInputOpen) return;
     const meNow = getMe();
     if (!meNow || meNow.dead) return;
     if (sdState === "countdown") cancelSd();
@@ -1267,39 +1207,39 @@ addEventListener("keyup", e => {
   const tag = document.activeElement?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return;
 
-  if (e.key === "Tab") showScoreboard = false;
+  if (e.key === "Tab") S.showScoreboard = false;
   if (e.key === "Delete" && sdState === "charging") cancelSd();
-  if (bindings.shoot && e.key.toLowerCase() === bindings.shoot && beamHeld) releaseBeamCharge();
+  if (bindings.shoot && e.key.toLowerCase() === bindings.shoot && S.beamHeld) releaseBeamCharge();
 });
 
 setInterval(() => {
-  if (!inGame) return;
+  if (!S.inGame) return;
   const me = getMe();
-  if (!me || me.dead) { beamHeld = false; beamWasReady = false; abilityWasReady = true; return; }  // evita carga "atascada" tras morir
+  if (!me || me.dead) { S.beamHeld = false; S.beamWasReady = false; S.abilityWasReady = true; return; }  // evita carga "atascada" tras morir
   // Aviso eléctrico al quedar el rayo totalmente cargado (solo en el flanco de subida)
   const beamReady = me.shipType === "capital" && (me.beamCharge ?? 0) >= 0.999;
-  if (beamReady && !beamWasReady) playBeamReadySound();
-  beamWasReady = beamReady;
+  if (beamReady && !S.beamWasReady) playBeamReadySound();
+  S.beamWasReady = beamReady;
   // Aviso al quedar lista la habilidad [X] (EMP / mina), solo en el flanco de subida
   const hasAbility = !me.pilotingFor && (me.shipType === "emp" || me.shipType === "interceptor");
   const abilityCd = me.shipType === "emp" ? (me.empCooldown ?? 0) : (me.mineCooldown ?? 0);
   const abilityReady = hasAbility && abilityCd <= 0;
-  if (abilityReady && !abilityWasReady) playAbilityReadySound();
-  abilityWasReady = abilityReady;
-  const targetAngle = Math.atan2(mouseY - canvas.height / 2, mouseX - canvas.width / 2);
+  if (abilityReady && !S.abilityWasReady) playAbilityReadySound();
+  S.abilityWasReady = abilityReady;
+  const targetAngle = Math.atan2(S.mouseY - canvas.height / 2, S.mouseX - canvas.width / 2);
   ws.send(JSON.stringify({
     type: "input",
     thrust: !!(bindings.thrust && keys[bindings.thrust]),
     reverse: !!(bindings.reverse && keys[bindings.reverse]),
     strafeLeft: !!(bindings.strafeLeft && keys[bindings.strafeLeft]),
     strafeRight: !!(bindings.strafeRight && keys[bindings.strafeRight]),
-    inertiaDamp: inertiaDampActive,
+    inertiaDamp: S.inertiaDampActive,
     targetAngle
   }));
 }, 33);
 
 function getMe() {
-  return players[myId];
+  return S.players[S.myId];
 }
 
 function worldToScreen(x, y, camX, camY) {
@@ -1691,7 +1631,7 @@ function drawOneAsteroid(a, camX, camY) {
 
 // Llamar con above=false antes de las naves, above=true después
 function drawAsteroids(camX, camY, above = false) {
-  asteroids.forEach(a => {
+  S.asteroids.forEach(a => {
     const isAbove = (a.z ?? 0) === 1;
     if (above !== isAbove) return;
     drawOneAsteroid(a, camX, camY);
@@ -2053,7 +1993,7 @@ function drawShip(player, camX, camY) {
 
     // Callsign (sube si hay escudo para no solapar)
     ctx.save();
-    ctx.fillStyle = player.id === myId ? "#00ccff" : "rgba(255,255,255,0.6)";
+    ctx.fillStyle = player.id === S.myId ? "#00ccff" : "rgba(255,255,255,0.6)";
     ctx.font = "11px 'Courier New', monospace";
     ctx.textAlign = "center";
     ctx.fillText(player.name || "Pilot", pos.x, pos.y + (hasShield ? offY - 12 : offY - 6));
@@ -2061,7 +2001,7 @@ function drawShip(player, camX, camY) {
   }
 
   // ── Target lock reticle (estilo space-sim) ──
-  if (player.id === targetId) {
+  if (player.id === S.targetId) {
     drawTargetReticle(pos.x, pos.y, player);
   }
 }
@@ -2153,7 +2093,7 @@ function drawVelocityVector(player, camX, camY) {
 }
 
 function drawBullets(camX, camY) {
-  bullets.forEach(b => {
+  S.bullets.forEach(b => {
     const pos = worldToScreen(
       b.x,
       b.y,
@@ -2178,7 +2118,7 @@ function drawBullets(camX, camY) {
 
 // Rayo de la Capital: línea brillante con halo y chispas eléctricas, se desvanece.
 function drawBeams(camX, camY) {
-  beams.forEach(b => {
+  S.beams.forEach(b => {
     const a = worldToScreen(b.x1, b.y1, camX, camY);
     const c = worldToScreen(b.x2, b.y2, camX, camY);
     const frac = Math.max(0, (b.life ?? 0) / (b.maxLife || 1));
@@ -2251,7 +2191,7 @@ function drawBeams(camX, camY) {
 
 // Onda expansiva del pulso EMP (rojo) y de la explosión de mina (naranja).
 function drawEmpPulses(camX, camY) {
-  empPulses.forEach(e => {
+  S.empPulses.forEach(e => {
     const pos = worldToScreen(e.x, e.y, camX, camY);
     const frac = Math.max(0, (e.life ?? 0) / (e.maxLife || 1));
     const prog = 1 - frac;                 // 0→1 a medida que se expande
@@ -2287,7 +2227,7 @@ function drawMines(camX, camY) {
   const me = getMe();
   const myTeam = me ? me.team : null;
   const now = performance.now();
-  mines.forEach(mn => {
+  S.mines.forEach(mn => {
     if (mn.team !== myTeam) return;        // ocultas a los enemigos
     const pos = worldToScreen(mn.x, mn.y, camX, camY);
     const armed = (mn.arm ?? 0) <= 0;
@@ -2328,23 +2268,23 @@ function drawMines(camX, camY) {
 
 // HUD del modo oleadas: indicador de oleada/enemigos + banner central temporal.
 function drawWaveHud() {
-  if (!waveMode) return;
+  if (!S.waveMode) return;
 
   ctx.save();
   ctx.textAlign = "center";
   ctx.font = "14px 'Courier New', monospace";
   ctx.fillStyle = "#ff8899";
-  const label = waveNum > 0 ? i18nt("hud.waveLabel", { n: waveNum, total: waveTotal }) : i18nt("hud.preparing");
-  const vidas = teamLives != null ? `  ·  ${i18nt("game.teamLives")}: ${"♥".repeat(Math.max(0, teamLives)) || "0"}` : "";
-  ctx.fillText(`${label}  ·  ${i18nt("hud.enemiesShort")}: ${enemiesLeft}${vidas}`, canvas.width / 2, 70);
+  const label = S.waveNum > 0 ? i18nt("hud.waveLabel", { n: S.waveNum, total: S.waveTotal }) : i18nt("hud.preparing");
+  const vidas = S.teamLives != null ? `  ·  ${i18nt("game.teamLives")}: ${"♥".repeat(Math.max(0, S.teamLives)) || "0"}` : "";
+  ctx.fillText(`${label}  ·  ${i18nt("hud.enemiesShort")}: ${S.enemiesLeft}${vidas}`, canvas.width / 2, 70);
   ctx.restore();
 
-  if (waveBanner) {
-    const t = Date.now() - waveBannerShownAt;
+  if (S.waveBanner) {
+    const t = Date.now() - S.waveBannerShownAt;
     const dur = 2600;
     if (t < dur) {
       const a = t < 300 ? t / 300 : (t > dur - 600 ? Math.max(0, (dur - t) / 600) : 1);
-      const boss = waveBanner.key === "wave.boss";
+      const boss = S.waveBanner.key === "wave.boss";
       ctx.save();
       ctx.textAlign = "center";
       ctx.globalAlpha = a;
@@ -2352,7 +2292,7 @@ function drawWaveHud() {
       ctx.font = "bold 44px 'Courier New', monospace";
       ctx.shadowColor = boss ? "#ff335588" : "#ffcc4488";
       ctx.shadowBlur = 24;
-      ctx.fillText(i18nt(waveBanner.key, { n: waveBanner.n }), canvas.width / 2, canvas.height * 0.28);
+      ctx.fillText(i18nt(S.waveBanner.key, { n: S.waveBanner.n }), canvas.width / 2, canvas.height * 0.28);
       ctx.restore();
       ctx.textAlign = "left";
     }
@@ -2365,7 +2305,7 @@ function drawMineTimers() {
   const me = getMe();
   if (!me || me.dead || me.shipType !== "interceptor" || me.pilotingFor) return;
 
-  const myMines = mines.filter(m => m.ownerId === myId);
+  const myMines = S.mines.filter(m => m.ownerId === S.myId);
   const SLOTS = 4; // = CFG.MINE_MAX_ACTIVE en el servidor
   const total = Math.max(SLOTS, myMines.length);
   const r = 11, gap = 30;
@@ -2418,19 +2358,19 @@ function drawMineTimers() {
 
 // Nave "cubierta": posición dentro del radio de un asteroide flotante (z=1, sobre las naves)
 function isSheltered(px, py) {
-  return asteroids.some(a => a.z === 1 && Math.hypot(px - a.x, py - a.y) < a.r);
+  return S.asteroids.some(a => a.z === 1 && Math.hypot(px - a.x, py - a.y) < a.r);
 }
 
 // Línea de visión bloqueada: algún asteroide de colisión (z=0) intersecta el segmento
 function losBlocked(ax, ay, bx, by) {
-  return asteroids.some(a => a.z === 0 && ptSegDist(a.x, a.y, ax, ay, bx, by) < a.r);
+  return S.asteroids.some(a => a.z === 0 && ptSegDist(a.x, a.y, ax, ay, bx, by) < a.r);
 }
 // ──────────────────────────────────────────────
 
 function radarVisibleEnemies() {
-  const me = players[myId];
+  const me = S.players[S.myId];
   if (!me) return [];
-  return Object.values(players).filter(p => {
+  return Object.values(S.players).filter(p => {
     if (p.dead || p.team === me.team || p.pilotingFor) return false;
     if (Math.hypot(p.x - me.x, p.y - me.y) > (p.radarSignature || 450)) return false;
     if (isSheltered(p.x, p.y)) return false;       // bajo asteroide flotante → oculto
@@ -2441,26 +2381,26 @@ function radarVisibleEnemies() {
 
 function cycleTarget() {
   const enemies = radarVisibleEnemies();
-  if (enemies.length === 0) { targetId = null; return; }
-  if (!targetId) { targetId = enemies[0].id; return; }
-  const idx = enemies.findIndex(e => e.id === targetId);
-  if (idx === -1) { targetId = enemies[0].id; return; }
-  if (idx === enemies.length - 1) { targetId = null; return; }
-  targetId = enemies[idx + 1].id;
+  if (enemies.length === 0) { S.targetId = null; return; }
+  if (!S.targetId) { S.targetId = enemies[0].id; return; }
+  const idx = enemies.findIndex(e => e.id === S.targetId);
+  if (idx === -1) { S.targetId = enemies[0].id; return; }
+  if (idx === enemies.length - 1) { S.targetId = null; return; }
+  S.targetId = enemies[idx + 1].id;
 }
 
 function cycleTargetByRadar() {
   const enemies = radarVisibleEnemies();
-  if (enemies.length === 0) { targetId = null; return; }
-  if (!targetId) { targetId = enemies[0].id; return; }
-  const idx = enemies.findIndex(e => e.id === targetId);
-  if (idx === -1) { targetId = enemies[0].id; return; }
+  if (enemies.length === 0) { S.targetId = null; return; }
+  if (!S.targetId) { S.targetId = enemies[0].id; return; }
+  const idx = enemies.findIndex(e => e.id === S.targetId);
+  if (idx === -1) { S.targetId = enemies[0].id; return; }
   // Al llegar al último → deslockear (null); siguiente click vuelve al primero
-  targetId = idx === enemies.length - 1 ? null : enemies[idx + 1].id;
+  S.targetId = idx === enemies.length - 1 ? null : enemies[idx + 1].id;
 }
 function drawMissiles(camX, camY) {
 
-  missiles.forEach(m => {
+  S.missiles.forEach(m => {
 
     const pos = worldToScreen(m.x, m.y, camX, camY);
     const angle = Math.atan2(m.vy, m.vx);
@@ -2499,7 +2439,7 @@ function drawMissiles(camX, camY) {
 }
 function drawFlares(camX, camY) {
 
-  flares.forEach(f => {
+  S.flares.forEach(f => {
 
     const pos = worldToScreen(f.x, f.y, camX, camY);
 
@@ -2519,12 +2459,12 @@ function updateUI() {
   // El botón "Go"/ready vive ahora en React (Room.tsx); guardamos por si el
   // elemento legacy ya no existe.
   const readyBtn = document.getElementById("ready");
-  if (readyBtn) readyBtn.disabled = uiState !== "inRoom";
+  if (readyBtn) readyBtn.disabled = S.uiState !== "inRoom";
 }
 
 //RADAR
 function drawRadar() {
-  const scanning = performance.now() < scanUntil;
+  const scanning = performance.now() < S.scanUntil;
   const size = 140;
 
   const x = canvas.width - 170;
@@ -2580,11 +2520,11 @@ function drawRadar() {
 
   const me = getMe();
 
-  Object.values(players).forEach(p => {
+  Object.values(S.players).forEach(p => {
 
     // Enemigos: filtro de radar (firma, cobertura de asteroide, LOS)
     if (me && p.team !== me.team) {
-      const pinging = performance.now() < pingEnemiesUntil;
+      const pinging = performance.now() < S.pingEnemiesUntil;
       if (pinging) {
         // Ping activo: solo bypass de rango. Cobertura física sigue bloqueando.
         if (isSheltered(p.x, p.y)) return;
@@ -2597,8 +2537,8 @@ function drawRadar() {
       }
     }
 
-    const rx = x + ((p.x / world.width) - 0.5) * size;
-    const ry = y + ((p.y / world.height) - 0.5) * size;
+    const rx = x + ((p.x / S.world.width) - 0.5) * size;
+    const ry = y + ((p.y / S.world.height) - 0.5) * size;
 
     const blipR =
       p.shipType === "bomber" ? 5 :
@@ -2610,7 +2550,7 @@ function drawRadar() {
 
     ctx.fillStyle =
       p.dead ? "#555" :
-        p.id === myId ? "#00ccff" :
+        p.id === S.myId ? "#00ccff" :
           p.team === "green" ? "#00ff88" :
             "#ff3355";
 
@@ -2618,10 +2558,10 @@ function drawRadar() {
   });
   if (scanning) {
     // ── Asteroids on radar
-    asteroids.forEach(a => {
+    S.asteroids.forEach(a => {
 
-      const rx = x + (a.x / world.width - 0.5) * size;
-      const ry = y + (a.y / world.height - 0.5) * size;
+      const rx = x + (a.x / S.world.width - 0.5) * size;
+      const ry = y + (a.y / S.world.height - 0.5) * size;
 
       ctx.beginPath();
       ctx.arc(rx, ry, 1.5, 0, Math.PI * 2);
@@ -2720,21 +2660,21 @@ function updateTimer(secs) {
 
 function updateHUD(me) {
   // Artillero: muestra stats del casco del piloto
-  const ship = me.pilotingFor ? (players[me.pilotingFor] || me) : me;
+  const ship = me.pilotingFor ? (S.players[me.pilotingFor] || me) : me;
 
   // ── Avisos de voz (voz robótica femenina), disparados por flanco ──
   if (typeof playVoiceAlert === "function" && !me.dead) {
     const lang = (typeof getLang === "function") ? getLang() : "es";
     // Combustible bajo (< 25 %) con histéresis para no repetir
     if (ship.fuel < 25) {
-      if (!_voiceFuelLow) { _voiceFuelLow = true; playVoiceAlert(i18nt("voice.lowFuel"), lang); }
-    } else if (ship.fuel > 32) { _voiceFuelLow = false; }
+      if (!S.voiceFuelLow) { S.voiceFuelLow = true; playVoiceAlert(i18nt("voice.lowFuel"), lang); }
+    } else if (ship.fuel > 32) { S.voiceFuelLow = false; }
     // Escudos caídos (solo naves con escudo)
     if ((ship.maxShield ?? 0) > 0 && (ship.shield ?? 0) <= 0) {
-      if (!_voiceShieldDown) { _voiceShieldDown = true; playVoiceAlert(i18nt("voice.shieldsDown"), lang); }
-    } else if ((ship.shield ?? 0) > 0) { _voiceShieldDown = false; }
+      if (!S.voiceShieldDown) { S.voiceShieldDown = true; playVoiceAlert(i18nt("voice.shieldsDown"), lang); }
+    } else if ((ship.shield ?? 0) > 0) { S.voiceShieldDown = false; }
   } else {
-    _voiceFuelLow = false; _voiceShieldDown = false;
+    S.voiceFuelLow = false; S.voiceShieldDown = false;
   }
 
   // El HUD vive en React y solo está montado en partida (ruta /game). Si aún no
@@ -2791,13 +2731,13 @@ function updateHUD(me) {
 
   const inertiaEl = document.getElementById("inertiaMode");
   if (inertiaEl) {
-    inertiaEl.textContent = inertiaDampActive ? i18nt("hud.coupled") : i18nt("hud.decoupled");
-    inertiaEl.style.color = inertiaDampActive ? "#555" : "#8aa8b8";
+    inertiaEl.textContent = S.inertiaDampActive ? i18nt("hud.coupled") : i18nt("hud.decoupled");
+    inertiaEl.style.color = S.inertiaDampActive ? "#555" : "#8aa8b8";
   }
 
   const heatEl = document.getElementById("weaponHeatEl");
   if (heatEl) {
-    const heatPct = Math.round(weaponHeat);
+    const heatPct = Math.round(S.weaponHeat);
     if (heatPct === 0) {
       heatEl.textContent = i18nt("hud.cold");
       heatEl.style.color = "#555";
@@ -2831,14 +2771,14 @@ function updateHUD(me) {
   }
 
   const alive =
-    Object.values(players)
+    Object.values(S.players)
       .filter(p => !p.dead)
       .length;
 
   document.getElementById("alive").textContent = i18nt("hud.alive", { n: alive });
 
-  if (targetId) {
-    const t = players[targetId];
+  if (S.targetId) {
+    const t = S.players[S.targetId];
     if (t) {
       ctx.fillStyle = "yellow";
       ctx.font = "20px Arial";
@@ -2858,12 +2798,12 @@ function loop() {
   // Auto-clear target lock: si yo estoy muerto, si el objetivo muere o se esconde
   // bajo cobertura de asteroide. Perder el lock al morir evita reaparecer con el
   // objetivo que tenías antes.
-  if (targetId) {
-    const tgt = players[targetId];
-    const mePl = players[myId];
+  if (S.targetId) {
+    const tgt = S.players[S.targetId];
+    const mePl = S.players[S.myId];
     if (!mePl || mePl.dead || !tgt || tgt.dead ||
       (isSheltered(tgt.x, tgt.y) || losBlocked(mePl.x, mePl.y, tgt.x, tgt.y))) {
-      targetId = null;
+      S.targetId = null;
     }
   }
 
@@ -2874,29 +2814,29 @@ function loop() {
   // ── Camera: spectator or normal
   let camX, camY;
   if (me && me.dead) {
-    let spec = specTargetId ? players[specTargetId] : null;
+    let spec = S.specTargetId ? S.players[S.specTargetId] : null;
     if (!spec || spec.dead) {
-      const living = Object.values(players).filter(p => !p.dead && p.id !== myId);
+      const living = Object.values(S.players).filter(p => !p.dead && p.id !== S.myId);
       spec = living[0] || null;
-      specTargetId = spec ? spec.id : null;
+      S.specTargetId = spec ? spec.id : null;
     }
     camX = spec ? spec.x : me.x;
     camY = spec ? spec.y : me.y;
   } else if (me) {
     camX = me.x;
     camY = me.y;
-    specTargetId = null;
+    S.specTargetId = null;
   } else {
     camX = 0; camY = 0;
   }
 
   // ── Screen shake
-  if (shakeMag > 0.5) {
-    camX += (Math.random() - 0.5) * shakeMag;
-    camY += (Math.random() - 0.5) * shakeMag;
-    shakeMag *= 0.82;
+  if (S.shakeMag > 0.5) {
+    camX += (Math.random() - 0.5) * S.shakeMag;
+    camY += (Math.random() - 0.5) * S.shakeMag;
+    S.shakeMag *= 0.82;
   } else {
-    shakeMag = 0;
+    S.shakeMag = 0;
   }
 
   // ── Thrust particles for local player (no para artilleros)
@@ -2905,7 +2845,7 @@ function loop() {
   }
 
   // ── Humo de daño para todas las naves con HP bajo (lado trasero)
-  Object.values(players).forEach(p => {
+  Object.values(S.players).forEach(p => {
     if (p.dead || p.pilotingFor) return;
     const hf = p.hp / (p.maxHp || 100);
     if (hf >= 0.55) return;
@@ -2934,8 +2874,8 @@ function loop() {
 
   drawMines(camX, camY);            // minas bajo las naves (solo equipo propio)
 
-  Object.values(players).forEach(p => drawVelocityVector(p, camX, camY));
-  Object.values(players).forEach(p => drawShip(p, camX, camY));
+  Object.values(S.players).forEach(p => drawVelocityVector(p, camX, camY));
+  Object.values(S.players).forEach(p => drawShip(p, camX, camY));
 
   drawParticles(ctx, camX, camY);
   drawBullets(camX, camY);
@@ -2954,12 +2894,12 @@ function loop() {
 
   if (me) {
     updateHUD(me);
-    const pilot = me.pilotingFor ? players[me.pilotingFor] : null;
+    const pilot = me.pilotingFor ? S.players[me.pilotingFor] : null;
     setMissileWarning(!me.dead && !!(me.lockedByMissile || pilot?.lockedByMissile));
 
     if (me.dead) {
       //if (!deadPanel.classList.contains("hidden")) renderDeadTurretOptions();
-      const reservedPilot = me.pilotingFor ? players[me.pilotingFor] : null;
+      const reservedPilot = me.pilotingFor ? S.players[me.pilotingFor] : null;
       const inTurret = !!(reservedPilot && !reservedPilot.dead);
 
       ctx.fillStyle = "rgba(255,255,255,0.85)";
@@ -2967,12 +2907,12 @@ function loop() {
       ctx.textAlign = "center";
       ctx.fillText(i18nt("game.destroyed"), canvas.width / 2, canvas.height / 2 - 30);
       // Vidas: oleadas → pool de equipo; PVP/vuelo libre → infinito
-      const canRespawn = waveMode ? (teamLives ?? 0) > 0 : true;
+      const canRespawn = S.waveMode ? (S.teamLives ?? 0) > 0 : true;
       // El panel de muerte lo monta React (evento "dead"); aquí solo ajustamos
       // visibilidad (dedupe) y dibujamos la cuenta atrás de reaparición en canvas.
       setDeadPanelVisible(canRespawn);
       if (canRespawn) {
-        const elapsed = clientDeadAt ? Date.now() - clientDeadAt : 99999;
+        const elapsed = S.clientDeadAt ? Date.now() - S.clientDeadAt : 99999;
         const remaining = Math.max(0, Math.ceil((CFG_RESPAWN_DELAY * 1000 - elapsed) / 1000));
         ctx.font = "15px 'Courier New', monospace";
         if (remaining > 0) {
@@ -2989,8 +2929,8 @@ function loop() {
         }
         ctx.font = "12px 'Courier New', monospace";
         ctx.fillStyle = "#666";
-        const vidasTxt = waveMode
-          ? i18nt("game.teamLivesN", { n: teamLives })
+        const vidasTxt = S.waveMode
+          ? i18nt("game.teamLivesN", { n: S.teamLives })
           : i18nt("game.respawnsInf");
         ctx.fillText(`${vidasTxt}  ·  ${inTurret ? i18nt("game.chooseShipTurret") : i18nt("game.chooseShip")}`,
           canvas.width / 2, canvas.height / 2 + 38);
@@ -3016,17 +2956,17 @@ function loop() {
     }
   }
 
-  if (winner) {
+  if (S.winner) {
 
-    if (winner !== prevWinner) {
-      prevWinner = winner;
+    if (S.winner !== S.prevWinner) {
+      S.prevWinner = S.winner;
 
       clearTimeout(gameOverTimer);
       gameOverTimer = setTimeout(() => {
         showGameOver();
       }, 2500);
 
-      if (mobiOpen) closeMobiglass();
+      if (S.mobiOpen) closeMobiglass();
     }
 
     ctx.fillStyle = "rgba(0,0,0,0.7)";
@@ -3036,21 +2976,21 @@ function loop() {
     const cy = canvas.height / 2;
     ctx.textAlign = "center";
 
-    ctx.fillStyle = winner === "draw" ? "#ffcc00" : winner === "green" ? "#00ff88" : "#ff3355";
+    ctx.fillStyle = S.winner === "draw" ? "#ffcc00" : S.winner === "green" ? "#00ff88" : "#ff3355";
     ctx.font = "bold 52px 'Courier New', monospace";
     let resultText;
-    if (waveMode) {
+    if (S.waveMode) {
       // Modo oleadas: resultado de práctica (sin equipos)
-      resultText = winner === "green" ? i18nt("result.wavesWon") : i18nt("result.wavesLost");
+      resultText = S.winner === "green" ? i18nt("result.wavesWon") : i18nt("result.wavesLost");
     } else {
-      resultText = winner === "draw"
+      resultText = S.winner === "draw"
         ? i18nt("result.draw")
-        : (winner === "green" ? i18nt("result.greenWins") : i18nt("result.redWins"));
+        : (S.winner === "green" ? i18nt("result.greenWins") : i18nt("result.redWins"));
     }
     ctx.fillText(resultText, cx, cy - 90);
 
-    const sorted = Object.values(players).sort((a, b) => {
-      if (a.team !== b.team) return a.team === winner ? -1 : 1;
+    const sorted = Object.values(S.players).sort((a, b) => {
+      if (a.team !== b.team) return a.team === S.winner ? -1 : 1;
       return (b.kills || 0) - (a.kills || 0);
     });
 
@@ -3067,7 +3007,7 @@ function loop() {
       const d = String(p.deaths || 0).padStart(3);
       const a = String(p.assists || 0).padStart(3);
       const dmg = String(Math.round(p.damageDealt || 0)).padStart(5);
-      const me_m = p.id === myId ? " ◄" : "";
+      const me_m = p.id === S.myId ? " ◄" : "";
       ctx.fillText(name + "    " + k + " " + d + " " + a + " " + dmg + me_m, cx, cy - 6 + i * 24);
     });
 
@@ -3122,7 +3062,7 @@ function loop() {
 
   // ── Kill feed (top-right, below alive counter)
   const now = Date.now();
-  const recentKills = killFeed.filter(e => now - e.time < 5000);
+  const recentKills = S.killFeed.filter(e => now - e.time < 5000);
   if (recentKills.length > 0) {
     ctx.save();
     ctx.font = "12px 'Courier New', monospace";
@@ -3162,7 +3102,7 @@ function loop() {
   }
 
   // ── Chat log (bottom-left)
-  const recentChat = chatLog.filter(m => now - m.ts < 7000);
+  const recentChat = S.chatLog.filter(m => now - m.ts < 7000);
 
   if (recentChat.length > 0) {
     ctx.save();
@@ -3196,7 +3136,7 @@ function loop() {
     ctx.restore();
   }
   // ── Chat indicator
-  if (chatLog.length > 0) {
+  if (S.chatLog.length > 0) {
 
     ctx.save();
 
@@ -3222,8 +3162,8 @@ function loop() {
   }
 
   // ── Spectator indicator
-  if (me && me.dead && specTargetId) {
-    const spec = players[specTargetId];
+  if (me && me.dead && S.specTargetId) {
+    const spec = S.players[S.specTargetId];
     if (spec) {
       ctx.save();
       ctx.font = "12px 'Courier New', monospace";
@@ -3239,14 +3179,14 @@ function loop() {
   // El contenido del MobiGlass lo renderiza React (lee getMe/getPlayers al abrir).
 
   // ── Scoreboard (Tab mantenido)
-  if (showScoreboard) {
+  if (S.showScoreboard) {
     const rem = 18; // 1rem base
 
-    const green = Object.values(players)
+    const green = Object.values(S.players)
       .filter(p => p.team === "green")
       .sort((a, b) => (b.kills || 0) - (a.kills || 0));
 
-    const red = Object.values(players)
+    const red = Object.values(S.players)
       .filter(p => p.team === "red")
       .sort((a, b) => (b.kills || 0) - (a.kills || 0));
 
@@ -3349,7 +3289,7 @@ function loop() {
 
       team.forEach((p, i) => {
         const ry = rowStart + i * rowH + rowH * 0.75;
-        const isMe = p.id === myId;
+        const isMe = p.id === S.myId;
 
         // highlight jugador
         if (isMe) {
