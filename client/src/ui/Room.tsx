@@ -7,9 +7,8 @@ import {
   roomToggleReady,
   roomSwitchTeam,
   roomLeave,
-  menuMain,
 } from "../game";
-import { Backdrop, BackBtn, BrandTitle, GoldToggle, Icon, LangToggle, SegOption } from "./ds";
+import { Backdrop, BackBtn, BrandTitle, GoldToggle, LangToggle, SegOption } from "./ds";
 import ShipPicker from "./ShipPicker";
 
 // Sala / lobby con equipos, migrada a React (Fase 2). Reproduce el flujo real
@@ -229,139 +228,148 @@ export default function Room() {
       <Backdrop />
       <LangToggle lang={lang} onChange={setLang} />
       <div className="fixed left-7 top-7 z-40">
-        <BackBtn onClick={() => menuMain()} label={t("common.backMenu")} />
+        <BackBtn onClick={() => roomLeave()} label={t("common.backMenu")} />
       </div>
 
       <div className="relative z-[1] mx-auto flex min-h-full max-w-[1180px] animate-gs-fade flex-col items-center gap-6 px-6 pb-16 pt-8">
         <BrandTitle size={44} sub={false} />
         <span className="gs-eyebrow">{t("room.title")}</span>
 
-        {/* Config de sala */}
-        <div className="gs-panel flex w-full flex-col gap-4 p-6">
-          <span className="gs-eyebrow">{t("room.section")}</span>
-          <div className="flex items-center gap-2.5">
-            {isHost ? (
-              <>
-                <input
-                  className="gs-input font-bold"
-                  value={name}
-                  maxLength={28}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => e.stopPropagation()}
-                  placeholder={t("room.namePlaceholder")}
-                />
-                <button className="gs-btn min-w-[104px]" onClick={() => roomSend({ type: "setRoomName", name: name.trim() })}>
-                  {t("common.save")}
-                </button>
-              </>
-            ) : (
-              <div className="text-[18px] font-bold text-white">{room.name || "#" + room.id.slice(0, 6)}</div>
-            )}
-          </div>
-
-          {isHost && (
-            <>
-              <div className="grid grid-cols-1 gap-x-7 gap-y-4 sm:grid-cols-2">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[14px] font-semibold text-gs-rule">{t("room.coopAI")}</span>
-                  <span className="ml-auto">
-                    <GoldToggle on={!!room.coopMode} onChange={() => roomSend({ type: "toggleCoop" })} label={t("room.coopAI")} />
-                  </span>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[14px] font-semibold text-gs-rule">{t("room.midGameJoin")}</span>
-                  <span className="ml-auto">
-                    <GoldToggle
-                      on={!!room.allowJoinMidGame}
-                      onChange={() => roomSend({ type: "toggleMidGameJoin" })}
-                      label={t("room.midGameJoin")}
-                    />
-                  </span>
-                </div>
-                <div className={`flex items-center gap-2.5 ${room.coopMode ? "pointer-events-none opacity-40" : ""}`}>
-                  <span className="text-[14px] font-semibold text-gs-rule">{t("room.balancedTeams")}</span>
-                  <span className="ml-auto">
-                    <GoldToggle
-                      on={!!room.enforceBalance}
-                      onChange={() => roomSend({ type: "toggleEnforceBalance" })}
-                      label={t("room.balancedTeams")}
-                    />
-                  </span>
-                </div>
-              </div>
-              <hr className="border-0 border-t border-gs-rule/12" />
-              <div>
-                <div className="mb-3 text-[15px] font-semibold text-gs-rule">{t("room.scenarioSize")}</div>
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                  {SIZES.map((s) => (
-                    <SegOption
-                      key={s.key}
-                      active={(room.worldSize || "medium") === s.key}
-                      onClick={() => roomSend({ type: "setWorldSize", size: s.key })}
-                      title={
-                        <span>
-                          {t(s.label)} <span className="text-gs-gold-soft">{s.km}</span>
-                        </span>
-                      }
-                      sub={`${s.ast} ${t("room.asteroids")}`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Escuadrones */}
-        <div className="w-full">
-          <div className="mb-3 flex items-center gap-2.5">
-            <span className="gs-eyebrow">{t("room.squad")}</span>
-            <span className="gs-hud-mono ml-auto text-[13px]">
-              <span className="font-bold text-gs-green">{green.length}</span>
-              <span className="mx-1.5 text-gs-grey-3">vs</span>
-              {room.coopMode ? (
-                <span className="font-bold text-gs-red">{t("room.aiWaves")}</span>
-              ) : (
-                <span className="font-bold text-gs-red">{red.length}</span>
-              )}
-            </span>
-          </div>
-          <div className={`grid gap-3.5 ${room.coopMode ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"}`}>
-            <TeamColumn side="green" players={green} room={room} myId={myId} />
-            {!room.coopMode && <TeamColumn side="red" players={red} room={room} myId={myId} />}
-          </div>
-        </div>
-
-        {balanceWarn && <div className="text-center text-[13px] font-semibold text-gs-gold-soft">{t("room.unbalanced")}</div>}
-
-        {/* Selector de nave (oculto si soy artillero) */}
-        {!isGunner && (
-          <div className="w-full">
+        {/* Dos columnas: izquierda Nave de combate · derecha Sala + Escuadrón.
+            Si soy artillero no hay selector de nave → una sola columna. */}
+        <div className={`grid w-full items-start gap-6 ${isGunner ? "grid-cols-1" : "lg:grid-cols-[440px_minmax(0,1fr)]"}`}>
+          {/* Columna izquierda: selección de nave (2 cards por fila, crece vertical) */}
+          {!isGunner && (
             <ShipPicker
               selected={me?.shipType || "fighter"}
               onSelect={(type) => roomSend({ type: "selectShip", shipType: type })}
               label={t("room.shipLabel")}
             />
-          </div>
-        )}
-
-        {/* Acciones */}
-        <div className="flex flex-wrap justify-center gap-2.5">
-          {!room.coopMode && (
-            <button className="gs-btn" onClick={() => roomSwitchTeam()}>
-              {t("room.switchTeam")}
-            </button>
           )}
-          <button className="gs-btn gs-btn-danger" onClick={() => roomLeave()}>
-            <Icon name="arrowL" size={15} /> {t("common.leave")}
-          </button>
-          <button
-            className={`gs-btn min-w-[100px] ${me?.ready ? "gs-btn-primary" : "gs-btn-go"}`}
-            onClick={() => roomToggleReady()}
-          >
-            {me?.ready ? t("room.readyOn") : t("room.ready")}
-          </button>
+
+          {/* Columna derecha: Sala + Escuadrón */}
+          <div className="flex w-full flex-col gap-6">
+            {/* Sala (título fuera de la card, patrón de Escuadrón) */}
+            <div>
+              <div className="mb-3 flex items-center gap-2.5">
+                <span className="gs-eyebrow">{t("room.section")}</span>
+              </div>
+              <div className="gs-panel flex flex-col gap-4 p-6">
+                <div className="flex items-center gap-2.5">
+                  {isHost ? (
+                    <>
+                      <input
+                        className="gs-input font-bold"
+                        value={name}
+                        maxLength={28}
+                        onChange={(e) => setName(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        placeholder={t("room.namePlaceholder")}
+                      />
+                      <button className="gs-btn min-w-[104px]" onClick={() => roomSend({ type: "setRoomName", name: name.trim() })}>
+                        {t("common.save")}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-[18px] font-bold text-white">{room.name || "#" + room.id.slice(0, 6)}</div>
+                  )}
+                </div>
+
+                {isHost && (
+                  <>
+                    <div className="grid grid-cols-1 gap-x-7 gap-y-4 sm:grid-cols-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-[14px] font-semibold text-gs-rule">{t("room.coopAI")}</span>
+                        <span className="ml-auto">
+                          <GoldToggle on={!!room.coopMode} onChange={() => roomSend({ type: "toggleCoop" })} label={t("room.coopAI")} />
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-[14px] font-semibold text-gs-rule">{t("room.midGameJoin")}</span>
+                        <span className="ml-auto">
+                          <GoldToggle
+                            on={!!room.allowJoinMidGame}
+                            onChange={() => roomSend({ type: "toggleMidGameJoin" })}
+                            label={t("room.midGameJoin")}
+                          />
+                        </span>
+                      </div>
+                      <div className={`flex items-center gap-2.5 ${room.coopMode ? "pointer-events-none opacity-40" : ""}`}>
+                        <span className="text-[14px] font-semibold text-gs-rule">{t("room.balancedTeams")}</span>
+                        <span className="ml-auto">
+                          <GoldToggle
+                            on={!!room.enforceBalance}
+                            onChange={() => roomSend({ type: "toggleEnforceBalance" })}
+                            label={t("room.balancedTeams")}
+                          />
+                        </span>
+                      </div>
+                    </div>
+                    <hr className="border-0 border-t border-gs-rule/12" />
+                    <div>
+                      <div className="mb-3 text-[15px] font-semibold text-gs-rule">{t("room.scenarioSize")}</div>
+                      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                        {SIZES.map((s) => (
+                          <SegOption
+                            key={s.key}
+                            active={(room.worldSize || "medium") === s.key}
+                            onClick={() => roomSend({ type: "setWorldSize", size: s.key })}
+                            title={
+                              <span>
+                                {t(s.label)} <span className="text-gs-gold-soft">{s.km}</span>
+                              </span>
+                            }
+                            sub={`${s.ast} ${t("room.asteroids")}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Cambiar equipo / Go (ready) — entre Sala y Escuadrón, mitad de ancho cada uno */}
+            <div className="flex gap-3">
+              {!room.coopMode && (
+                <button className="gs-btn flex-1 min-h-[52px] text-[16px]" onClick={() => roomSwitchTeam()}>
+                  {t("room.switchTeam")}
+                </button>
+              )}
+              <button
+                className={`gs-btn flex-1 min-h-[52px] text-[16px] ${me?.ready ? "gs-btn-primary" : "gs-btn-go"}`}
+                onClick={() => roomToggleReady()}
+              >
+                {me?.ready ? t("room.readyOn") : t("room.ready")}
+              </button>
+            </div>
+
+            {/* Escuadrones */}
+            <div>
+              <div className="mb-3 flex items-center gap-2.5">
+                <span className="gs-eyebrow">{t("room.squad")}</span>
+                <span className="gs-hud-mono ml-auto text-[13px]">
+                  <span className="font-bold text-gs-green">{green.length}</span>
+                  <span className="mx-1.5 text-gs-grey-3">vs</span>
+                  {room.coopMode ? (
+                    <span className="font-bold text-gs-red">{t("room.aiWaves")}</span>
+                  ) : (
+                    <span className="font-bold text-gs-red">{red.length}</span>
+                  )}
+                </span>
+              </div>
+              <div className={`grid gap-3.5 ${room.coopMode ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"}`}>
+                <TeamColumn side="green" players={green} room={room} myId={myId} />
+                {!room.coopMode && <TeamColumn side="red" players={red} room={room} myId={myId} />}
+              </div>
+            </div>
+
+            {balanceWarn && (
+              <div className="text-center text-[13px] font-semibold text-gs-gold-soft">{t("room.unbalanced")}</div>
+            )}
+          </div>
         </div>
+
       </div>
     </div>
   );

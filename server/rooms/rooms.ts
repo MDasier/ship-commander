@@ -62,7 +62,7 @@ function createRoom(ownerId: string, ownerName: string): Room {
     winner:  null,
     killFeed: [],
     timeLeft: 0,
-    allowJoinMidGame: false,
+    allowJoinMidGame: true,
   };
   return rooms[id];
 }

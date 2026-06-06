@@ -79,32 +79,34 @@ export default function CoopRooms() {
         <BackBtn onClick={() => menuMain()} label={t("common.backMenu")} />
       </div>
 
-      <div className="relative z-[1] flex min-h-full animate-gs-fade flex-col items-center gap-7 px-6 pb-20 pt-8">
+      <div className="relative z-[1] flex min-h-full animate-gs-fade flex-col items-center justify-center gap-9 px-6 py-20">
         <BrandTitle size={46} sub={false} />
 
-        <div className="flex w-full max-w-[720px] flex-col gap-5">
-          <div className="flex justify-center gap-3">
-            <button className="gs-btn gs-btn-primary" onClick={() => lobbyCreateRoom()}>
-              <Icon name="coop" size={18} /> {t("lobby.create")}
-            </button>
-            <button className="gs-btn" onClick={() => lobbyRefresh()}>
-              <Icon name="refresh" size={16} /> {t("lobby.refresh")}
-            </button>
-          </div>
-
-          <div className="text-center">
+        <div className="gs-panel w-full max-w-[720px] p-6">
+          {/* Header del card: título + acciones (crear sala / actualizar lista) */}
+          <div className="mb-5 flex items-center justify-between gap-3">
             <span className="gs-eyebrow">{t("lobby.title")}</span>
+            <div className="flex items-center gap-2.5">
+              <button className="gs-btn gs-btn-primary px-4 py-2.5" onClick={() => lobbyCreateRoom()}>
+                <Icon name="coop" size={16} /> {t("lobby.create")}
+              </button>
+              <button
+                className="gs-btn gs-btn-ghost min-h-11 w-11 px-0"
+                onClick={() => lobbyRefresh()}
+                title={t("lobby.refresh")}
+                aria-label={t("lobby.refresh")}
+              >
+                <Icon name="refresh" size={17} />
+              </button>
+            </div>
           </div>
 
           {rooms.length === 0 ? (
-            <div className="gs-panel flex flex-col items-center gap-4 border-dashed px-6 py-12 text-center">
+            <div className="flex flex-col items-center gap-4 rounded-gs border border-dashed border-gs-rule/15 px-6 py-12 text-center">
               <div className="grid h-14 w-14 place-items-center rounded-full border border-gs-gold/40 text-gs-gold">
                 <Icon name="coop" size={28} />
               </div>
               <p className="m-0 max-w-[360px] leading-relaxed text-gs-grey-3">{t("lobby.hint")}</p>
-              <button className="gs-btn gs-btn-primary mt-1" onClick={() => lobbyCreateRoom()}>
-                <Icon name="coop" size={16} /> {t("lobby.create")}
-              </button>
             </div>
           ) : (
             <div className="flex flex-col gap-2.5">

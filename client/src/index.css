@@ -261,7 +261,7 @@
     background: linear-gradient(90deg, var(--color-gs-gold-deep), var(--color-gs-gold-bright));
     transition: width 0.36s var(--ease-gs);
   }
-  .gs-statbar.is-shd > span { background: linear-gradient(90deg, #2f6f8f, var(--color-gs-blue-soft)); }
+  .gs-statbar.is-shd > span { background: #aaddff; }
   .gs-statbar.is-hp > span { background: linear-gradient(90deg, var(--color-gs-green-deep), var(--color-gs-green)); }
 
   /* ── Telemetría mono (tabular) ── */

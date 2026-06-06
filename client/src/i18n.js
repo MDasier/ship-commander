@@ -26,7 +26,7 @@ const I18N = {
   es: {
     // Común
     "common.save": "Guardar",
-    "common.backMenu": "← Menú",
+    "common.backMenu": "Menú",
     "common.leave": "Salir",
     "common.ready": "LISTO",
     "common.recommended": "Recom.",
@@ -49,7 +49,7 @@ const I18N = {
 
     // Lobby
     "lobby.create": "Crear sala",
-    "lobby.refresh": "↺ Actualizar lista",
+    "lobby.refresh": "Actualizar lista",
     "lobby.title": "Salas disponibles",
     "lobby.hint": "Crea una sala o únete a una existente para empezar.",
     "lobby.empty": "No hay salas. ¡Crea una!",
@@ -74,7 +74,7 @@ const I18N = {
     // Controles
     "controls.title": "Controles",
     "controls.change": "Cambiar",
-    "controls.reset": "↺ Restaurar por defecto",
+    "controls.reset": "Restaurar por defecto",
     "controls.fixed": "FIJOS",
     "controls.thrust": "Propulsión",
     "controls.reverse": "Retroceso",
@@ -171,7 +171,7 @@ const I18N = {
     // Game over
     "gameover.hostHint": "Eres el HOST · puedes reiniciar la partida para todos o volver al lobby",
     "gameover.guestHint": "Esperando a que el HOST reinicie... · puedes volver al lobby cuando quieras",
-    "gameover.restart": "↺ Reiniciar partida",
+    "gameover.restart": "Reiniciar partida",
     "gameover.back": "↩ Volver al lobby",
     "gameover.victory": "VICTORIA",
     "gameover.defeat": "DERROTA",
@@ -237,7 +237,7 @@ const I18N = {
 
   en: {
     "common.save": "Save",
-    "common.backMenu": "← Menu",
+    "common.backMenu": "Menu",
     "common.leave": "Leave",
     "common.ready": "READY",
     "common.recommended": "Rec.",
@@ -258,7 +258,7 @@ const I18N = {
     "menu.supportSub": "Buy us a coffee",
 
     "lobby.create": "Create room",
-    "lobby.refresh": "↺ Refresh list",
+    "lobby.refresh": "Refresh list",
     "lobby.title": "Available rooms",
     "lobby.hint": "Create a room or join an existing one to start.",
     "lobby.empty": "No rooms. Create one!",
@@ -281,7 +281,7 @@ const I18N = {
 
     "controls.title": "Controls",
     "controls.change": "Change",
-    "controls.reset": "↺ Restore defaults",
+    "controls.reset": "Restore defaults",
     "controls.fixed": "FIXED",
     "controls.thrust": "Thrust",
     "controls.reverse": "Reverse",
@@ -373,7 +373,7 @@ const I18N = {
 
     "gameover.hostHint": "You are the HOST · restart the match for everyone or return to the lobby",
     "gameover.guestHint": "Waiting for the HOST to restart... · you can return to the lobby anytime",
-    "gameover.restart": "↺ Restart match",
+    "gameover.restart": "Restart match",
     "gameover.back": "↩ Back to lobby",
     "gameover.victory": "VICTORY",
     "gameover.defeat": "DEFEAT",
