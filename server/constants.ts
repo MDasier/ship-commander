@@ -7,10 +7,10 @@ interface WorldPreset { w: number; h: number; asteroids: number; label: string; 
 const FPS = 60;
 
 const WORLD_PRESETS: Record<string, WorldPreset> = {
-  small:  { w: 3000,  h: 3000,  asteroids: 15,  label: "Pequeño" },
-  medium: { w: 6000,  h: 6000,  asteroids: 40,  label: "Medio"   },
-  large:  { w: 10000, h: 10000, asteroids: 80,  label: "Grande"  },
-  huge:   { w: 15000, h: 15000, asteroids: 130, label: "Enorme"  },
+  small:  { w: 10000, h: 10000, asteroids: 15,  label: "Pequeño" },
+  medium: { w: 20000, h: 20000, asteroids: 40,  label: "Medio"   },
+  large:  { w: 35000, h: 35000, asteroids: 80,  label: "Grande"  },
+  huge:   { w: 50000, h: 50000, asteroids: 130, label: "Enorme"  },
 };
 
 const MAX_PLAYERS = 20;
