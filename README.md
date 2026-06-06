@@ -237,9 +237,16 @@ ship-commander/
 │   ├── particles.js    # Campo de estrellas, sistema de partículas (módulo)
 │   ├── sounds.js       # Música y SFX procedurales — Web Audio API (módulo)
 │   └── styles.css      # Todos los estilos UI (convención: unidades rem, texto ≥ 16px)
-├── server/             # ← Node + ws (sin package.json propio; usa el de la raíz)
-│   ├── server.js       # Servidor autoritativo — física, colisiones, salas, timer, IA, oleadas. Sirve dist/ en prod
-│   ├── config.js       # Carga y exporta la configuración (con defaults y persistencia)
+├── server/             # ← Node + ws en TypeScript (Node 24 type-stripping, sin build; usa el package.json de la raíz)
+│   ├── server.js       # Entry / composition root: arranca admin + juego/WS + game loop (.js)
+│   ├── config.js       # Carga y exporta CFG (defaults + persistencia) (.js)
+│   ├── types.d.ts      # Tipos de dominio ambiente (Player, Room, Bullet, Missile…)
+│   ├── net/            # wsServer (HTTP+WS), handlers (mensajes), serialize (state), broadcast
+│   ├── sim/            # loop, physics, movement, collisions, effects, weapons
+│   ├── rooms/          # rooms (salas + tripulación), lifecycle (start/restart)
+│   ├── entities/       # player, spawn
+│   ├── ai/             # ai (bots), waves (oleadas)
+│   ├── admin/          # adminServer (panel :8081, API /config)
 │   └── config.json     # Valores personalizados (generado automáticamente al guardar)
 ├── tools/              # Utilidades CommonJS (editor de naves, generador de presets)
 └── dist/               # Salida de `vite build` (gitignored)
@@ -280,10 +287,10 @@ Esta sección explica cómo fluye la información entre cliente y servidor para 
 
 ### Conexión WebSocket
 
-El servidor (`server/server.js`) inicia un servidor HTTP en el puerto **8080** que también sirve los archivos estáticos del cliente. Encima de ese mismo servidor HTTP se monta el servidor WebSocket (`ws`):
+El servidor (`server/net/wsServer.ts`, arrancado desde el entry `server/server.js`) inicia un servidor HTTP en el puerto **8080** que también sirve los archivos estáticos del cliente. Encima de ese mismo servidor HTTP se monta el servidor WebSocket (`ws`) en el path `/ws`:
 
 ```js
-const wss = new WebSocketServer({ server: httpServer });
+const wss = new WebSocket.Server({ server: httpServer, path: "/ws" });
 wss.on("connection", ws => { /* nuevo jugador */ });
 ```
 
@@ -391,6 +398,6 @@ En cambio, `asteroids`, `beams`, `empPulses` y `mines` se aplican de forma **inm
 
 ### Panel admin (puerto 8081)
 
-Un servidor HTTP independiente en `server.js` sirve `admin.html` en el puerto 8081. El panel hace `GET /config` al cargar y `POST /config` al guardar. El servidor escribe los cambios en `server/config.json` y los aplica en el mismo objeto `CFG` que usa el game loop; los cambios son inmediatos.
+Un servidor HTTP independiente (`server/admin/adminServer.ts`) sirve `admin.html` en el puerto 8081. El panel hace `GET /config` al cargar y `POST /config` al guardar. El servidor escribe los cambios en `server/config.json` y los aplica en el mismo objeto `CFG` que usa el game loop; los cambios son inmediatos.
 
 ---
