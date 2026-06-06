@@ -35,9 +35,9 @@ const I18N = {
     "menu.tag": "Tag",
     "menu.namePlaceholder": "Escribe tu nombre...",
     "menu.saved": "✓ Guardado",
-    "menu.playOnline": "COOP",
-    "menu.solo": "VUELA SÓLO",
-    "menu.controls": "VER CONTROLES",
+    "menu.playOnline": "ARENA",
+    "menu.solo": "VUELA SOLO",
+    "menu.controls": "CONTROLES",
     "menu.support": "❤ APOYA EL PROYECTO",
 
     // Lobby
@@ -187,7 +187,7 @@ const I18N = {
 
     // Avisos de voz (voz robótica femenina estilo SC)
     "voice.lowFuel": "Combustible bajo",
-    "voice.shieldsDown": "Escudos caídos",
+    "voice.shieldsDown": "Sin escudos",
     "voice.hullCritical": "Casco crítico",
 
     // Resultado de partida
@@ -208,9 +208,9 @@ const I18N = {
     "menu.tag": "Tag",
     "menu.namePlaceholder": "Type your name...",
     "menu.saved": "✓ Saved",
-    "menu.playOnline": "COOP",
+    "menu.playOnline": "ARENA",
     "menu.solo": "FLY SOLO",
-    "menu.controls": "VIEW CONTROLS",
+    "menu.controls": "CONTROLS",
     "menu.support": "❤ SUPPORT THE PROJECT",
 
     "lobby.create": "Create room",

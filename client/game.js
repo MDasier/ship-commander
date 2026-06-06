@@ -820,17 +820,6 @@ document.getElementById("mobiCloseBtn").onclick = closeMobiglass;
 mobiglassEl.addEventListener("click", e => {
   if (e.target === mobiglassEl) closeMobiglass();
 });
-/*
-function openMobiglass() {
-  const me = getMe();
-  if (!me) return;
-  mobiOpen = true;
-  mobiglassEl.classList.remove("hidden");
-  //updateMobiglass();
-  renderPilotPane();
-  renderPartidaPane();
-  renderControlesPane();
-}*/
 
 function bindingText(action) {
   return displayKey(bindings[action] || DEFAULT_BINDINGS[action]);
@@ -857,16 +846,8 @@ function openMobiglass() {
   mobiOpen = true;
   mobiglassEl.classList.remove("hidden");
 
-  renderPilotPane();
-  renderPartidaPane();
-
   setMobiTab("piloto");
 }
-/*
-function closeMobiglass() {
-  mobiOpen = false;
-  mobiglassEl.classList.add("hidden");
-}*/
 function closeMobiglass() {
   cancelRecording();
 
@@ -1885,12 +1866,11 @@ function renderPlayers() {
     const mjOn = roomData.allowJoinMidGame;
     const ebOn = roomData.enforceBalance;
     const coopOn = roomData.coopMode;
-    const ws_ = roomData.worldSize || "medium";
+    const ws_ = roomData.worldSize || "large";
     const SIZES = [
-      { key: "small", label: "Pequeño 3K", sub: "15 ast." },
-      { key: "medium", label: "Medio 6K", sub: "40 ast." },
-      { key: "large", label: "Grande 10K", sub: "80 ast." },
-      { key: "huge", label: "Enorme 15K", sub: "130 ast." },
+      { key: "medium", label: "Medio 10K", sub: "77 ast." },
+      { key: "large", label: "Grande 20K", sub: "127 ast." },
+      { key: "huge", label: "Enorme 40K", sub: "257 ast." },
     ];
     hostBar.innerHTML = `
       <div class="hostToggleRow">
@@ -1941,7 +1921,7 @@ function renderPlayers() {
     balBar.id = "balanceBar";
     balBar.innerHTML = `<span class="balTeam green">🟢 ${gc} jugador(es)</span>
       <span class="balSep">vs</span>
-      <span class="balTeam red">🤖 IA · OLEADAS</span>`;
+      <span class="balTeam red"> Bots · (OLEADAS)</span>`;
     playersDiv.appendChild(balBar);
   } else if (gc > 0 || rc > 0) {
     const balBar = document.createElement("div");
@@ -2396,8 +2376,8 @@ function drawWorldBounds(camX, camY) {
   const me = getMe();
   if (!me) return;
 
-  const WORLD_SIZE = 10000;
-  const WARNING_DIST = 1000;
+  const WORLD_SIZE = 20000;
+  const WARNING_DIST = 1777;
 
   const leftDist   = me.x;
   const rightDist  = WORLD_SIZE - me.x;
