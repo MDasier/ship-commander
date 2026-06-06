@@ -1480,18 +1480,22 @@ function requireName() {
 function getPlayerName() { return playerName; }
 function setPlayerName(name) { return applyName(name); }
 
-document.getElementById("createRoom").onclick = () => {
+// Acciones de la lista de salas (disparadas desde React, CoopRooms.tsx).
+function lobbyCreateRoom() {
   if (!requireName()) return;
   initAudio();
   applyStoredVolumes();
   ws.send(JSON.stringify({ type: "createRoom" }));
-};
-
-document.getElementById("refreshRooms").onclick = () => {
-  ws.send(JSON.stringify({
-    type: "getRooms"
-  }));
-};
+}
+function lobbyRefresh() {
+  ws.send(JSON.stringify({ type: "getRooms" }));
+}
+function lobbyJoin(roomId) {
+  if (!requireName()) return;
+  initAudio();
+  applyStoredVolumes();
+  ws.send(JSON.stringify({ type: "joinRoom", roomId }));
+}
 
 const readyBtn = document.getElementById("ready");
 
@@ -1523,7 +1527,7 @@ const SUPPORT_URL = "https://www.paypal.com/paypalme/mdasier";
 const MENU_SCREENS = ["mainMenu", "lobby", "soloSetup", "controlsScreen", "room"];
 // Pantallas cuyo UI ya vive en React (App.tsx las monta como overlay). A medida
 // que se migran pantallas legacy se añaden aquí para ocultar el #menu antiguo.
-const REACT_SCREENS = new Set(["mainMenu", "soloSetup"]);
+const REACT_SCREENS = new Set(["mainMenu", "soloSetup", "lobby"]);
 let _menuScreen = "mainMenu";
 function showMenuScreen(name) {
   _menuScreen = name;
@@ -1746,49 +1750,13 @@ ws.onmessage = e => {
 
 };
 
+// La lista de salas está migrada a React (CoopRooms.tsx). Guardamos el último
+// listado del servidor y avisamos a React; el render lo hace el componente.
+let roomList = [];
+function getRoomList() { return roomList; }
 function renderRooms(list) {
-
-  roomsDiv.innerHTML = "";
-
-  if (list.length === 0) {
-    //roomsDiv.innerHTML = '<div style="color:#444;font-size:12px;padding:12px 0">No hay salas. Crea una.</div>';
-    return;
-  }
-
-  list.forEach(room => {
-
-    const div = document.createElement("div");
-    div.className = "roomItem";
-
-    const playing = room.status === "playing";
-    const canJoin = !playing || room.allowJoinMidGame;
-
-    const sizeLabels = { small: "3K", medium: "6K", large: "10K", huge: "15K" };
-    const sizeLabel = sizeLabels[room.worldSize] || "6K";
-    let statusText = playing ? "EN PARTIDA" : "EN ESPERA";
-    if (playing && room.allowJoinMidGame) statusText = "EN PARTIDA · ABIERTA";
-    statusText += ` · ${sizeLabel}`;
-
-    div.innerHTML = `
-      <span class="roomId">${room.name || '#' + room.id.slice(0, 6)}</span>
-      <span class="roomStatus ${playing ? 'playing' : ''} ${playing && room.allowJoinMidGame ? 'open' : ''}">${statusText}</span>
-      <span class="roomPlayers">${room.players}/20</span>
-      <button ${canJoin ? '' : 'disabled'}>Unirse</button>
-    `;
-
-    if (canJoin) {
-      div.querySelector("button").onclick = () => {
-        if (!requireName()) return;
-        initAudio();
-        applyStoredVolumes();
-        ws.send(JSON.stringify({ type: "joinRoom", roomId: room.id }));
-      };
-    }
-
-    roomsDiv.appendChild(div);
-
-  });
-
+  roomList = Array.isArray(list) ? list : [];
+  window.dispatchEvent(new CustomEvent("rooms-update"));
 }
 // Etiquetas cortas para la lista de jugadores — se actualizan dinámicamente
 const SHIP_LABELS = { interceptor: "INTERCEPTOR", fighter: "L.FIGHTER", bomber: "BOMBER", gunship: "GUNSHIP" };
@@ -4526,6 +4494,8 @@ export {
   getPlayerName, setPlayerName, menuPlayOnline, menuSolo, menuMain, getMenuScreen, SUPPORT_URL,
   // Datos de nave + práctica solo (puente para React)
   getShips, drawShipPreview, startSolo,
+  // Lista de salas Co-op (puente para React)
+  getRoomList, lobbyCreateRoom, lobbyRefresh, lobbyJoin,
 };
 
 loop();

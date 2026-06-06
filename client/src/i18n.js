@@ -55,6 +55,8 @@ const I18N = {
     "lobby.empty": "No hay salas. ¡Crea una!",
     "lobby.join": "Unirse",
     "lobby.playing": "En partida",
+    "lobby.waiting": "En espera",
+    "lobby.open": "Abierta",
 
     // Solo / práctica
     "solo.title": "Vuela sólo",
@@ -234,6 +236,8 @@ const I18N = {
     "lobby.empty": "No rooms. Create one!",
     "lobby.join": "Join",
     "lobby.playing": "In match",
+    "lobby.waiting": "Waiting",
+    "lobby.open": "Open",
 
     "solo.title": "Fly solo",
     "solo.mode": "MODE",

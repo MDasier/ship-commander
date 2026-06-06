@@ -22,19 +22,8 @@
     <!-- ── MENÚ PRINCIPAL ── (migrado a React: client/src/ui/MainMenu.tsx,
          renderizado en la ruta "/" por App.tsx) -->
 
-    <!-- ── BUSCAR PARTIDAS ── -->
-    <div id="lobby" class="hidden">
-      <button class="menuBackBtn" data-back data-i18n="common.backMenu">← Menú</button>
-
-      <div id="lobbyActions">
-        <button id="createRoom" data-i18n="lobby.create">Crear sala</button>
-        <button id="refreshRooms" data-i18n="lobby.refresh">↺ Actualizar lista</button>
-      </div>
-
-      <h2 data-i18n="lobby.title">Salas disponibles</h2>
-      <div id="rooms"></div>
-      <div id="lobbyHint" data-i18n="lobby.hint">Crea una sala o únete a una existente para empezar.</div>
-    </div>
+    <!-- ── BUSCAR PARTIDAS ── migrada a React: client/src/ui/CoopRooms.tsx
+         (ruta "/lobby"), abierta por menuPlayOnline() desde game.js. -->
 
     <!-- ── PRÁCTICA EN SOLITARIO ── migrada a React: client/src/ui/FlySolo.tsx
          (ruta "/solo"), arrancada por menuSolo() desde game.js. -->

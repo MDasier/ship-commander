@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Routes, Route, useNavigate } from "react-router";
 import MainMenu from "./ui/MainMenu";
+import CoopRooms from "./ui/CoopRooms";
 import FlySolo from "./ui/FlySolo";
 import ControlsScreen from "./ui/ControlsScreen";
 import Reconnect from "./ui/Reconnect";
@@ -51,8 +52,9 @@ export default function App() {
     <>
       <Routes>
         <Route path="/" element={<MainMenu />} />
+        <Route path="/lobby" element={<CoopRooms />} />
         <Route path="/solo" element={<FlySolo />} />
-        {/* lobby/room siguen en game.js (legacy); se migrarán a estas rutas. */}
+        {/* room (sala con equipos) sigue en game.js (legacy); se migrará a /room. */}
         <Route path="*" element={null} />
       </Routes>
       {showControls && <ControlsScreen onClose={() => setShowControls(false)} />}
