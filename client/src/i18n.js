@@ -132,6 +132,7 @@ const I18N = {
     "room.asteroids": "ast.",
 
     // HUD
+    "hud.status": "ESTADO",
     "hud.hp": "HP",
     "hud.shield": "SHD",
     "hud.fuel": "Fuel",
@@ -334,6 +335,7 @@ const I18N = {
     "room.sizeHuge": "Huge",
     "room.asteroids": "ast.",
 
+    "hud.status": "STATUS",
     "hud.hp": "HP",
     "hud.shield": "SHD",
     "hud.fuel": "Fuel",

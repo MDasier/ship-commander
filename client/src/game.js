@@ -822,7 +822,10 @@ const roomDiv = document.getElementById("room");
 const roomsDiv = document.getElementById("rooms");
 const playersDiv = document.getElementById("players");
 
-const hud = document.getElementById("hud");
+// El HUD vive en React (Hud.tsx), montado en la ruta /game. Sustituimos el
+// antiguo flag visual (#hud.hidden) por un estado de juego explícito que los
+// guards de input consultan; React monta/desmonta el HUD por ruta.
+let inGame = false;
 
 // ── Mobiglass
 const mobiglassEl = document.getElementById("mobiglass");
@@ -1223,7 +1226,7 @@ function returnToLobby() {
   closeMobiglass();
   closeChat();
   menu.style.display = "";
-  hud.classList.add("hidden");
+  inGame = false;
   showMenuScreen("mainMenu");   // volver al hub principal
   updateUI();
 }
@@ -1288,7 +1291,7 @@ const RECOVER_LIMIT = 60;//calor mínimo (umbral de descongestión)
 function fireWeapon() {
   const me = getMe();
 
-  if (!me || me.dead || hud.classList.contains("hidden")) {
+  if (!me || me.dead || !inGame) {
     stopAutoFire();
     return;
   }
@@ -1380,7 +1383,7 @@ let abilityWasReady = true;   // idem para la habilidad [X] (arranca lista → s
 //}, HEAT_DECAY_MS);
 
 canvas.addEventListener("mousedown", e => {
-  if (hud.classList.contains("hidden")) return;
+  if (!inGame) return;
   const me = getMe();
   if (!me || me.dead) return;
   if (e.button === 0) {
@@ -1594,7 +1597,7 @@ ws.onmessage = e => {
   if (data.type === "gameStarted") {
 
     menu.style.display = "none";
-    hud.classList.remove("hidden");
+    inGame = true;
     // Desmonta cualquier overlay de menú React (p. ej. FlySolo) al entrar en juego.
     window.dispatchEvent(new CustomEvent("menu-screen", { detail: "game" }));
     deadIds = new Set();
@@ -1620,7 +1623,7 @@ ws.onmessage = e => {
     currentRoomId = data.room.id;
     hideGameOver();
     closeMobiglass();
-    hud.classList.add("hidden");
+    inGame = false;
     menu.style.display = "";
     showMenuScreen("room");
     renderPlayers();
@@ -2279,7 +2282,7 @@ addEventListener("keyup", e => {
 const CFG_RESPAWN_DELAY = 5; // debe coincidir con server config RESPAWN_DELAY
 
 setInterval(() => {
-  if (hud.classList.contains("hidden")) return;
+  if (!inGame) return;
   const me = getMe();
   if (!me || me.dead) { beamHeld = false; beamWasReady = false; abilityWasReady = true; return; }  // evita carga "atascada" tras morir
   // Aviso eléctrico al quedar el rayo totalmente cargado (solo en el flanco de subida)
@@ -3787,8 +3790,10 @@ function drawWarningOverlay(me) {
 
   ctx.restore();
 }
-const timerEl = document.getElementById("timer");
 function updateTimer(secs) {
+  // El HUD vive en React (montado solo en partida); búsqueda perezosa + guard.
+  const timerEl = document.getElementById("timer");
+  if (!timerEl) return;
   if (secs == null) { timerEl.textContent = "--:--"; return; }
   const m = Math.floor(secs / 60);
   const s = secs % 60;
@@ -3816,8 +3821,11 @@ function updateHUD(me) {
     _voiceFuelLow = false; _voiceShieldDown = false;
   }
 
-  document.getElementById("hp").textContent =
-    Math.floor(ship.hp);
+  // El HUD vive en React y solo está montado en partida (ruta /game). Si aún no
+  // existe (transición), salimos: los campos de abajo asumen que el DOM está.
+  const hpEl = document.getElementById("hp");
+  if (!hpEl) return;
+  hpEl.textContent = Math.floor(ship.hp);
 
   const shieldEl = document.getElementById("shieldEl");
   if (shieldEl) {

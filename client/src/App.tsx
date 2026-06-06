@@ -4,6 +4,7 @@ import MainMenu from "./ui/MainMenu";
 import CoopRooms from "./ui/CoopRooms";
 import Room from "./ui/Room";
 import FlySolo from "./ui/FlySolo";
+import Hud from "./ui/Hud";
 import ControlsScreen from "./ui/ControlsScreen";
 import Reconnect from "./ui/Reconnect";
 
@@ -56,7 +57,8 @@ export default function App() {
         <Route path="/lobby" element={<CoopRooms />} />
         <Route path="/room" element={<Room />} />
         <Route path="/solo" element={<FlySolo />} />
-        {/* HUD y MobiGlass en partida siguen en game.js (legacy). */}
+        <Route path="/game" element={<Hud />} />
+        {/* MobiGlass / panel de muerte / game over / chat siguen en game.js (legacy). */}
         <Route path="*" element={null} />
       </Routes>
       {showControls && <ControlsScreen onClose={() => setShowControls(false)} />}

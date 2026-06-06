@@ -36,33 +36,9 @@
 
   </div>
 
-  <!-- ── HUD ── -->
-  <div id="hud" class="hidden">
-
-    <div id="topLeft">
-      <div><span data-i18n="hud.hp">HP</span>: <span id="hp">100</span></div>
-      <div><span data-i18n="hud.shield">SHD</span>: <span id="shieldEl">—</span></div>
-      <div><span data-i18n="hud.fuel">Fuel</span>: <span id="fuel">100</span></div>
-      <div><span data-i18n="hud.speed">Vel</span>: <span id="speed">0</span></div>
-      <div><span data-i18n="hud.kd">K/D</span>: <span id="kd">0/0</span></div>
-      <div><span data-i18n="hud.msl">MSL</span>: <span id="mslCd">LISTO</span></div>
-      <div><span data-i18n="hud.flares">BENG</span>: <span id="flaresEl">—</span></div>
-      <div><span data-i18n="hud.flight">FLT</span>: <span id="inertiaMode">CPLD</span></div>
-      <div><span data-i18n="hud.cannon">CAÑÓN</span>: <span id="weaponHeatEl">FRÍO</span></div>
-      <div id="abilityRow" style="display:none"><span id="abilityName">ESP</span>: <span id="abilityCd">LISTO</span>
-      </div>
-    </div>
-
-    <div id="topCenter">
-      <div id="timer">--:--</div>
-    </div>
-
-    <div id="topRight">
-      <div id="alive"></div>
-      <div id="hudControls" data-i18n="hud.controlsLine">[F1] MobiGlass · [Enter] Chat</div>
-    </div>
-
-  </div>
+  <!-- ── HUD ── migrado a React: client/src/ui/Hud.tsx (ruta "/game").
+       game.js sigue escribiendo los valores por id (updateHUD/updateTimer)
+       cada frame; React solo renderiza la estructura. -->
 
   <!-- ── PANEL NAVE AL MORIR ── -->
   <div id="deadPanel" class="hidden">
