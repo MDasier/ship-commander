@@ -116,7 +116,9 @@ function drawRadar() {
   const scanning = performance.now() < S.scanUntil;
   const size = 140;
 
-  const x = canvas.width - 170;
+  // Centrado abajo (antes esquina inferior derecha): en ultrawide la esquina
+  // queda demasiado lejos de la vista del jugador.
+  const x = canvas.width / 2;
   const y = canvas.height - 170;
   const r = size / 2;
 
