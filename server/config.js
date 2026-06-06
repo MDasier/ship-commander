@@ -46,7 +46,7 @@ const DEFAULTS = {
   // ── Rayo principal (nave Capital) — disparo primario del piloto
   CAPITAL_BEAM_DAMAGE: 150,    // muy potente
   CAPITAL_BEAM_CHARGE_TIME: 75, // ticks (~1.25s) manteniendo pulsado para cargar
-  CAPITAL_BEAM_RANGE: 850,     // alcance del rayo (editable en admin → "Rayo Capital")
+  CAPITAL_BEAM_RANGE: 750,     // alcance del rayo (editable en admin → "Rayo Capital")
   CAPITAL_BEAM_HALFWIDTH: 14,  // semianchura para detección de impacto
   CAPITAL_BEAM_LIFE: 8,        // ticks que dura el efecto visual
   EMP_DURATION: 90,            // ticks (~1.5s) de chispas rojas del rayo de la Capital (solo visual)
@@ -79,7 +79,7 @@ const DEFAULTS = {
   GUNNER_MISSILE_COOLDOWN: 55,
 
   // ── IA / Dificultad (bots del modo oleadas)
-  AI_SPEED_MULT: 0.62,          // multiplica el empuje del bot (menor = más lento, más fácil de acertar)
+  AI_SPEED_MULT: 0.42,          // multiplica el empuje del bot (menor = más lento, más fácil de acertar)
   AI_TURN_MULT: 0.7,            // multiplica el giro del bot (menor = menos esquivo)
   AI_AIM_JITTER: 0.10,          // error de puntería en radianes (mayor = falla más). Ahora apuntan con adelanto (lead)
   AI_FIRE_COOLDOWN_MULT: 1.35,  // multiplica el cooldown de disparo del bot (mayor = dispara menos)
@@ -87,7 +87,7 @@ const DEFAULTS = {
   AI_FIRE_CONE: 0.16,           // semiángulo (rad) dentro del cual el bot dispara cañón (menor = más preciso, dispara menos)
   AI_BULLET_RANGE: 820,         // alcance al que el bot abre fuego con cañón (px)
   AI_MISSILE_CHANCE: 0.012,     // probabilidad por tick de lanzar misil cuando está alineado (bomber lo multiplica)
-  AI_BOMBER_MISSILE_MULT: 4,    // el bomber lanza misiles con esta probabilidad extra (su rol es misilero)
+  AI_BOMBER_MISSILE_MULT: 3,    // el bomber lanza misiles con esta probabilidad extra (su rol es misilero)
   AI_FLARE_HEALTH_FRAC: 0.5,    // si su HP+escudo cae por debajo de esto y hay misil enemigo cerca, suelta bengala
   AI_REGROUP_HEALTH_FRAC: 0.35, // por debajo de esta vida el bot huye hacia un aliado en vez de atacar
   AI_PASS_DISTANCE: 260,        // distancia a la que el bot rompe la pasada (deja de acercarse y vira) px

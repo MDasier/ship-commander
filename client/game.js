@@ -2138,8 +2138,6 @@ function renderDeadTurretOptions() {
   });
 }
 
-// Las previews se dibujan en buildShipCards() al recibir el init del servidor
-
 addEventListener("keydown", e => {
   const tag = document.activeElement?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return;
@@ -2311,67 +2309,7 @@ function worldToScreen(x, y, camX, camY) {
     y: y - camY + canvas.height / 2
   };
 }
-//LIMITES Y GRID DEL MAPA
-function drawWorldBoundsOLD(camX, camY) {
-  const me = getMe();
-  if (!me) return;
-
-  const WARNING_DIST = 1000;
-
-  const leftDist = me.x;
-  const rightDist = 10000 - me.x;
-  const topDist = me.y;
-  const bottomDist = 10000 - me.y;
-
-  const leftX = worldToScreen(0, 0, camX, camY).x;
-  const rightX = worldToScreen(10000, 0, camX, camY).x;
-  const topY = worldToScreen(0, 0, camX, camY).y;
-  const bottomY = worldToScreen(0, 10000, camX, camY).y;
-
-  ctx.lineWidth = 4;
-
-  if (leftDist < WARNING_DIST) {
-    ctx.globalAlpha = 1 - leftDist / WARNING_DIST;
-
-    ctx.beginPath();
-    ctx.strokeStyle = "#ff4444";
-    ctx.moveTo(leftX, 0);
-    ctx.lineTo(leftX, canvas.height);
-    ctx.stroke();
-  }
-
-  if (rightDist < WARNING_DIST) {
-    ctx.globalAlpha = 1 - rightDist / WARNING_DIST;
-
-    ctx.beginPath();
-    ctx.strokeStyle = "#ff4444";
-    ctx.moveTo(rightX, 0);
-    ctx.lineTo(rightX, canvas.height);
-    ctx.stroke();
-  }
-
-  if (topDist < WARNING_DIST) {
-    ctx.globalAlpha = 1 - topDist / WARNING_DIST;
-
-    ctx.beginPath();
-    ctx.strokeStyle = "#ff4444";
-    ctx.moveTo(0, topY);
-    ctx.lineTo(canvas.width, topY);
-    ctx.stroke();
-  }
-
-  if (bottomDist < WARNING_DIST) {
-    ctx.globalAlpha = 1 - bottomDist / WARNING_DIST;
-
-    ctx.beginPath();
-    ctx.strokeStyle = "#ff4444";
-    ctx.moveTo(0, bottomY);
-    ctx.lineTo(canvas.width, bottomY);
-    ctx.stroke();
-  }
-
-  ctx.globalAlpha = 1;
-}
+//LIMITES DEL MAPA
 function drawWorldBounds(camX, camY) {
   const me = getMe();
   if (!me) return;
