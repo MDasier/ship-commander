@@ -37,7 +37,7 @@ export default function FlySolo() {
         <BackBtn onClick={() => menuMain()} label={t("common.backMenu")} />
       </div>
 
-      <div className="relative z-[1] flex min-h-full animate-gs-fade flex-col items-center gap-6 px-6 pb-16 pt-8">
+      <div className="relative z-[1] flex min-h-full animate-gs-fade flex-col items-center justify-center gap-6 px-6 py-16">
         <BrandTitle size={44} sub={false} />
         <span className="gs-eyebrow">{t("solo.title")}</span>
 
