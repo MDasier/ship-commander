@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useI18n } from "../hooks/useI18n";
 import { menuMain, startSolo } from "../game";
-import { Backdrop, BackBtn, BrandTitle, LangToggle, RadarMark, Section, SegOption } from "./ds";
+import { Backdrop, BackBtn, BrandTitle, LangToggle, Section, SegOption } from "./ds";
 import ShipPicker from "./ShipPicker";
 
 // Pantalla de práctica en solitario migrada a React (Fase 2). Reúne modo,
@@ -91,8 +91,6 @@ export default function FlySolo() {
 
         <p className="m-0 max-w-[560px] text-center text-[13px] text-gs-grey-3">{t("solo.hint")}</p>
       </div>
-
-      <RadarMark />
     </div>
   );
 }

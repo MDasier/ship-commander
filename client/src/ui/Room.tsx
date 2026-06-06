@@ -9,7 +9,7 @@ import {
   roomLeave,
   menuMain,
 } from "../game";
-import { Backdrop, BackBtn, BrandTitle, GoldToggle, Icon, LangToggle, RadarMark, SegOption } from "./ds";
+import { Backdrop, BackBtn, BrandTitle, GoldToggle, Icon, LangToggle, SegOption } from "./ds";
 import ShipPicker from "./ShipPicker";
 
 // Sala / lobby con equipos, migrada a React (Fase 2). Reproduce el flujo real
@@ -363,8 +363,6 @@ export default function Room() {
           </button>
         </div>
       </div>
-
-      <RadarMark />
     </div>
   );
 }
