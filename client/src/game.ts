@@ -442,7 +442,18 @@ ws.onmessage = e => {
     S.asteroids = data.asteroids || [];
     S.world = data.world || S.world;
     S.winner = data.winner;
-    S.killFeed = data.killFeed || [];
+    // El servidor sella cada kill con `time: Date.now()` de SU reloj; el fade del
+    // feed (draw.ts) compara contra el reloj del CLIENTE, así que un desfase de
+    // relojes (deploy remoto) hace que el feed no aparezca o se quede pegado.
+    // Resellamos cada entrada con el reloj del cliente la primera vez que la
+    // vemos (matching por el time del servidor, que sí es estable como id).
+    const prevKillFeed = S.killFeed;
+    S.killFeed = (data.killFeed || []).map(e => {
+      const prevEntry = prevKillFeed.find(p =>
+        p.srvTime === e.time && p.victimName === e.victimName &&
+        p.killerName === e.killerName && p.weapon === e.weapon);
+      return prevEntry || { ...e, srvTime: e.time, time: Date.now() };
+    });
     updateTimer(data.timeLeft);
 
     // Modo oleadas (solo práctica)

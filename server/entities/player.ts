@@ -235,6 +235,10 @@ function killPlayer(p: Player, killer: Player | null, weapon: string, room: Room
     killer.kills++;
   }
 
+  // ── Kill feed: notificación arriba-derecha en el cliente (muerte por enemigo,
+  // suicidio, asteroide…). Sin esta llamada room.killFeed nunca se llena.
+  pushKill(room, (killer && killer.id !== p.id) ? killer : null, p, weapon);
+
   // ── Tripulación muere con la nave
   const crewIds = p.gunnerIds
     ? p.gunnerIds.filter(Boolean)
