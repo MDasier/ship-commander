@@ -37,6 +37,7 @@ function handleMessage(ws: any, player: Player, msg: any): void {
 
   if (msg.type === "createRoom") {
     const room = createRoom(player.id, player.name);
+    if (typeof msg.allowJoinMidGame === "boolean") room.allowJoinMidGame = msg.allowJoinMidGame;
     joinRoom(player, room);
     send(ws, { type: "roomJoined", roomId: room.id });
     broadcastRoom(room, { type: "roomUpdate", room });

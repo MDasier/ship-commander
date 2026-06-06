@@ -224,7 +224,7 @@ function lobbyCreateRoom() {
   if (!requireName()) return;
   initAudio();
   applyStoredVolumes();
-  ws.send(JSON.stringify({ type: "createRoom" }));
+  ws.send(JSON.stringify({ type: "createRoom", allowJoinMidGame: true }));
 }
 function lobbyRefresh() {
   ws.send(JSON.stringify({ type: "getRooms" }));
