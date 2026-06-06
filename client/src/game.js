@@ -1161,30 +1161,25 @@ function updateMobiPartida() {
 let _mobiPartidaSig = "";
 
 // ── Game Over
-const gameOverEl = document.getElementById("gameOver");
-const restartBtn = document.getElementById("restartBtn");
-
+// Game Over migrado a React (GameOver.tsx): el texto VICTORIA/DERROTA + marcador
+// se siguen dibujando en el canvas; React solo monta las pistas host/invitado y
+// los botones (reiniciar / volver al lobby), vía el evento "gameover".
 function showGameOver() {
   if (uiState !== "inRoom") return;
   if (!winner) return;
-
-  gameOverEl.classList.remove("hidden");
-  const isHost = roomData && roomData.ownerId === myId;
-  // En práctica (solo) no hay reinicio ni pistas host/invitado: solo "Volver al lobby"
-  restartBtn.classList.toggle("hidden", soloMode || !isHost);
-  const hostHint = document.getElementById("gameOverHostHint");
-  const guestHint = document.getElementById("gameOverGuestHint");
-  if (hostHint) hostHint.classList.toggle("hidden", soloMode || !isHost);
-  if (guestHint) guestHint.classList.toggle("hidden", soloMode || isHost);
+  const isHost = !!(roomData && roomData.ownerId === myId);
   playVictorySound();
   stopMusic();
   hideDeadPanel();
+  window.dispatchEvent(new CustomEvent("gameover", { detail: { show: true, isHost, solo: soloMode } }));
 }
 
 function hideGameOver() {
-  gameOverEl.classList.add("hidden");
-  restartBtn.classList.add("hidden");
+  window.dispatchEvent(new CustomEvent("gameover", { detail: { show: false } }));
 }
+
+// Acción de reinicio (host) desde el game over React.
+function gameRestart() { ws.send(JSON.stringify({ type: "restartGame" })); }
 
 function resetClientState() {
   players = {}; bullets = []; missiles = []; asteroids = [];
@@ -1197,10 +1192,6 @@ function resetClientState() {
   hideDeadPanel();
   soloMode = false; waveMode = false; waveNum = 0; enemiesLeft = 0; waveBanner = null; teamLives = null;
 }
-
-restartBtn.onclick = () => {
-  ws.send(JSON.stringify({ type: "restartGame" }));
-};
 
 // Vuelve al lobby desde cualquier estado (game over, partida en curso o muerto).
 // Centraliza toda la limpieza para que no haya estados a medias ("doble salida").
@@ -1227,36 +1218,27 @@ function returnToLobby() {
   updateUI();
 }
 
-document.getElementById("backToLobby").onclick = returnToLobby;
-
-// ── Chat
-const chatContainer = document.getElementById("chatContainer");
-const chatInput = document.getElementById("chatInput");
+// ── Chat ── migrado a React (ChatInput.tsx): el LOG se dibuja en el canvas;
+// React solo monta el input al abrir. chatInputOpen sigue aquí (puerta del input
+// de juego). openChat/closeChat emiten "chat"; chatSend envía y cierra.
 let chatInputOpen = false;
 
 function openChat() {
   chatInputOpen = true;
   clearKeys();   // suelta el movimiento al empezar a escribir
-  chatContainer.classList.remove("hidden");
-  chatInput.value = "";
-  chatInput.focus();
+  window.dispatchEvent(new CustomEvent("chat", { detail: true }));
 }
 
 function closeChat() {
   chatInputOpen = false;
-  chatContainer.classList.add("hidden");
-  chatInput.blur();
+  window.dispatchEvent(new CustomEvent("chat", { detail: false }));
 }
 
-chatInput.addEventListener("keydown", e => {
-  e.stopPropagation();
-  if (e.key === "Enter") {
-    const text = chatInput.value.trim();
-    if (text) ws.send(JSON.stringify({ type: "chat", text }));
-    closeChat();
-  }
-  if (e.key === "Escape") closeChat();
-});
+function chatSend(text) {
+  const t = (text || "").trim();
+  if (t) ws.send(JSON.stringify({ type: "chat", text: t }));
+  closeChat();
+}
 
 canvas.addEventListener("mousemove", e => {
   mouseX = e.clientX;
@@ -2059,8 +2041,8 @@ function handleShipCardClick(e) {
 }
 // #shipCards (sala) migrado a React; el panel de muerte (#deadShipCards) sigue legacy.
 const _shipCardsEl = document.getElementById("shipCards");
+// #shipCards (sala) y #deadShipCards (panel de muerte) migrados a React.
 if (_shipCardsEl) _shipCardsEl.addEventListener("click", handleShipCardClick);
-document.getElementById("deadShipCards").addEventListener("click", handleShipCardClick);
 
 const _soloShipCards = document.getElementById("soloShipCards");
 if (_soloShipCards) _soloShipCards.addEventListener("click", e => {
@@ -2068,41 +2050,26 @@ if (_soloShipCards) _soloShipCards.addEventListener("click", e => {
   if (card) syncSoloShipSelector(card.dataset.type);
 });
 
-// Botón cambiar equipo desde el panel de muerte
-document.getElementById("deadSwitchTeamBtn").addEventListener("click", () => {
-  ws.send(JSON.stringify({ type: "switchTeam" }));
-});
-
-// Botón salir al lobby desde el panel de muerte (un jugador muerto puede abandonar
-// la partida sin tener que esperar al game over)
-document.getElementById("deadLeaveBtn").addEventListener("click", returnToLobby);
-
-const deadPanel = document.getElementById("deadPanel");
-
-function showDeadPanel() {
-  deadPanel.classList.remove("hidden");
-  const me = getMe();
-  if (me) syncShipSelector(me.shipType || "fighter");
-  _deadTurretSig = "";
-  renderDeadTurretOptions();
+// Panel de muerte migrado a React (DeadPanel.tsx). La visibilidad pasa por
+// setDeadPanelVisible (deduplica: solo emite "dead" al cambiar), porque la
+// llaman tanto las transiciones muerte/reaparición como el loop cada frame
+// (caso oleadas sin vidas). React monta el panel y delega las acciones en
+// game.js (roomSend selectShip/boardShip/switchTeam, roomLeave).
+let _deadVisible = false;
+function setDeadPanelVisible(v) {
+  if (v === _deadVisible) return;
+  _deadVisible = v;
+  window.dispatchEvent(new CustomEvent("dead", { detail: v }));
 }
-
-function hideDeadPanel() {
-  deadPanel.classList.add("hidden");
-  _deadTurretSig = "";
-}
+function showDeadPanel() { setDeadPanelVisible(true); }
+function hideDeadPanel() { setDeadPanelVisible(false); }
 
 // Opciones de "ir de torretero": naves aliadas vivas (Gunship/Capital) con torreta
 // libre que un jugador muerto puede abordar para reaparecer como artillero.
-let _deadTurretSig = "";
-function renderDeadTurretOptions() {
-  const section = document.getElementById("deadTurretSection");
-  const optsEl = document.getElementById("deadTurretOptions");
-  if (!section || !optsEl) return;
-
+// Devuelve los datos; React (DeadPanel) los renderiza y refresca por intervalo.
+function getTurretOptions() {
   const me = players[myId];
-  if (!me) { section.classList.add("hidden"); return; }
-
+  if (!me) return [];
   const myReservedPilot = me.pilotingFor || null;
   const entries = [];
   Object.values(players).forEach(p => {
@@ -2116,28 +2083,7 @@ function renderDeadTurretOptions() {
       entries.push({ id: p.id, name: p.name || "Pilot", type: p.shipType, free, reservedHere });
     }
   });
-
-  // Evita re-render innecesario del DOM
-  const sig = entries.map(e => `${e.id}:${e.free}:${e.reservedHere ? 1 : 0}`).join("|");
-  if (sig === _deadTurretSig) return;
-  _deadTurretSig = sig;
-
-  if (entries.length === 0) { section.classList.add("hidden"); optsEl.innerHTML = ""; return; }
-  section.classList.remove("hidden");
-
-  optsEl.innerHTML = entries.map(e => {
-    const label = SHIP_LABELS[e.type] || e.type.toUpperCase();
-    const status = e.reservedHere ? "RESERVADA · [R] para entrar" : `${e.free} torreta(s) libre(s)`;
-    return `<button class="deadTurretBtn${e.reservedHere ? ' reserved' : ''}" data-pid="${e.id}">
-      <span class="dtName">${e.name}</span>
-      <span class="dtType">${label}</span>
-      <span class="dtStatus">${status}</span>
-    </button>`;
-  }).join("");
-
-  optsEl.querySelectorAll(".deadTurretBtn").forEach(btn => {
-    btn.onclick = () => ws.send(JSON.stringify({ type: "boardShip", targetId: btn.dataset.pid }));
-  });
+  return entries;
 }
 
 // Las previews se dibujan en buildShipCards() al recibir el init del servidor
@@ -4048,11 +3994,10 @@ function loop() {
       ctx.fillText(i18nt("game.destroyed"), canvas.width / 2, canvas.height / 2 - 30);
       // Vidas: oleadas → pool de equipo; PVP/vuelo libre → infinito
       const canRespawn = waveMode ? (teamLives ?? 0) > 0 : true;
-      deadPanel.classList.toggle("hidden", !canRespawn);
+      // El panel de muerte lo monta React (evento "dead"); aquí solo ajustamos
+      // visibilidad (dedupe) y dibujamos la cuenta atrás de reaparición en canvas.
+      setDeadPanelVisible(canRespawn);
       if (canRespawn) {
-        deadPanel.classList.remove("hidden");
-        renderDeadTurretOptions();
-
         const elapsed = clientDeadAt ? Date.now() - clientDeadAt : 99999;
         const remaining = Math.max(0, Math.ceil((CFG_RESPAWN_DELAY * 1000 - elapsed) / 1000));
         ctx.font = "15px 'Courier New', monospace";
@@ -4082,7 +4027,7 @@ function loop() {
       }
       ctx.textAlign = "left";
     } else {
-      deadPanel.classList.add("hidden");
+      setDeadPanelVisible(false);
     }
 
     // Aviso de nave apagada por EMP
@@ -4495,6 +4440,8 @@ export {
   // MobiGlass en partida (puente para React)
   getMe, getPlayers, closeMobiglass,
   getAudioSettings, setAudioEffects, setAudioMusic, setAudioTrack, setAudioMuted,
+  // Overlays en partida: game over / chat / panel de muerte (puente para React)
+  gameRestart, chatSend, getTurretOptions,
 };
 
 loop();

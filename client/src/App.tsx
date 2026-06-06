@@ -6,6 +6,9 @@ import Room from "./ui/Room";
 import FlySolo from "./ui/FlySolo";
 import Hud from "./ui/Hud";
 import MobiGlass from "./ui/MobiGlass";
+import GameOver from "./ui/GameOver";
+import ChatInput from "./ui/ChatInput";
+import DeadPanel from "./ui/DeadPanel";
 import ControlsScreen from "./ui/ControlsScreen";
 import Reconnect from "./ui/Reconnect";
 import { closeMobiglass } from "./game.js";
@@ -26,6 +29,9 @@ export default function App() {
   const [showControls, setShowControls] = useState(false);
   const [disconnected, setDisconnected] = useState(false);
   const [mobiOpen, setMobiOpen] = useState(false);
+  const [gameOver, setGameOver] = useState<{ isHost: boolean; solo: boolean } | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [dead, setDead] = useState(false);
 
   // game.js emite "menu-screen" al cambiar de pantalla → reflejamos en la URL.
   useEffect(() => {
@@ -60,6 +66,24 @@ export default function App() {
     return () => window.removeEventListener("mobi", onMobi as EventListener);
   }, []);
 
+  // Overlays en partida (game.js emite los eventos): game over, chat, muerte.
+  useEffect(() => {
+    const onGameOver = (e: Event) => {
+      const d = (e as CustomEvent<{ show: boolean; isHost?: boolean; solo?: boolean }>).detail;
+      setGameOver(d.show ? { isHost: !!d.isHost, solo: !!d.solo } : null);
+    };
+    const onChat = (e: Event) => setChatOpen((e as CustomEvent<boolean>).detail);
+    const onDead = (e: Event) => setDead((e as CustomEvent<boolean>).detail);
+    window.addEventListener("gameover", onGameOver as EventListener);
+    window.addEventListener("chat", onChat as EventListener);
+    window.addEventListener("dead", onDead as EventListener);
+    return () => {
+      window.removeEventListener("gameover", onGameOver as EventListener);
+      window.removeEventListener("chat", onChat as EventListener);
+      window.removeEventListener("dead", onDead as EventListener);
+    };
+  }, []);
+
   return (
     <>
       <Routes>
@@ -71,6 +95,9 @@ export default function App() {
         {/* MobiGlass / panel de muerte / game over / chat siguen en game.js (legacy). */}
         <Route path="*" element={null} />
       </Routes>
+      {dead && <DeadPanel />}
+      {gameOver && <GameOver isHost={gameOver.isHost} solo={gameOver.solo} />}
+      {chatOpen && <ChatInput />}
       {showControls && <ControlsScreen onClose={() => setShowControls(false)} />}
       {mobiOpen && <MobiGlass onClose={() => closeMobiglass()} />}
       {disconnected && <Reconnect onRetry={() => location.reload()} />}

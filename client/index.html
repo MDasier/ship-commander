@@ -40,40 +40,17 @@
        game.js sigue escribiendo los valores por id (updateHUD/updateTimer)
        cada frame; React solo renderiza la estructura. -->
 
-  <!-- ── PANEL NAVE AL MORIR ── -->
-  <div id="deadPanel" class="hidden">
-    <div id="deadPanelInner">
-      <div id="deadPanelTitle" data-i18n="dead.selectShip">SELECCIONAR NAVE</div>
-      <div id="deadShipCards"></div>
-      <div id="deadTurretSection" class="hidden">
-        <div id="deadTurretLabel" data-i18n="dead.turret">O ENTRA DE ARTILLERO</div>
-        <div id="deadTurretOptions"></div>
-      </div>
-      <div id="deadPanelActions">
-        <button id="deadSwitchTeamBtn" data-i18n="dead.switchTeam">⇄ Cambiar equipo</button>
-        <button id="deadLeaveBtn" data-i18n="dead.leave">↩ Salir al lobby</button>
-      </div>
-    </div>
-  </div>
+  <!-- ── PANEL NAVE AL MORIR ── migrado a React: client/src/ui/DeadPanel.tsx
+       (evento "dead" desde game.js). -->
 
   <!-- ── MOBIGLASS ── migrado a React: client/src/ui/MobiGlass.tsx, montado por
        App.tsx al recibir el evento "mobi" desde game.js (F1). -->
 
-  <!-- ── GAME OVER ── -->
-  <div id="gameOver" class="hidden">
-    <div id="gameOverHostHint" class="hidden gameOverHint" data-i18n="gameover.hostHint">Eres el HOST · puedes reiniciar la partida para todos o
-      volver al lobby</div>
-    <div id="gameOverGuestHint" class="hidden gameOverHint" data-i18n="gameover.guestHint">Esperando a que el HOST reinicie... · puedes volver al lobby
-      cuando quieras</div>
-    <button id="restartBtn" class="hidden" data-i18n="gameover.restart">↺ Reiniciar partida</button>
-    <button id="backToLobby" data-i18n="gameover.back">↩ Volver al lobby</button>
-  </div>
+  <!-- ── GAME OVER ── migrado a React: client/src/ui/GameOver.tsx (evento
+       "gameover"). El texto VICTORIA/DERROTA y el marcador van en el canvas. -->
 
-  <!-- ── CHAT ── -->
-  <div id="chatContainer" class="hidden">
-    <input id="chatInput" type="text" maxlength="60" data-i18n-ph="chat.placeholder"
-      placeholder="Mensaje... (Enter enviar · Esc cancelar)" autocomplete="off" spellcheck="false">
-  </div>
+  <!-- ── CHAT ── migrado a React: client/src/ui/ChatInput.tsx (evento "chat").
+       El LOG de mensajes se dibuja en el canvas (game.js). -->
 
   <!-- ── CONEXIÓN PERDIDA ── migrada a React: client/src/ui/Reconnect.tsx,
        montada por App.tsx al recibir el evento "conn-lost" desde game.js. -->

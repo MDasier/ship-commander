@@ -152,6 +152,8 @@ const I18N = {
     "dead.turret": "O ENTRA DE ARTILLERO",
     "dead.switchTeam": "⇄ Cambiar equipo",
     "dead.leave": "↩ Salir al lobby",
+    "dead.reserved": "RESERVADA · [R] para entrar",
+    "dead.freeTurrets": "{n} torreta(s) libre(s)",
 
     // MobiGlass
     "mobi.pilot": "PILOTO",
@@ -354,6 +356,8 @@ const I18N = {
     "dead.turret": "OR MAN A TURRET",
     "dead.switchTeam": "⇄ Switch team",
     "dead.leave": "↩ Leave to lobby",
+    "dead.reserved": "RESERVED · [R] to enter",
+    "dead.freeTurrets": "{n} free turret(s)",
 
     "mobi.pilot": "PILOT",
     "mobi.match": "MATCH",
