@@ -7,7 +7,7 @@ const CFG = require("../config");
 
 // Distancia mínima de un punto al segmento A→B. Usada para colisión swept
 // (anti-tunneling).
-function distToSegment(px, py, ax, ay, bx, by) {
+function distToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
 
   const dx = bx - ax, dy = by - ay;
   const lenSq = dx * dx + dy * dy;
@@ -19,7 +19,7 @@ function distToSegment(px, py, ax, ay, bx, by) {
 // Distancia mínima entre dos segmentos AB y CD (clásico segment-segment).
 // Permite tratar la nave como cápsula (segmento + radio) frente al recorrido
 // barrido de un proyectil, en lugar de un punto.
-function segToSegDist(ax, ay, bx, by, cx, cy, dx, dy) {
+function segToSegDist(ax: number, ay: number, bx: number, by: number, cx: number, cy: number, dx: number, dy: number): number {
   const ux = bx - ax, uy = by - ay;
   const vx = dx - cx, vy = dy - cy;
   const wx = ax - cx, wy = ay - cy;
@@ -51,7 +51,7 @@ function segToSegDist(ax, ay, bx, by, cx, cy, dx, dy) {
   return Math.hypot(px, py);
 }
 
-function segmentHitsAsteroid(x1, y1, x2, y2, asteroids) {
+function segmentHitsAsteroid(x1: number, y1: number, x2: number, y2: number, asteroids: Asteroid[]): Asteroid | null {
   for (const ast of asteroids) {
     //if (ast.z !== 0) continue;//Para los asteroides flotantes
     const dx = x2 - x1;
@@ -75,7 +75,7 @@ function segmentHitsAsteroid(x1, y1, x2, y2, asteroids) {
 }
 
 // Cápsula de colisión de la nave en coords de mundo (segmento de proa a popa + radio).
-function shipCapsule(p) {
+function shipCapsule(p: Player): Capsule {
   const ship = CFG.SHIP_TYPES[p.shipType] || CFG.SHIP_TYPES.fighter;
   const col  = ship.collider || { front: 0, rear: 0, radius: 14 };
   const cos = Math.cos(p.angle), sin = Math.sin(p.angle);
@@ -87,7 +87,7 @@ function shipCapsule(p) {
 }
 
 // Nave "cubierta": su posición cae dentro del radio de un asteroide flotante (z=1)
-function isSheltered(px, py, asteroids) {
+function isSheltered(px: number, py: number, asteroids: Asteroid[]): boolean {
   return asteroids.some(a => a.z === 1 && Math.hypot(px - a.x, py - a.y) < a.r);
 }
 

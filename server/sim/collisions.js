@@ -4,7 +4,7 @@
 // de su detección de impacto.
 
 const CFG = require("../config");
-const { segmentHitsAsteroid, shipCapsule, segToSegDist, isSheltered } = require("./physics");
+const { segmentHitsAsteroid, shipCapsule, segToSegDist, isSheltered } = require("./physics.ts");
 const { applyDamage, registerCrewDamage, killPlayer } = require("../entities/player");
 const { steerMissile } = require("./weapons");
 
