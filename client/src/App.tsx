@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Routes, Route, useNavigate } from "react-router";
 import MainMenu from "./ui/MainMenu";
+import FlySolo from "./ui/FlySolo";
 import ControlsScreen from "./ui/ControlsScreen";
 import Reconnect from "./ui/Reconnect";
 
@@ -12,6 +13,7 @@ const SCREEN_PATH: Record<string, string> = {
   lobby: "/lobby",
   soloSetup: "/solo",
   room: "/room",
+  game: "/game",
 };
 
 export default function App() {
@@ -49,7 +51,8 @@ export default function App() {
     <>
       <Routes>
         <Route path="/" element={<MainMenu />} />
-        {/* lobby/solo/room siguen en game.js (legacy); se migrarán a estas rutas. */}
+        <Route path="/solo" element={<FlySolo />} />
+        {/* lobby/room siguen en game.js (legacy); se migrarán a estas rutas. */}
         <Route path="*" element={null} />
       </Routes>
       {showControls && <ControlsScreen onClose={() => setShowControls(false)} />}

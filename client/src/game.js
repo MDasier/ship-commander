@@ -521,7 +521,12 @@ function roundRectPath(c, x, y, w, h, r) {
 }
 
 // Draw preview silhouettes into the selector canva
-function drawShipPreviewInto(el, type, shape) {
+// `accent` opcional ("gold") recolorea la preview para el reskin React; por
+// defecto mantiene el cian de las pantallas legacy (sala / panel de muerte).
+function drawShipPreviewInto(el, type, shape, accent) {
+  const C = accent === "gold"
+    ? { fill: "#ffc61933", stroke: "#ffc619", line: "#908d4899", cockpit: "#ffe75ccc", engine: "#908d48aa" }
+    : { fill: "#00ccff55", stroke: "#00ccff", line: "#00aaff66", cockpit: "#bff4ffcc", engine: "#00aaff88" };
   const pc = el.getContext("2d");
   const w = el.width, h = el.height;
   pc.clearRect(0, 0, w, h);
@@ -537,14 +542,14 @@ function drawShipPreviewInto(el, type, shape) {
   pc.scale(sc, sc);
   pc.beginPath();
   buildShipPath(pc, type);
-  pc.fillStyle = "#00ccff55";
-  pc.strokeStyle = "#00ccff";
+  pc.fillStyle = C.fill;
+  pc.strokeStyle = C.stroke;
   pc.lineWidth = 1.5 / sc;
   pc.fill();
   pc.stroke();
   // Líneas de chasis
   if (shape.lines && shape.lines.length) {
-    pc.strokeStyle = "#00aaff66";
+    pc.strokeStyle = C.line;
     pc.lineWidth = 1 / sc;
     pc.beginPath();
     for (const [a, b] of shape.lines) { pc.moveTo(a[0], a[1]); pc.lineTo(b[0], b[1]); }
@@ -553,7 +558,7 @@ function drawShipPreviewInto(el, type, shape) {
   // Cabina / puente
   if (shape.cockpit) {
     const [cx, cy, rx, ry] = shape.cockpit;
-    pc.fillStyle = "#bff4ffcc";
+    pc.fillStyle = C.cockpit;
     if (shape.cockpitRect) {
       roundRectPath(pc, cx - rx, cy - ry, rx * 2, ry * 2, Math.min(rx, ry) * 0.35);
     } else {
@@ -567,7 +572,7 @@ function drawShipPreviewInto(el, type, shape) {
   pc.moveTo(eng[0][0], eng[0][1]);
   pc.lineTo(eng[1][0], eng[1][1]);
   pc.lineTo(eng[2][0], eng[2][1]);
-  pc.strokeStyle = "#00aaff88";
+  pc.strokeStyle = C.engine;
   pc.lineWidth = 1 / sc;
   pc.stroke();
   pc.restore();
@@ -582,6 +587,12 @@ function drawShipPreviews() {
     const el3 = document.getElementById("solo-prev-" + type);
     if (el3) drawShipPreviewInto(el3, type, shape);
   }
+}
+
+// Puente para React: dibuja la geometría de una nave en un canvas dado.
+function drawShipPreview(canvas, type, accent) {
+  const shape = SHIP_SHAPES[type];
+  if (canvas && shape) drawShipPreviewInto(canvas, type, shape, accent);
 }
 
 canvas.width = innerWidth;
@@ -1510,6 +1521,9 @@ document.getElementById("switchTeam").onclick = () => {
 const SUPPORT_URL = "https://www.paypal.com/paypalme/mdasier";
 
 const MENU_SCREENS = ["mainMenu", "lobby", "soloSetup", "controlsScreen", "room"];
+// Pantallas cuyo UI ya vive en React (App.tsx las monta como overlay). A medida
+// que se migran pantallas legacy se añaden aquí para ocultar el #menu antiguo.
+const REACT_SCREENS = new Set(["mainMenu", "soloSetup"]);
 let _menuScreen = "mainMenu";
 function showMenuScreen(name) {
   _menuScreen = name;
@@ -1517,12 +1531,11 @@ function showMenuScreen(name) {
     const el = document.getElementById(s);
     if (el) el.classList.toggle("hidden", s !== name);
   });
-  // El MainMenu vive en React (overlay en la ruta "/"). Ocultamos el contenedor
-  // legacy #menu cuando la pantalla activa es mainMenu para que su chrome (título
-  // y selector de idioma antiguos) no se vea de fondo. En el resto de pantallas
-  // (lobby/solo/room, aún legacy) #menu debe estar visible.
+  // Pantallas ya migradas a React (overlays montados por App.tsx). Ocultamos el
+  // contenedor legacy #menu cuando la activa es una de ellas para que su chrome
+  // antiguo no se vea de fondo. El resto (lobby/room, aún legacy) lo mantiene.
   const menuEl = document.getElementById("menu");
-  if (menuEl) menuEl.style.display = (name === "mainMenu") ? "none" : "";
+  if (menuEl) menuEl.style.display = REACT_SCREENS.has(name) ? "none" : "";
   // Notifica a React la pantalla activa (para reflejarla en la ruta).
   window.dispatchEvent(new CustomEvent("menu-screen", { detail: name }));
 }
@@ -1537,6 +1550,7 @@ function menuPlayOnline() {
   return true;
 }
 function menuSolo() { showMenuScreen("soloSetup"); }
+function menuMain() { showMenuScreen("mainMenu"); }
 
 document.querySelectorAll("[data-back]").forEach(btn => {
   btn.onclick = () => showMenuScreen("mainMenu");
@@ -1545,32 +1559,15 @@ document.querySelectorAll("[data-back]").forEach(btn => {
 // Arrancamos en el MainMenu React (ruta "/"): ocultamos el chrome legacy de #menu.
 showMenuScreen("mainMenu");
 
-// Grupos de opción (duración / tamaño) de la práctica solo
-function wireChoiceGroup(groupId) {
-  const group = document.getElementById(groupId);
-  if (!group) return;
-  group.addEventListener("click", e => {
-    const btn = e.target.closest(".soloChoice");
-    if (!btn) return;
-    group.querySelectorAll(".soloChoice").forEach(b => b.classList.toggle("selected", b === btn));
-  });
-}
-wireChoiceGroup("soloMode");
-wireChoiceGroup("soloDuration");
-wireChoiceGroup("soloSize");
-
-document.getElementById("soloStart").onclick = () => {
+// La pantalla de práctica solo está migrada a React (FlySolo.tsx). Arranca la
+// partida con las opciones elegidas; conserva el flujo legacy (guardar nombre,
+// inicializar audio) antes de pedir el solo al servidor.
+function startSolo({ mode = "waves", size = "large", durationS = 300, shipType = "fighter" } = {}) {
   applyName();                       // guarda el tag actual (sin exigirlo en solo)
   initAudio();
   applyStoredVolumes();
-  const modeBtn = document.querySelector("#soloMode .soloChoice.selected");
-  const durBtn = document.querySelector("#soloDuration .soloChoice.selected");
-  const sizeBtn = document.querySelector("#soloSize .soloChoice.selected");
-  const mode = modeBtn ? modeBtn.dataset.mode : "waves";
-  const durationS = durBtn ? Number(durBtn.dataset.secs) : 300;
-  const size = sizeBtn ? sizeBtn.dataset.size : "medium";
-  ws.send(JSON.stringify({ type: "startSolo", mode, size, durationS, shipType: soloSelectedShip }));
-};
+  ws.send(JSON.stringify({ type: "startSolo", mode, size, durationS, shipType }));
+}
 
 ws.onmessage = e => {
 
@@ -1615,6 +1612,8 @@ ws.onmessage = e => {
 
     menu.style.display = "none";
     hud.classList.remove("hidden");
+    // Desmonta cualquier overlay de menú React (p. ej. FlySolo) al entrar en juego.
+    window.dispatchEvent(new CustomEvent("menu-screen", { detail: "game" }));
     deadIds = new Set();
     startMusic();
 
@@ -1808,7 +1807,15 @@ function radarRating(sig) {
   return "−−";                     // firma baja = difícil de detectar
 }
 
+// Metadatos de nave que envía el servidor en el init. Se exponen a React
+// (getShips + evento "ships-init") para que las pantallas React (Vuela Solo,
+// y más adelante Lobby) rendericen sus tarjetas con los stats reales.
+let shipMeta = null;
+function getShips() { return shipMeta; }
+
 function buildShipCards(ships) {
+  shipMeta = ships;
+  window.dispatchEvent(new CustomEvent("ships-init"));
   for (const [type, ship] of Object.entries(ships)) {
     const words = (ship.label || type).split(" ");
     SHIP_LABELS[type] = words[words.length - 1].toUpperCase().slice(0, 7);
@@ -4516,7 +4523,9 @@ export {
   getBindings, rebindKey, resetBindings, onBindingsChange,
   BINDING_LABELS, RESERVED_KEYS, DEFAULT_BINDINGS, displayKey, bindingText,
   // Menú principal
-  getPlayerName, setPlayerName, menuPlayOnline, menuSolo, getMenuScreen, SUPPORT_URL,
+  getPlayerName, setPlayerName, menuPlayOnline, menuSolo, menuMain, getMenuScreen, SUPPORT_URL,
+  // Datos de nave + práctica solo (puente para React)
+  getShips, drawShipPreview, startSolo,
 };
 
 loop();

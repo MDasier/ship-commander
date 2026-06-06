@@ -29,6 +29,7 @@ const I18N = {
     "common.backMenu": "← Menú",
     "common.leave": "Salir",
     "common.ready": "LISTO",
+    "common.recommended": "Recom.",
     "common.lang": "Idioma",
 
     // Menú principal
@@ -209,6 +210,7 @@ const I18N = {
     "common.backMenu": "← Menu",
     "common.leave": "Leave",
     "common.ready": "READY",
+    "common.recommended": "Rec.",
     "common.lang": "Language",
 
     "menu.tag": "Tag",

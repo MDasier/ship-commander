@@ -2,7 +2,9 @@
 // Iconos monoline tipo lucide (currentColor), título de marca, toggle de idioma,
 // fondo cockpit (wash + starfield) y la marca de radar decorativa.
 // El estilo vive en index.css (tokens @theme + clases .gs-*).
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { getShips, drawShipPreview } from "../game.js";
 
 // ── Iconos (viewBox 24, trazo currentColor) ──────────────────
 const ICON_PATHS: Record<string, ReactNode> = {
@@ -181,6 +183,82 @@ export function RadarMark({ size = 220 }: { size?: number }) {
       </svg>
     </div>
   );
+}
+
+// ── Botón "volver" ───────────────────────────────────────────
+export function BackBtn({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button className="gs-btn gs-btn-ghost font-mono text-[13px]" onClick={onClick}>
+      <Icon name="arrowL" size={16} /> {label}
+    </button>
+  );
+}
+
+// ── Etiqueta de sección centrada ─────────────────────────────
+export function Section({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <div className="mb-3.5 text-center">
+        <span className="gs-eyebrow text-gs-grey-3">{label}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Opción segmentada ────────────────────────────────────────
+export function SegOption({
+  active,
+  onClick,
+  title,
+  sub,
+  disabled,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: ReactNode;
+  sub?: ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <button className={`gs-seg ${active ? "is-active" : ""}`} onClick={onClick} disabled={disabled} aria-pressed={active}>
+      {title}
+      {sub && <span className="gs-seg-sub">{sub}</span>}
+    </button>
+  );
+}
+
+// ── Datos de nave del servidor (puente game.js) ──────────────
+export type ShipMeta = {
+  label?: string;
+  desc?: string;
+  maxHp: number;
+  maxShield?: number;
+  thrustMult: number;
+  maxMissiles: number;
+  radarSignature: number;
+  crewCapacity?: number;
+};
+
+// Suscribe al init de naves del servidor; devuelve el mapa { type: ShipMeta }.
+export function useShips(): Record<string, ShipMeta> | null {
+  const [ships, setShips] = useState<Record<string, ShipMeta> | null>(() => getShips());
+  useEffect(() => {
+    const sync = () => setShips({ ...(getShips() as Record<string, ShipMeta>) });
+    if (!getShips()) window.addEventListener("ships-init", sync);
+    else sync();
+    return () => window.removeEventListener("ships-init", sync);
+  }, []);
+  return ships;
+}
+
+// Canvas con la geometría de la nave (dibujada por game.js, acento oro).
+export function ShipPreview({ type, w = 130, h = 66 }: { type: string; w?: number; h?: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (ref.current) drawShipPreview(ref.current, type, "gold");
+  }, [type]);
+  return <canvas ref={ref} width={w} height={h} className="mx-auto block" style={{ width: w, height: h }} />;
 }
 
 // ── Tooltip de ayuda (botón "?") ─────────────────────────────

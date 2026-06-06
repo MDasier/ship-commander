@@ -210,6 +210,32 @@
   .gs-eyebrow {
     @apply font-body text-[12px] font-extrabold uppercase tracking-[0.34em] text-gs-gold;
   }
+
+  /* ── Opción segmentada (modo / duración / tamaño) ── */
+  .gs-seg {
+    @apply min-h-11 cursor-pointer rounded-gs border border-gs-rule/15 bg-black/35 px-4 py-3
+      text-center font-body font-bold tracking-wide text-gs-grey-2 transition-all duration-200 ease-gs;
+  }
+  .gs-seg:hover:not(:disabled) { @apply border-gs-gold text-white; }
+  .gs-seg:focus-visible { @apply outline-2 outline-offset-2 outline-gs-gold-bright; }
+  .gs-seg.is-active {
+    @apply border-gs-gold-bright bg-gs-gold-bright/8 text-gs-gold-bright shadow-[0_0_14px_rgba(255,198,25,0.25)];
+  }
+  .gs-seg:disabled { @apply cursor-not-allowed opacity-35; }
+  .gs-seg-sub { @apply mt-1 block text-[11px] font-medium text-gs-grey-3; }
+
+  /* ── Barra de stat (tarjetas de nave / HUD) ── */
+  .gs-statbar { @apply h-[7px] overflow-hidden rounded-[3px] bg-white/10; }
+  .gs-statbar > span {
+    @apply block h-full rounded-[3px];
+    background: linear-gradient(90deg, var(--color-gs-gold-deep), var(--color-gs-gold-bright));
+    transition: width 0.36s var(--ease-gs);
+  }
+  .gs-statbar.is-shd > span { background: linear-gradient(90deg, #2f6f8f, var(--color-gs-blue-soft)); }
+  .gs-statbar.is-hp > span { background: linear-gradient(90deg, var(--color-gs-green-deep), var(--color-gs-green)); }
+
+  /* ── Telemetría mono (tabular) ── */
+  .gs-hud-mono { @apply font-mono tabular-nums; }
 }
 
 /* ============================================================
