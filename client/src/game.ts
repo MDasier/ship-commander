@@ -22,7 +22,7 @@ import {
 import { drawShipPreview } from "./game/shapes";
 import {
   DEFAULT_BINDINGS, BINDING_LABELS, RESERVED_KEYS,
-  SUPPORT_URL, MENU_SCREENS, REACT_SCREENS,
+  SUPPORT_URL, MENU_SCREENS, REACT_SCREENS, CFG_RESPAWN_DELAY,
 } from "./game/constants";
 import { clearKeys, installInput } from "./game/input";
 import {
@@ -578,6 +578,33 @@ function getTurretOptions() {
   return entries;
 }
 
+// Info para el panel de muerte React (DeadPanel): estado de reaparición, vidas
+// de equipo, oleada y enemigos. Lee el estado vivo del servidor; React lo
+// refresca por intervalo mientras el panel está montado. Replica la lógica que
+// antes se dibujaba centrada en el canvas (draw.ts), ahora movida al panel.
+function getDeadInfo() {
+  const me = S.myId ? S.players[S.myId] : null;
+  const waveMode = !!S.waveMode;
+  const teamLives = S.teamLives;
+  const canRespawn = waveMode ? (teamLives ?? 0) > 0 : true;
+  const reservedPilot = me && me.pilotingFor ? S.players[me.pilotingFor] : null;
+  const inTurret = !!(reservedPilot && !reservedPilot.dead);
+  const elapsed = S.clientDeadAt ? Date.now() - S.clientDeadAt : 99999;
+  const remaining = Math.max(0, Math.ceil((CFG_RESPAWN_DELAY * 1000 - elapsed) / 1000));
+  return {
+    waveMode,
+    teamLives,
+    canRespawn,
+    inTurret,
+    reservedPilotName: reservedPilot ? (reservedPilot.name || "") : null,
+    remaining,                       // segundos hasta poder reaparecer (0 = ya)
+    respawnKey: bindingText("respawn"),
+    waveNum: S.waveNum,
+    waveTotal: S.waveTotal,
+    enemiesLeft: S.enemiesLeft,
+  };
+}
+
 // Las previews se dibujan en buildShipCards() al recibir el init del servidor
 
 // (handlers de teclado + envio de input ~30/s en game/input.ts)
@@ -602,7 +629,7 @@ export {
   getMe, getPlayers, closeMobiglass,
   getAudioSettings, setAudioEffects, setAudioMusic, setAudioTrack, setAudioMuted,
   // Overlays en partida: game over / chat / panel de muerte (puente para React)
-  gameRestart, chatSend, getTurretOptions,
+  gameRestart, chatSend, getTurretOptions, getDeadInfo,
 };
 
 // Registra los listeners de input (teclado/ratón) inyectando las funciones del

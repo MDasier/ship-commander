@@ -192,7 +192,7 @@ const I18N = {
 
     // En juego
     "game.destroyed": "DESTRUIDO",
-    "game.respawnIn": "Reapareciendo en {n}s...",
+    "game.respawnIn": "Reaparición disponible en {n}s...",
     "game.pressRespawn": "Pulsa [{key}] para reaparecer",
     "game.spectator": "ESPECTADOR · {name} · [TAB] cambiar",
     "game.noTeamLives": "Sin vidas de equipo · esperando el final de la partida",
@@ -390,7 +390,7 @@ const I18N = {
     "boot.retry": "Retrying connection...",
 
     "game.destroyed": "DESTROYED",
-    "game.respawnIn": "Respawning in {n}s...",
+    "game.respawnIn": "Respawn available in {n}s...",
     "game.pressRespawn": "Press [{key}] to respawn",
     "game.spectator": "SPECTATOR · {name} · [TAB] to switch",
     "game.noTeamLives": "No team lives · waiting for the match to end",
