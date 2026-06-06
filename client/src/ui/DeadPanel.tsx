@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useI18n } from "../hooks/useI18n";
 import { getMe, getTurretOptions, getDeadInfo, roomSend, roomSwitchTeam, roomLeave } from "../game";
@@ -51,13 +51,29 @@ export default function DeadPanel() {
   const turrets = (getTurretOptions() as Turret[]) || [];
   const info = getDeadInfo() as DeadInfo;
 
-  // Instrucción de reaparición: cuenta atrás → tecla (o torreta si estoy embarcado).
-  const respawnLine =
-    info.remaining > 0
-      ? t("game.respawnIn", { n: info.remaining })
-      : info.inTurret
-        ? t("game.respawnTurret", { key: info.respawnKey, name: info.reservedPilotName || t("game.ally") })
-        : t("game.pressRespawn", { key: info.respawnKey });
+  // Selección optimista de nave: estando muerto, selectShip no emite roomUpdate,
+  // así que la card no se marcaba de forma fiable. Marcamos al instante al pulsar
+  // y adoptamos el valor del servidor solo cuando cambia (no en cada tick), para
+  // no revertir la selección durante el roundtrip.
+  const serverShip = me?.shipType;
+  const [picked, setPicked] = useState<string>(serverShip || "fighter");
+  const prevServer = useRef(serverShip);
+  useEffect(() => {
+    if (serverShip !== prevServer.current) {
+      prevServer.current = serverShip;
+      if (serverShip) setPicked(serverShip);
+    }
+  });
+  const selectShip = (type: string) => {
+    setPicked(type);
+    roomSend({ type: "selectShip", shipType: type });
+  };
+
+  const ready = info.remaining <= 0;
+  // Texto del botón de reaparición: cuenta atrás (deshabilitado) → acción (listo).
+  const respawnLabel = ready
+    ? `${info.inTurret ? t("room.board") : t("controls.respawn")} · [${info.respawnKey}]`
+    : t("game.respawnIn", { n: info.remaining });
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[200] grid place-items-center px-6 font-body">
@@ -65,29 +81,31 @@ export default function DeadPanel() {
         {/* Columna izquierda: selección de nave (filas de 3 cards) */}
         <div className="min-w-0">
           <ShipPicker
-            selected={me?.shipType || "fighter"}
-            onSelect={(type) => roomSend({ type: "selectShip", shipType: type })}
+            selected={picked}
+            onSelect={selectShip}
             label={t("dead.selectShip")}
           />
         </div>
 
         {/* Columna derecha: estado de muerte + acciones */}
         <div className="flex flex-col gap-4 lg:border-l lg:border-gs-rule/12 lg:pl-6">
-          {/* DESTRUIDO + instrucción de reaparición */}
-          <div className="text-center">
+          {/* DESTRUIDO + botón de reaparición (además de la tecla R) */}
+          <div className="flex flex-col items-center gap-3 text-center">
             <div
               className="font-display text-[28px] font-black tracking-[0.12em] text-gs-red"
               style={{ textShadow: "0 0 18px rgba(155,57,53,0.5)" }}
             >
               {t("game.destroyed")}
             </div>
-            <div
-              className={`mt-2 gs-hud-mono text-[14px] font-semibold ${
-                info.remaining > 0 ? "text-gs-grey-2" : "text-gs-green"
+            <button
+              className={`gs-btn w-full ${
+                ready ? "border-gs-green bg-gs-green/15 text-gs-green hover:border-gs-green hover:bg-gs-green/25" : ""
               }`}
+              disabled={!ready}
+              onClick={() => roomSend({ type: "respawn" })}
             >
-              {respawnLine}
-            </div>
+              {respawnLabel}
+            </button>
           </div>
 
           {/* Métricas: oleada / enemigos / vidas de equipo */}
