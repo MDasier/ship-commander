@@ -1,11 +1,41 @@
-/* Tailwind CSS v4 SIN Preflight (reset base) para convivir con el CSS legacy
-   del juego (styles.css) durante la migración incremental. Importamos solo las
-   capas theme + utilities; omitimos la capa base/preflight a propósito.
-   Cuando todo el cliente sea React podremos reactivar el preflight.
+/* Tailwind CSS v4 SIN Preflight: importamos solo las capas theme + utilities y
+   aportamos nuestra propia base (abajo). Ya no hay CSS legacy (styles.css se
+   eliminó); todo el estilo es Tailwind (tokens @theme + utilidades + clases .gs-*).
    Doc oficial: https://tailwindcss.com/docs/preflight */
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
+
+/* ============================================================
+   Base (sustituye al antiguo styles.css). Look del handoff:
+   fondo void, Nunito Sans, border-box global (como game.css del handoff).
+   ============================================================ */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--color-gs-void);
+    color: #fff;
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  #root {
+    height: 100%;
+  }
+  /* Canvas del juego: ocupa la ventana, por detrás de los overlays React. */
+  #c {
+    position: fixed;
+    inset: 0;
+  }
+}
 
 /* ============================================================
    Fuentes del design system (GuildSwarm × Ship Commander).
@@ -287,3 +317,9 @@
   .gs-stars::before,
   .gs-stars::after { animation: none; }
 }
+
+/* Scrollbar con acento oro (paneles desplazables). */
+.gs-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.gs-scroll::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
+.gs-scroll::-webkit-scrollbar-thumb { background: rgba(144, 141, 72, 0.5); border-radius: 6px; }
+.gs-scroll::-webkit-scrollbar-thumb:hover { background: var(--color-gs-gold); }

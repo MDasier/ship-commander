@@ -21,17 +21,12 @@ export const ws = new WebSocket(wsURL);
 // Mientras no se haya conectado nunca, mostramos la pantalla de "despertando";
 // si tarda, escalamos al mensaje de reposo. Tras la primera conexión, una caída
 // pasa a usar el overlay normal de "conexión perdida".
+// Overlay de arranque migrado a React (Boot.tsx); emitimos el evento "boot".
 function hideBoot() {
-  const b = document.getElementById("serverBoot");
-  if (b) b.classList.add("hidden");
+  window.dispatchEvent(new CustomEvent("boot", { detail: { show: false } }));
 }
 function showBoot(cold: boolean) {
-  const b = document.getElementById("serverBoot");
-  if (b) b.classList.remove("hidden");
-  if (cold) {
-    const c = document.getElementById("serverBootCold");
-    if (c) c.classList.remove("hidden");
-  }
+  window.dispatchEvent(new CustomEvent("boot", { detail: { show: true, cold } }));
 }
 
 // ── Reconexión automática ──
@@ -79,6 +74,10 @@ function showConnLost() {
   window.dispatchEvent(new CustomEvent("conn-lost"));
   scheduleReconnect(500);
 }
+
+// ¿Se ha conectado alguna vez? (lo lee App al montar para no quedarse mostrando
+// el overlay de arranque si el "open" ocurrió antes de montar React.)
+export function isEverConnected() { return S.everConnected; }
 
 // Si en 4 s no hemos conectado, probablemente el servidor estaba dormido
 setTimeout(() => { if (!S.everConnected) showBoot(true); }, 4000);

@@ -76,7 +76,7 @@ export default function ControlsScreen({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="gs-panel sc-scroll max-h-[88vh] w-[min(660px,92vw)] animate-gs-fade overflow-y-auto p-6 text-white"
+        className="gs-panel gs-scroll max-h-[88vh] w-[min(660px,92vw)] animate-gs-fade overflow-y-auto p-6 text-white"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5 flex items-center justify-between">

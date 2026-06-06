@@ -114,7 +114,7 @@ export default function MobiGlass({ onClose }: { onClose: () => void }) {
               <Icon name="x" size={16} />
             </button>
           </div>
-          <div className="sc-scroll flex-1 overflow-y-auto px-6 py-5">
+          <div className="gs-scroll flex-1 overflow-y-auto px-6 py-5">
             {tab === "pilot" && <PilotTab me={me} />}
             {tab === "match" && <MatchTab onExit={onClose} />}
             {tab === "controls" && <ControlsTab />}

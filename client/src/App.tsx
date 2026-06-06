@@ -11,7 +11,8 @@ import ChatInput from "./ui/ChatInput";
 import DeadPanel from "./ui/DeadPanel";
 import ControlsScreen from "./ui/ControlsScreen";
 import Reconnect from "./ui/Reconnect";
-import { closeMobiglass, getMenuScreen } from "./game";
+import Boot from "./ui/Boot";
+import { closeMobiglass, getMenuScreen, isEverConnected } from "./game";
 
 // Mapea cada pantalla del menú (emitida por game.js) a una ruta. Por ahora solo
 // "/" (MainMenu) tiene componente React; lobby/solo/room siguen en game.js y se
@@ -32,6 +33,9 @@ export default function App() {
   const [gameOver, setGameOver] = useState<{ isHost: boolean; solo: boolean } | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [dead, setDead] = useState(false);
+  // Overlay de arranque: visible al cargar hasta conectar (salvo que ya
+  // estuviéramos conectados al montar, p. ej. si el "open" llegó antes).
+  const [boot, setBoot] = useState<{ cold: boolean } | null>(() => (isEverConnected() ? null : { cold: false }));
 
   // Sincroniza la ruta con la pantalla actual de game.js SOLO al montar: su
   // primer evento "mainMenu" se dispara en el bootstrap ANTES de que React monte
@@ -85,13 +89,19 @@ export default function App() {
     };
     const onChat = (e: Event) => setChatOpen((e as CustomEvent<boolean>).detail);
     const onDead = (e: Event) => setDead((e as CustomEvent<boolean>).detail);
+    const onBoot = (e: Event) => {
+      const d = (e as CustomEvent<{ show: boolean; cold?: boolean }>).detail;
+      setBoot(d.show ? { cold: !!d.cold } : null);
+    };
     window.addEventListener("gameover", onGameOver as EventListener);
     window.addEventListener("chat", onChat as EventListener);
     window.addEventListener("dead", onDead as EventListener);
+    window.addEventListener("boot", onBoot as EventListener);
     return () => {
       window.removeEventListener("gameover", onGameOver as EventListener);
       window.removeEventListener("chat", onChat as EventListener);
       window.removeEventListener("dead", onDead as EventListener);
+      window.removeEventListener("boot", onBoot as EventListener);
     };
   }, []);
 
@@ -112,6 +122,7 @@ export default function App() {
       {showControls && <ControlsScreen onClose={() => setShowControls(false)} />}
       {mobiOpen && <MobiGlass onClose={() => closeMobiglass()} />}
       {disconnected && <Reconnect onRetry={() => location.reload()} />}
+      {boot && <Boot cold={boot.cold} />}
     </>
   );
 }

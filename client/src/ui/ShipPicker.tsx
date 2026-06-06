@@ -107,7 +107,7 @@ export default function ShipPicker({
       <div className="mb-4 text-center">
         <span className="gs-eyebrow">{label || t("room.shipLabel")}</span>
       </div>
-      <div className="sc-scroll flex flex-wrap justify-center gap-3 overflow-x-auto px-1 pb-3.5 pt-1">
+      <div className="gs-scroll flex flex-wrap justify-center gap-3 overflow-x-auto px-1 pb-3.5 pt-1">
         {entries.map(([type, ship]) => (
           <ShipCard
             key={type}

@@ -9,7 +9,6 @@
 // es canvas legacy). Verificado: quitar el pragma deja 56 errores solo de tipado
 // (no de correctitud); la extracción ya destapó y arregló los orphans reales.
 // ── Módulos del cliente (ES modules · empaquetados por Vite) ──
-import "./styles.css";
 import { applyI18n, onLangChange, setLang } from "./i18n.js";
 import { spawnExplosion, spawnBeamImpact } from "./particles.js";
 import {
@@ -31,7 +30,7 @@ import {
   setAudioEffects, setAudioMusic, setAudioTrack, setAudioMuted,
 } from "./game/audio";
 import { S } from "./game/state";
-import { ws } from "./game/net";
+import { ws, isEverConnected } from "./game/net";
 import { canvas, getMe } from "./game/render/canvas";
 import {
   initRender, startRenderLoop, clearAsteroidCache,
@@ -592,6 +591,7 @@ export {
   BINDING_LABELS, RESERVED_KEYS, DEFAULT_BINDINGS, displayKey, bindingText,
   // Menú principal
   getPlayerName, setPlayerName, menuPlayOnline, menuSolo, menuMain, getMenuScreen, SUPPORT_URL,
+  isEverConnected,
   // Datos de nave + práctica solo (puente para React)
   getShips, drawShipPreview, startSolo,
   // Lista de salas Co-op (puente para React)

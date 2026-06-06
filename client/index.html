@@ -8,16 +8,10 @@
 
 <body>
 
-  <!-- ── MENU ── -->
-  <div id="menu">
-
-    <h1>Ship Commander</h1>
-
-    <!-- ── SELECTOR DE IDIOMA ── -->
-    <div id="langSwitch">
-      <button data-lang="es">ES</button>
-      <button data-lang="en">EN</button>
-    </div>
+  <!-- ── MENU ── contenedor legacy vestigial: toda la UI está migrada a React
+       (client/src/ui/*). game.js (showMenuScreen) aún alterna su display, por eso
+       se conserva el #menu vacío y oculto. -->
+  <div id="menu" style="display:none">
 
     <!-- ── MENÚ PRINCIPAL ── (migrado a React: client/src/ui/MainMenu.tsx,
          renderizado en la ruta "/" por App.tsx) -->
@@ -55,14 +49,8 @@
   <!-- ── CONEXIÓN PERDIDA ── migrada a React: client/src/ui/Reconnect.tsx,
        montada por App.tsx al recibir el evento "conn-lost" desde game.js. -->
 
-  <!-- ── ARRANQUE / DESPERTAR DEL SERVIDOR (anti-standby, p.ej. Render) ── -->
-  <div id="serverBoot">
-    <div id="serverBootInner">
-      <div class="bootSpinner"></div>
-      <div id="serverBootTitle" data-i18n="boot.waking">Conectando con el servidor...</div>
-      <div id="serverBootCold" class="hidden" data-i18n="boot.cold">El servidor estaba en reposo. Despertándolo, espera unos segundos...</div>
-    </div>
-  </div>
+  <!-- ── ARRANQUE / DESPERTAR DEL SERVIDOR ── migrado a React: client/src/ui/Boot.tsx
+       (evento "boot" desde game.js/net.ts). -->
 
   <!-- ── CANVAS ── -->
   <canvas id="c"></canvas>
