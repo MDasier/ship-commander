@@ -11,6 +11,10 @@ import "./styles.css";
 import { i18nt, applyI18n, onLangChange, setLang } from "./i18n.js";
 import { spawnExplosion, spawnBeamImpact } from "./particles.js";
 import {
+  getBindings, rebindKey, resetBindings, onBindingsChange,
+  displayKey, bindingText, renderControlesPane,
+} from "./game/controls";
+import {
   initAudio, startMusic, stopMusic, resetAudio,
   playShootSound, playEmpSound,
   playBeamFireSound, playExplosionSound, playVictorySound,
@@ -36,174 +40,8 @@ import {
 import { cycleTargetByRadar } from "./game/render/sensors";
 import { triggerPingEffect } from "./game/render/world";
 
-// ── Keybindings ────────────────────────────────
-let bindings = { ...DEFAULT_BINDINGS };
-try {
-  const saved = JSON.parse(localStorage.getItem("spacetactics_bindings") || "null");
-  if (saved) bindings = { ...DEFAULT_BINDINGS, ...saved };
-} catch (_) { }
-
-function saveBindings() {
-  localStorage.setItem("spacetactics_bindings", JSON.stringify(bindings));
-}
-
-function displayKey(k) {
-  if (!k) return "—";
-  const map = { " ": "Espacio", "arrowleft": "←", "arrowright": "→", "arrowup": "↑", "arrowdown": "↓" };
-  return map[k] || k.toUpperCase();
-}
-
-let recordingAction = null;
-let recordingHandler = null;
-
-function cancelRecording() {
-  if (recordingHandler) {
-    document.removeEventListener("keydown", recordingHandler, true);
-    recordingHandler = null;
-  }
-  recordingAction = null;
-}
-
-function startRecording(action, keyEl) {
-  cancelRecording();
-  recordingAction = action;
-  keyEl.innerHTML = `<kbd class="bindingRecording">Presiona...</kbd>`;
-
-  recordingHandler = function (e) {
-    if (["shift", "control", "alt", "meta"].includes(e.key.toLowerCase())) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-
-    const newKey = e.key.toLowerCase();
-
-    if (RESERVED_KEYS.has(newKey)) {
-      keyEl.innerHTML = `<kbd class="bindingError">Reservada</kbd>`;
-      setTimeout(() => {
-        keyEl.innerHTML = `<kbd>${displayKey(bindings[action])}</kbd>`;
-      }, 1200);
-      cancelRecording();
-      return;
-    }
-
-    // Desvincula la tecla si ya estaba asignada a otra acción
-    for (const [k, v] of Object.entries(bindings)) {
-      if (k !== action && v === newKey) {
-        bindings[k] = null;
-        const otherEl = document.querySelector(`.bindingKeyCell[data-action="${k}"]`);
-        if (otherEl) otherEl.innerHTML = `<kbd>—</kbd>`;
-      }
-    }
-
-    bindings[action] = newKey;
-    saveBindings();
-    keyEl.innerHTML = `<kbd>${displayKey(newKey)}</kbd>`;
-    cancelRecording();
-  };
-
-  document.addEventListener("keydown", recordingHandler, true);
-}
-
-// ── Puente para la UI React (Fase 1) ──────────────────────────────────
-// `bindings` sigue siendo la única fuente de verdad que consume el input del
-// juego. React lee/escribe a través de esta API; la captura de tecla la hace
-// el componente React y llama rebindKey(). El render legacy (mobiglass) sigue
-// usando bindings directamente y se mantiene coherente al leer getBindings().
-const _bindingsListeners = [];
-function onBindingsChange(fn) {
-  _bindingsListeners.push(fn);
-  return () => {
-    const i = _bindingsListeners.indexOf(fn);
-    if (i >= 0) _bindingsListeners.splice(i, 1);
-  };
-}
-function _emitBindingsChange() {
-  const snap = getBindings();
-  _bindingsListeners.forEach(fn => { try { fn(snap); } catch (_) { } });
-}
-function getBindings() { return { ...bindings }; }
-// Reasigna `rawKey` a `action`. Devuelve "ok" | "reserved". Misma lógica que
-// startRecording pero sin DOM (normaliza, rechaza reservadas, desvincula
-// conflictos, persiste y notifica a React).
-function rebindKey(action, rawKey) {
-  const newKey = (rawKey || "").toLowerCase();
-  if (RESERVED_KEYS.has(newKey)) return "reserved";
-  for (const [k, v] of Object.entries(bindings)) {
-    if (k !== action && v === newKey) bindings[k] = null;
-  }
-  bindings[action] = newKey;
-  saveBindings();
-  _emitBindingsChange();
-  return "ok";
-}
-function resetBindings() {
-  bindings = { ...DEFAULT_BINDINGS };
-  saveBindings();
-  _emitBindingsChange();
-}
-
-function renderControlesPane(paneId = "pane-controles") {
-  cancelRecording();
-  const pane = document.getElementById(paneId);
-  if (!pane) return;
-  pane.innerHTML = "";
-
-  const table = document.createElement("table");
-  table.className = "mobiControls bindingTable";
-
-  for (const [action, label] of Object.entries(BINDING_LABELS)) {
-    const tr = document.createElement("tr");
-
-    const tdLabel = document.createElement("td");
-    tdLabel.textContent = i18nt("controls." + action) !== ("controls." + action)
-      ? i18nt("controls." + action) : label;
-
-    const tdKey = document.createElement("td");
-    tdKey.className = "bindingKeyCell";
-    tdKey.dataset.action = action;
-    tdKey.innerHTML = `<kbd>${displayKey(bindings[action])}</kbd>`;
-
-    const tdBtn = document.createElement("td");
-    const btn = document.createElement("button");
-    btn.className = "bindingChangeBtn";
-    btn.textContent = i18nt("controls.change");
-    btn.onclick = () => {
-      startRecording(action, tdKey);
-    };
-    tdBtn.appendChild(btn);
-
-    tr.appendChild(tdLabel);
-    tr.appendChild(tdKey);
-    tr.appendChild(tdBtn);
-    table.appendChild(tr);
-  }
-
-  const resetBtn = document.createElement("button");
-  resetBtn.className = "bindingChangeBtn";
-  resetBtn.style.marginTop = "14px";
-  resetBtn.textContent = i18nt("controls.reset");
-  resetBtn.onclick = () => {
-    bindings = { ...DEFAULT_BINDINGS };
-    saveBindings();
-    renderControlesPane(paneId);
-  };
-
-  const fixedDiv = document.createElement("div");
-  fixedDiv.innerHTML = `
-    <div class="bindingFixedTitle">${i18nt("controls.fixed")}</div>
-    <table class="mobiControls" style="color:#3a5060">
-      <tr><td><kbd>${i18nt("controls.kbMouse")}</kbd></td><td>${i18nt("controls.fxAim")}</td></tr>
-      <tr><td><kbd>${i18nt("controls.kbLClick")}</kbd></td><td>${i18nt("controls.fxFire")}</td></tr>
-      <tr><td><kbd>${i18nt("controls.kbRClick")}</kbd></td><td>${i18nt("controls.fxLock")}</td></tr>
-      <tr><td><kbd>${i18nt("controls.kbTab")}</kbd></td><td>${i18nt("controls.fxScore")}</td></tr>
-      <tr><td><kbd>F1</kbd></td><td>${i18nt("controls.fxMobi")}</td></tr>
-      <tr><td><kbd>Del</kbd></td><td>${i18nt("controls.fxSelfDestruct")}</td></tr>
-    </table>
-  `;
-
-  pane.appendChild(table);
-  pane.appendChild(resetBtn);
-  pane.appendChild(fixedDiv);
-}
+// Controles/keybindings (getBindings, rebindKey, bindingText, renderControlesPane…)
+// viven en game/controls.ts.
 
 
 // triggerPingEffect (+ su cola) vive en game/render/world.ts.
@@ -232,10 +70,6 @@ const menu = document.getElementById("menu");
 // Pestañas, botón de cierre y click-fuera del MobiGlass los gestiona React
 // (MobiGlass.tsx). game.js solo emite el evento "mobi" en open/closeMobiglass.
 // (S.mobiOpen)
-
-function bindingText(action) {
-  return displayKey(bindings[action] || DEFAULT_BINDINGS[action]);
-}
 
 // ── i18n: aplica el idioma guardado al cargar y cablea los selectores ──
 (function initI18n() {
