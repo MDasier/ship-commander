@@ -1,4 +1,5 @@
 // ── Módulos del cliente (ES modules · empaquetados por Vite) ──
+import "./styles.css";
 import { i18nt, applyI18n, onLangChange, setLang, getLang } from "./i18n.js";
 import {
   spawnExplosion, spawnBeamImpact, spawnThrustParticle, spawnSmokeParticle,

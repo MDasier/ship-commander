@@ -4,7 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const gamePath = path.join(__dirname, "..", "client", "game.js");
+const gamePath = path.join(__dirname, "..", "client", "src", "game.js");
 const src = fs.readFileSync(gamePath, "utf8");
 
 const marker = "const SHIP_SHAPES =";
