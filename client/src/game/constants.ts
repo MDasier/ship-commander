@@ -48,7 +48,11 @@ const REACT_SCREENS = new Set(["mainMenu", "soloSetup", "lobby", "room"]);
 // Debe coincidir con server config RESPAWN_DELAY
 const CFG_RESPAWN_DELAY = 5;
 
+// Cooldown del ping de radar (1 cada 3 s)
+const PING_COOLDOWN_MS = 3000;
+
 export {
   DEFAULT_BINDINGS, BINDING_LABELS, RESERVED_KEYS,
   SUPPORT_URL, MENU_SCREENS, REACT_SCREENS, CFG_RESPAWN_DELAY,
+  PING_COOLDOWN_MS,
 };

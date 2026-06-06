@@ -27,6 +27,7 @@ import {
   DEFAULT_BINDINGS, BINDING_LABELS, RESERVED_KEYS,
   SUPPORT_URL, MENU_SCREENS, REACT_SCREENS, CFG_RESPAWN_DELAY,
 } from "./game/constants";
+import { keys, clearKeys, installInput } from "./game/input";
 import {
   applyStoredVolumes, getAudioSettings,
   setAudioEffects, setAudioMusic, setAudioTrack, setAudioMuted,
@@ -236,8 +237,6 @@ addEventListener("resize", () => {
 // quedan handles/constantes locales que no comparte ningún otro módulo.
 let gameOverTimer = null;
 
-const PING_COOLDOWN_MS = 3000;
-
 // ── Client-side interpolation ──────────────────
 const INTERP_DELAY = 80;  // ms behind server time (~2.5 ticks at 30fps)
 const MAX_BUFFER = 12;
@@ -293,16 +292,8 @@ function applyInterpolatedState() {
   if (S.stateBuffer.length > MAX_BUFFER) S.stateBuffer.splice(0, S.stateBuffer.length - MAX_BUFFER);
 }
 
-const keys = {};
-
-// Suelta todas las teclas a la vez (evita inputs "atascados" al perder el foco,
-// alt-tab, abrir el chat o un panel). El movimiento se lee de este estado.
-function clearKeys() {
-  for (const k in keys) keys[k] = false;
-}
-// Si la ventana pierde el foco o se oculta la pestaña, soltamos todo.
-addEventListener("blur", clearKeys);
-document.addEventListener("visibilitychange", () => { if (document.hidden) clearKeys(); });
+// `keys` y `clearKeys` (estado de teclas) viven en game/input.ts; el render loop
+// y openChat/returnToLobby los consumen importados.
 
 const menu = document.getElementById("menu");
 
@@ -432,12 +423,7 @@ function chatSend(text) {
   closeChat();
 }
 
-canvas.addEventListener("mousemove", e => {
-  S.mouseX = e.clientX;
-  S.mouseY = e.clientY;
-});
-
-document.addEventListener("contextmenu", e => e.preventDefault());
+// Listeners de ratón/teclado registrados por game/input.ts (installInput).
 
 // ── Weapon heat system
 let weaponFireTimer = null;
@@ -545,30 +531,7 @@ function releaseBeamCharge(cancel = false) {
 //  if (S.weaponHeat > 0) S.weaponHeat = Math.max(0, S.weaponHeat - HEAT_DECAY_AMT);
 //}, HEAT_DECAY_MS);
 
-canvas.addEventListener("mousedown", e => {
-  if (!S.inGame) return;
-  const me = getMe();
-  if (!me || me.dead) return;
-  if (e.button === 0) {
-    if (isCapitalPilot()) { startBeamCharge(); return; }
-    stopAutoFire();
-    S.mouseLeftHeld = true;
-    fireWeapon();
-  } else if (e.button === 2) {
-    // Clic der: ciclar objetivo; al pasar del último → deslockear
-    cycleTargetByRadar();
-  }
-});
-
-canvas.addEventListener("mouseup", e => {
-  if (e.button === 0) { releaseBeamCharge(); stopAutoFire(); }
-});
-
-// El ratón sale del canvas: cancelar la carga (no disparar) para no soltar el rayo sin querer
-canvas.addEventListener("mouseleave", () => { releaseBeamCharge(true); stopAutoFire(); });
-
-// Perder el foco de la ventana (alt-tab, clic fuera): cancelar la carga del rayo
-addEventListener("blur", () => { releaseBeamCharge(true); stopAutoFire(); });
+// (listeners de ratón en game/input.ts)
 
 // ── Spectator
 function cycleSpectator() {
@@ -1007,164 +970,7 @@ function getTurretOptions() {
 
 // Las previews se dibujan en buildShipCards() al recibir el init del servidor
 
-addEventListener("keydown", e => {
-  const tag = document.activeElement?.tagName;
-  if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return;
-
-  const key = e.key.toLowerCase();
-  keys[key] = true;
-
-  // Evita que teclas de juego desplacen la página (espacio y flechas hacen scroll)
-  if (key === " " || key === "spacebar" || key.startsWith("arrow")) e.preventDefault();
-
-  if (bindings.brake && key === bindings.brake) {
-    const me = getMe();
-    if (me && !me.dead) {
-      ws.send(JSON.stringify({ type: "brake" }));
-    }
-  }
-
-  if (bindings.scan && key === bindings.scan) {
-    const me = getMe();
-    const now = performance.now();
-    if (me && !me.dead && now >= S.nextPingAt) {
-      S.nextPingAt = now + PING_COOLDOWN_MS;   // 1 ping cada 3 s
-      S.scanUntil = now + 8000;
-      S.pingEnemiesUntil = now + 2000;
-      triggerPingEffect(me.x, me.y);
-      initAudio();         // asegura el contexto de audio en este gesto de tecla
-      playPingSound();     // sonar tipo Star Citizen
-    }
-  }
-
-  if (bindings.inertiaDamp && key === bindings.inertiaDamp) {
-    const me = getMe();
-    if (me && !me.dead) S.inertiaDampActive = !S.inertiaDampActive;
-  }
-
-  // Fallback teclado: shoot / missile
-  if (bindings.shoot && key === bindings.shoot) {
-    if (isCapitalPilot()) {
-      startBeamCharge();
-    } else {
-      ws.send(JSON.stringify({ type: "shoot" }));
-      playShootSound();
-    }
-  }
-  if (bindings.missile && key === bindings.missile && S.targetId) {
-    const meM = getMe();
-    const ready = meM && (meM.missileCooldown ?? 0) <= 0 &&
-      (meM.missilesActive ?? 0) < (meM.maxMissiles ?? 0);
-    if (ready) {
-      ws.send(JSON.stringify({ type: "missile", targetId: S.targetId }));
-      playMissileSound();
-    } else {
-      playAlertSound("noMissile");   // sin misiles disponibles / en recarga
-    }
-  }
-
-  // Tab: scoreboard (mantener) — en modo espectador cicla cámaras
-  if (e.key === "Tab") {
-    e.preventDefault();
-    const meNow = getMe();
-    if (meNow && meNow.dead) {
-      cycleSpectator();
-    } else {
-      S.showScoreboard = true;
-    }
-  }
-
-  if (bindings.respawn && key === bindings.respawn) {
-    const meNow = getMe();
-    // Vidas: en oleadas hace falta pool del equipo > 0; en PVP/vuelo libre es infinito
-    const canRespawn = S.waveMode ? (S.teamLives ?? 0) > 0 : true;
-    if (meNow && meNow.dead && canRespawn) {
-      const elapsed = S.clientDeadAt ? Date.now() - S.clientDeadAt : 99999;
-      if (elapsed >= (CFG_RESPAWN_DELAY * 1000)) {
-        ws.send(JSON.stringify({ type: "respawn" }));
-      }
-    }
-  }
-
-  if (key === "enter" && !S.chatInputOpen) {
-    e.preventDefault();
-    const meNow = getMe();
-    if (meNow && !meNow.dead) openChat();
-  }
-
-  if (bindings.flare && key === bindings.flare) {
-    const meF = getMe();
-    if (meF && !meF.pilotingFor && (meF.flaresLeft ?? 1) <= 0) {
-      playAlertSound("noFlare");     // sin bengalas en el pool de esta vida
-    } else {
-      ws.send(JSON.stringify({ type: "flare" }));
-    }
-  }
-
-  // Habilidad especial (EMP del Disruptor / mina del Interceptor)
-  if (bindings.special && key === bindings.special) {
-    const meNow = getMe();
-    if (meNow && !meNow.dead && !meNow.pilotingFor) {
-      ws.send(JSON.stringify({ type: "special" }));
-    }
-  }
-
-  if (e.key === "F1") {
-    e.preventDefault();
-    initAudio();
-    if (S.mobiOpen) closeMobiglass();
-    else openMobiglass();
-  }
-
-  if (e.key === "Delete") {
-    if (e.repeat) return;
-    e.preventDefault();
-    if (S.chatInputOpen) return;
-    const meNow = getMe();
-    if (!meNow || meNow.dead) return;
-    if (sdState === "countdown") cancelSd();
-    else if (!sdState) startSdCharge();
-  }
-});
-
-addEventListener("keyup", e => {
-  // El estado de tecla SIEMPRE se limpia, aunque el foco esté en un input;
-  // de lo contrario una tecla soltada mientras se escribe se quedaría "pegada".
-  keys[e.key.toLowerCase()] = false;
-
-  const tag = document.activeElement?.tagName;
-  if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return;
-
-  if (e.key === "Tab") S.showScoreboard = false;
-  if (e.key === "Delete" && sdState === "charging") cancelSd();
-  if (bindings.shoot && e.key.toLowerCase() === bindings.shoot && S.beamHeld) releaseBeamCharge();
-});
-
-setInterval(() => {
-  if (!S.inGame) return;
-  const me = getMe();
-  if (!me || me.dead) { S.beamHeld = false; S.beamWasReady = false; S.abilityWasReady = true; return; }  // evita carga "atascada" tras morir
-  // Aviso eléctrico al quedar el rayo totalmente cargado (solo en el flanco de subida)
-  const beamReady = me.shipType === "capital" && (me.beamCharge ?? 0) >= 0.999;
-  if (beamReady && !S.beamWasReady) playBeamReadySound();
-  S.beamWasReady = beamReady;
-  // Aviso al quedar lista la habilidad [X] (EMP / mina), solo en el flanco de subida
-  const hasAbility = !me.pilotingFor && (me.shipType === "emp" || me.shipType === "interceptor");
-  const abilityCd = me.shipType === "emp" ? (me.empCooldown ?? 0) : (me.mineCooldown ?? 0);
-  const abilityReady = hasAbility && abilityCd <= 0;
-  if (abilityReady && !S.abilityWasReady) playAbilityReadySound();
-  S.abilityWasReady = abilityReady;
-  const targetAngle = Math.atan2(S.mouseY - canvas.height / 2, S.mouseX - canvas.width / 2);
-  ws.send(JSON.stringify({
-    type: "input",
-    thrust: !!(bindings.thrust && keys[bindings.thrust]),
-    reverse: !!(bindings.reverse && keys[bindings.reverse]),
-    strafeLeft: !!(bindings.strafeLeft && keys[bindings.strafeLeft]),
-    strafeRight: !!(bindings.strafeRight && keys[bindings.strafeRight]),
-    inertiaDamp: S.inertiaDampActive,
-    targetAngle
-  }));
-}, 33);
+// (handlers de teclado + envio de input ~30/s en game/input.ts)
 
 function getMe() {
   return S.players[S.myId];
@@ -3285,5 +3091,27 @@ export {
   // Overlays en partida: game over / chat / panel de muerte (puente para React)
   gameRestart, chatSend, getTurretOptions,
 };
+
+// Registra los listeners de input (teclado/ratón) inyectando las funciones del
+// motor que necesitan. Se hace aquí, al final, cuando ya están todas definidas.
+installInput({
+  canvas,
+  getBindings,
+  getSdState: () => sdState,
+  getMe,
+  isCapitalPilot,
+  fireWeapon,
+  stopAutoFire,
+  startBeamCharge,
+  releaseBeamCharge,
+  cycleTargetByRadar,
+  cycleSpectator,
+  triggerPingEffect,
+  openChat,
+  openMobiglass,
+  closeMobiglass,
+  cancelSd,
+  startSdCharge,
+});
 
 loop();
