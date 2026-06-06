@@ -61,7 +61,7 @@ export default function MainMenu() {
       <LangToggle lang={lang} onChange={setLang} />
 
       <div className="relative z-[1] flex min-h-full animate-gs-fade flex-col items-center justify-center gap-11 px-6 py-20">
-        <BrandTitle size={58} subtitle={t("menu.subtitle")} />
+        <BrandTitle size={58} />
 
         {/* Fila de Tag */}
         <div className="w-full max-w-[560px]">

@@ -233,7 +233,7 @@ export default function Room() {
       </div>
 
       <div className="relative z-[1] mx-auto flex min-h-full max-w-[1180px] animate-gs-fade flex-col items-center gap-6 px-6 pb-16 pt-8">
-        <BrandTitle size={44} />
+        <BrandTitle size={44} sub={false} />
         <span className="gs-eyebrow">{t("room.title")}</span>
 
         {/* Config de sala */}

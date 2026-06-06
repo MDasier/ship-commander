@@ -38,7 +38,7 @@ export default function FlySolo() {
       </div>
 
       <div className="relative z-[1] flex min-h-full animate-gs-fade flex-col items-center gap-6 px-6 pb-16 pt-8">
-        <BrandTitle size={44} />
+        <BrandTitle size={44} sub={false} />
         <span className="gs-eyebrow">{t("solo.title")}</span>
 
         <div className="flex w-full max-w-[640px] flex-col gap-6">

@@ -134,7 +134,10 @@ export function Icon({
 }
 
 // ── Título de marca ──────────────────────────────────────────
-export function BrandTitle({ size = 58, subtitle }: { size?: number; subtitle?: string }) {
+// Réplica del handoff (ui.jsx BrandTitle): título + subtítulo "TOP-DOWN AERIAL
+// COMBAT" (cuando sub) + crédito "powered by Erodd" (siempre). El subtítulo va
+// dentro del h1 en em para escalar con el tamaño del título.
+export function BrandTitle({ size = 58, sub = true }: { size?: number; sub?: boolean }) {
   return (
     <div className="text-center">
       <h1
@@ -142,10 +145,24 @@ export function BrandTitle({ size = 58, subtitle }: { size?: number; subtitle?: 
         style={{ fontSize: size, textShadow: "0 0 24px rgba(255,198,25,0.45), 0 0 2px rgba(255,198,25,0.6)" }}
       >
         Ship Commander
+        {sub && (
+          <span
+            className="block font-body font-bold text-gs-grey-2"
+            style={{
+              fontSize: "0.18em",
+              letterSpacing: "0.42em",
+              marginTop: "0.6em",
+              paddingLeft: "0.42em",
+              textShadow: "none",
+            }}
+          >
+            TOP-DOWN AERIAL COMBAT
+          </span>
+        )}
       </h1>
-      {subtitle && (
-        <div className="mt-3 font-body text-[0.62rem] font-bold tracking-[0.42em] text-gs-grey-2">{subtitle}</div>
-      )}
+      <div className="mt-2.5 font-body text-[11px] font-semibold uppercase tracking-[0.26em] text-gs-grey-3">
+        powered by <span className="font-extrabold tracking-[0.18em] text-gs-gold-bright">Erodd</span>
+      </div>
     </div>
   );
 }

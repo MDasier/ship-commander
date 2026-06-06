@@ -80,7 +80,7 @@ export default function CoopRooms() {
       </div>
 
       <div className="relative z-[1] flex min-h-full animate-gs-fade flex-col items-center gap-7 px-6 pb-20 pt-8">
-        <BrandTitle size={46} />
+        <BrandTitle size={46} sub={false} />
 
         <div className="flex w-full max-w-[720px] flex-col gap-5">
           <div className="flex justify-center gap-3">
