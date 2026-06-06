@@ -156,10 +156,4 @@ The project is actively evolving and currently includes:
 
 ## 👤 Author
 
-Powered by MDasier (https://github.com/MDasier)
-
----
-
-## 📄 License
-
-Add your license here (MIT / private / etc.)
+Powered by [MDasier](https://github.com/MDasier)
