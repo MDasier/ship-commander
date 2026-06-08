@@ -3,3 +3,4 @@ node_modules/
 dist/
 /Ship Commander-handoff.zip
 /.design-handoff/
+aiOLD.ts
